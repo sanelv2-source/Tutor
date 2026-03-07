@@ -18,41 +18,104 @@ import {
   Link as LinkIcon,
   FileText
 } from 'lucide-react';
+import Logo from './Logo';
 
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('rapporter');
   const [reportStatus, setReportStatus] = useState<'great' | 'good' | 'needs_focus'>('great');
   const [masteryLevel, setMasteryLevel] = useState(80);
+  const [isSendingVipps, setIsSendingVipps] = useState<number | null>(null);
 
   // Mock data
-  const students = [
-    { id: 1, name: 'Jonas Berg', subject: 'Matte R1', parent: 'Kari Berg', phone: '987 65 432' },
-    { id: 2, name: 'Sofie Lien', subject: 'Fysikk 1', parent: 'Ola Lien', phone: '456 78 901' },
-    { id: 3, name: 'Emil Hansen', subject: 'Gitar', parent: 'Ingrid Hansen', phone: '123 45 678' },
-  ];
+  const [students, setStudents] = useState([
+    { id: 1, name: 'Jonas Berg', subject: 'Matte R1', parent: 'Kari Berg', phone: '987 65 432', parentEmail: 'sanelv2@gmail.com' },
+    { id: 2, name: 'Sofie Lien', subject: 'Fysikk 1', parent: 'Ola Lien', phone: '456 78 901', parentEmail: 'sanelv2@gmail.com' },
+    { id: 3, name: 'Emil Hansen', subject: 'Gitar', parent: 'Ingrid Hansen', phone: '123 45 678', parentEmail: 'sanelv2@gmail.com' },
+  ]);
 
-  const schedule = [
-    { id: 1, time: '14:00 - 15:00', student: 'Jonas Berg', subject: 'Matte R1', status: 'upcoming' },
-    { id: 2, time: '16:30 - 17:30', student: 'Sofie Lien', subject: 'Fysikk 1', status: 'upcoming' },
-    { id: 3, time: '18:00 - 19:00', student: 'Emil Hansen', subject: 'Gitar', status: 'completed' },
-  ];
+  const [schedule, setSchedule] = useState([
+    { id: 1, time: '14:00 - 15:00', student: 'Jonas Berg', subject: 'Matte R1', status: 'upcoming', amount: 450 },
+    { id: 2, time: '16:30 - 17:30', student: 'Sofie Lien', subject: 'Fysikk 1', status: 'upcoming', amount: 500 },
+    { id: 3, time: '18:00 - 19:00', student: 'Emil Hansen', subject: 'Gitar', status: 'completed', amount: 400 },
+  ]);
 
-  const invoices = [
+  const [invoices, setInvoices] = useState([
     { id: 1, student: 'Jonas Berg', amount: 450, date: '12. Okt', status: 'paid', method: 'Vipps' },
     { id: 2, student: 'Sofie Lien', amount: 500, date: '10. Okt', status: 'pending', method: 'Faktura' },
     { id: 3, student: 'Emil Hansen', amount: 400, date: '05. Okt', status: 'paid', method: 'Vipps' },
-  ];
+  ]);
+
+  const handleSendVippsRequest = async (sessionId: number) => {
+    setIsSendingVipps(sessionId);
+    
+    const session = schedule.find(s => s.id === sessionId);
+    const student = students.find(s => s.name === session?.student);
+    
+    if (!session || !student) {
+      setIsSendingVipps(null);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/payment/vipps-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          teacherName: user?.name || 'Lærer',
+          amount: session.amount,
+          phone: student.phone,
+          parentEmail: student.parentEmail,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke sende Vipps-krav');
+      }
+
+      // Update session status to 'pending_payment'
+      setSchedule(prev => prev.map(s => 
+        s.id === sessionId ? { ...s, status: 'pending_payment' } : s
+      ));
+
+      // Add to invoices
+      const newInvoice = {
+        id: Date.now(),
+        student: student.name,
+        amount: session.amount,
+        date: new Date().toLocaleDateString('no-NB', { day: '2-digit', month: 'short' }),
+        status: 'pending',
+        method: 'Vipps'
+      };
+      setInvoices(prev => [newInvoice, ...prev]);
+
+    } catch (error) {
+      console.error('Error sending Vipps request:', error);
+      alert('Det oppstod en feil ved sending av Vipps-krav.');
+    } finally {
+      setIsSendingVipps(null);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans pb-16 md:pb-0">
       
-      {/* Sidebar Navigation */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col">
+      {/* Mobile Header */}
+      <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-20">
+        <Logo iconSize="w-6 h-6 text-base" textSize="text-lg" />
+        <button onClick={onLogout} className="p-2 text-slate-500 hover:text-slate-900">
+          <LogOut className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Desktop Sidebar Navigation */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col h-screen sticky top-0">
         <div className="h-20 flex items-center px-6 border-b border-slate-100">
           <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" />
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           <button 
             onClick={() => setActiveTab('oversikt')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'oversikt' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -94,8 +157,40 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
         </div>
       </aside>
 
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center h-16 px-2 z-30 pb-safe">
+        <button 
+          onClick={() => setActiveTab('oversikt')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'oversikt' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <Users className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Elever</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('timeplan')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'timeplan' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <CalendarIcon className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Timeplan</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('betaling')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'betaling' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <CreditCard className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Betaling</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('rapporter')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'rapporter' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Rapporter</span>
+        </button>
+      </nav>
+
       {/* Main Content */}
-      <main className="flex-1 p-6 sm:p-10 overflow-y-auto">
+      <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
@@ -162,21 +257,37 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                 </h2>
                 <div className="space-y-4">
                   {schedule.map((session) => (
-                    <div key={session.id} className={`p-4 rounded-xl border-l-4 flex items-center justify-between ${session.status === 'completed' ? 'bg-slate-50 border-slate-300 opacity-70' : 'bg-indigo-50 border-indigo-600'}`}>
+                    <div key={session.id} className={`p-4 rounded-xl border-l-4 flex items-center justify-between ${session.status === 'completed' || session.status === 'pending_payment' ? 'bg-slate-50 border-slate-300 opacity-70' : 'bg-indigo-50 border-indigo-600'}`}>
                       <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${session.status === 'completed' ? 'bg-slate-200 text-slate-500' : 'bg-indigo-100 text-indigo-600'}`}>
-                          {session.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${session.status === 'completed' || session.status === 'pending_payment' ? 'bg-slate-200 text-slate-500' : 'bg-indigo-100 text-indigo-600'}`}>
+                          {session.status === 'completed' || session.status === 'pending_payment' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
                         </div>
                         <div>
-                          <p className={`font-bold ${session.status === 'completed' ? 'text-slate-700' : 'text-indigo-900'}`}>{session.time}</p>
+                          <p className={`font-bold ${session.status === 'completed' || session.status === 'pending_payment' ? 'text-slate-700' : 'text-indigo-900'}`}>{session.time}</p>
                           <p className="text-sm text-slate-600">{session.student} • {session.subject}</p>
+                          {session.status === 'pending_payment' && (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
+                              Venter på betaling
+                            </span>
+                          )}
                         </div>
                       </div>
-                      {session.status === 'upcoming' && (
-                        <button className="text-sm font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 bg-white transition-colors">
-                          Flytt
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {session.status === 'upcoming' && (
+                          <button className="text-sm font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 bg-white transition-colors">
+                            Flytt
+                          </button>
+                        )}
+                        {session.status === 'completed' && (
+                          <button 
+                            onClick={() => handleSendVippsRequest(session.id)}
+                            disabled={isSendingVipps === session.id}
+                            className="text-sm font-medium text-white bg-[#ff5b24] hover:bg-[#e04a1a] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70 flex items-center gap-2"
+                          >
+                            {isSendingVipps === session.id ? 'Sender...' : 'Send Vipps-krav'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -7,6 +7,8 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
+  const [usePassword, setUsePassword] = useState(false);
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
@@ -67,6 +69,34 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'En feil oppstod');
+      setIsLoading(false);
+    }
+  };
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunne ikke sende magisk lenke');
+      }
+
+      setIsMagicLinkSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'En ukjent feil oppstod');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -138,87 +168,114 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
               {error}
             </div>
           )}
-          
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-                E-postadresse
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
-                  placeholder="din@epost.no"
-                />
-              </div>
-            </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                Passord
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
-                  placeholder="••••••••"
-                />
+          {isMagicLinkSent ? (
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-emerald-100 mb-4">
+                <Mail className="h-6 w-6 text-emerald-600" />
               </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
-                  Husk meg
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
-                  Glemt passord?
-                </a>
-              </div>
-            </div>
-
-            <div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Sjekk e-posten din</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Vi har sendt en magisk innloggingslenke til <strong>{email}</strong>. Klikk på lenken i e-posten for å logge inn.
+              </p>
               <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                onClick={() => setIsMagicLinkSent(false)}
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
               >
-                {isLoading ? 'Logger inn...' : (
-                  <>
-                    Logg inn
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
+                Prøv en annen e-postadresse
               </button>
             </div>
-          </form>
+          ) : (
+            <form className="space-y-6" onSubmit={usePassword ? handleSubmit : handleMagicLink}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                  E-postadresse
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                    placeholder="din@epost.no"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div className="mt-6">
+              {usePassword && (
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                    Passord
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
+                    Husk meg
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <button 
+                    type="button" 
+                    onClick={() => setUsePassword(!usePassword)}
+                    className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                  >
+                    {usePassword ? 'Bruk magisk lenke' : 'Logg inn med passord'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Sender...' : (
+                    <>
+                      {usePassword ? 'Logg inn' : 'Send magisk lenke'}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!isMagicLinkSent && (
+            <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
@@ -263,6 +320,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
               </div>
             </div>
           </div>
+          )}
         </div>
         
         <p className="mt-8 text-center text-sm text-slate-500">

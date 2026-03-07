@@ -9,7 +9,7 @@ import {
 } from '@stripe/react-stripe-js';
 
 // Replace with your actual publishable key
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
+const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
 
 function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void }) {
   const stripe = useStripe();
@@ -54,7 +54,7 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
         clientSecret,
         {
           payment_method: {
-            card: cardElement,
+            card: cardElement as any,
             billing_details: {
               email: user?.email,
               name: user?.name,

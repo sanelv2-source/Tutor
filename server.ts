@@ -18,7 +18,7 @@ function getStripe(): Stripe {
     if (!key) {
       throw new Error('STRIPE_SECRET_KEY environment variable is required');
     }
-    stripeClient = new Stripe(key, { apiVersion: '2023-10-16' });
+    stripeClient = new Stripe(key, { apiVersion: '2025-02-24.acacia' as any });
   }
   return stripeClient;
 }
@@ -34,6 +34,60 @@ async function startServer() {
   }
 
   // API routes
+  app.post("/api/auth/magic-link", async (req, res) => {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "E-post er påkrevd" });
+    }
+
+    // Create user if they don't exist
+    if (!users.has(email)) {
+      users.set(email, { name: email.split('@')[0], email, password: '', verified: false, hasPaid: false, token: null });
+    }
+
+    const user = users.get(email);
+    const token = crypto.randomBytes(32).toString("hex");
+    user.token = token;
+    users.set(email, user);
+
+    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+    const magicLink = `${appUrl}/?verify=${token}`;
+
+    if (resend) {
+      try {
+        const data = await resend.emails.send({
+          from: "TutorFlyt <onboarding@resend.dev>",
+          to: email,
+          subject: "Innlogging til TutorFlyt",
+          html: `
+            <h1>Logg inn på TutorFlyt</h1>
+            <p>Klikk på lenken under for å logge inn på din konto:</p>
+            <a href="${magicLink}" style="display:inline-block;padding:12px 24px;background-color:#4f46e5;color:white;text-decoration:none;border-radius:6px;font-weight:bold;margin-top:16px;">Logg inn</a>
+            <p style="margin-top:24px;font-size:12px;color:#666;">Eller kopier og lim inn denne lenken i nettleseren din:</p>
+            <p style="font-size:12px;color:#666;">${magicLink}</p>
+          `,
+        });
+        
+        if (data.error) {
+          console.error("Resend API returned an error:", data.error);
+          return res.status(500).json({ error: "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend." });
+        }
+      } catch (error) {
+        console.error("Failed to send email:", error);
+        return res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
+      }
+    } else {
+      console.log("=========================================");
+      console.log("RESEND_API_KEY not set. Simulating magic link email:");
+      console.log(`To: ${email}`);
+      console.log(`Magic Link: ${magicLink}`);
+      console.log("=========================================");
+    }
+
+    res.json({ message: "Magisk lenke sendt", token });
+  });
+
   app.post("/api/auth/signup", async (req, res) => {
     const { name, email, password } = req.body;
     
@@ -308,6 +362,53 @@ async function startServer() {
     user.hasPaid = true;
     users.set(email, user);
     
+    res.json({ success: true });
+  });
+
+  app.post("/api/payment/vipps-request", async (req, res) => {
+    const { teacherName, amount, phone, parentEmail } = req.body;
+
+    if (!teacherName || !amount || !phone || !parentEmail) {
+      return res.status(400).json({ error: "Mangler nødvendig informasjon" });
+    }
+
+    if (resend) {
+      try {
+        const data = await resend.emails.send({
+          from: "TutorFlyt <onboarding@resend.dev>",
+          to: parentEmail,
+          subject: `Vipps-krav fra ${teacherName} - TutorFlyt`,
+          html: `
+            <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h2 style="color: #111827;">Betaling for undervisning</h2>
+              <p style="color: #4b5563; font-size: 16px; line-height: 1.5;">
+                Lærer <strong>${teacherName}</strong> har fullført timen.
+              </p>
+              <div style="background-color: #f9fafb; padding: 16px; border-radius: 6px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 18px; color: #111827;">Vennligst Vipps <strong>${amount} kr</strong> til:</p>
+                <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #ff5b24;">${phone}</p>
+              </div>
+              <p style="color: #6b7280; font-size: 14px;">Takk for at du bruker TutorFlyt!</p>
+            </div>
+          `,
+        });
+        
+        if (data.error) {
+          console.error("Resend API returned an error:", data.error);
+          return res.status(500).json({ error: "Kunne ikke sende e-post." });
+        }
+      } catch (error) {
+        console.error("Failed to send email:", error);
+        return res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
+      }
+    } else {
+      console.log("=========================================");
+      console.log("RESEND_API_KEY not set. Simulating Vipps request email:");
+      console.log(`To: ${parentEmail}`);
+      console.log(`Message: Lærer ${teacherName} har fullført timen. Vennligst Vipps ${amount} til ${phone}.`);
+      console.log("=========================================");
+    }
+
     res.json({ success: true });
   });
 
