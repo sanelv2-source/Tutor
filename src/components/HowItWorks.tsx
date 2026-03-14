@@ -31,34 +31,15 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
         <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto mb-24">
           <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-slate-900 aspect-video group">
             <video 
-              className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-500"
+              className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
               autoPlay 
               muted 
               loop 
               playsInline
             >
-              {/* 
-                TODO: Bytt ut denne URL-en med din genererte video.
-                
-                Din prompt for videogenerering (f.eks. i Google Veo, Sora eller Runway):
-                "Generer en profesjonell produktvideo for min app 'TutorFlyt'.
-                Intro: Start med et kort klipp av en blid lærer i 20-årene som sitter foran en laptop og vinker vennlig 'hei' til kameraet i et lyst, moderne kontormiljø.
-                Overgang: Myk overgang (fade) til et rent og moderne digitalt dashboard på en dataskjerm.
-                Dashboard-innhold: Vis en liste over elever, en kalender med musikkundervisning, og en knapp der det står 'Send rapport' som blir trykket på av en musepeker.
-                Stil: Minimalistisk SaaS-stil, lyse farger (hvit og blå/lilla), og høy bildekvalitet.
-                Slutt: Avslutt med en smarttelefon som viser en Vipps-betaling som blir godkjent.
-                Stemning: Trygg, effektiv og inspirerende. Ingen lyd, da jeg skal ha den som bakgrunnsvideo."
-              */}
-              <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4" />
+              <source src="https://jshciiidthsxjhwlxmbh.supabase.co/storage/v1/object/sign/Video/63328-506377472_medium.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iMDI1N2Q0Mi04YTljLTQ2OWItOGY2Yy1lZjJiMjE3ZmI0YTAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlby82MzMyOC01MDYzNzc0NzJfbWVkaXVtLm1wNCIsImlhdCI6MTc3MzQ4MjkxOCwiZXhwIjoxODA1MDE4OTE4fQ.W2KgNPPrxQB_9X2dmIsUVKcuILC8GCnOoX5WB6mbAIE" type="video/mp4" />
               Din nettleser støtter ikke video-taggen.
             </video>
-            
-            {/* Midlertidig overlay for å vise at dette er en placeholder */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-               <div className="bg-black/40 backdrop-blur-md text-white px-6 py-3 rounded-full text-sm font-medium border border-white/20 shadow-lg">
-                 Din produktvideo kommer her
-               </div>
-            </div>
           </div>
         </section>
 
