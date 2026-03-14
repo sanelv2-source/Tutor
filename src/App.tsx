@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { supabase } from './supabaseClient';
 import Login from './components/Login';
 import Landing from './components/Landing';
 import Dashboard from './components/Dashboard';
@@ -6,49 +8,145 @@ import Signup from './components/Signup';
 import Payment from './components/Payment';
 import Verify from './components/Verify';
 import Privacy from './components/Privacy';
+import Terms from './components/Terms';
 import Contact from './components/Contact';
+import About from './components/About';
+import EmailPreview from './components/EmailPreview';
+import ClientPortal from './components/ClientPortal';
+import HowItWorks from './components/HowItWorks';
+import Pricing from './components/Pricing';
+import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
+import Unauthorized from './components/Unauthorized';
 
 export default function App() {
-  const [page, setPage] = useState('landing');
-  const [verificationToken, setVerificationToken] = useState<string | null>(null);
-  const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean} | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string} | null>(() => {
+    const saved = localStorage.getItem('tutorflyt_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // Save user to localStorage whenever it changes
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('tutorflyt_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('tutorflyt_user');
+    }
+  }, [user]);
 
   useEffect(() => {
-    // Check for verification token in URL
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('verify');
-    if (token) {
-      setVerificationToken(token);
-      setPage('verify');
+    // Check for verify token in URL
+    const params = new URLSearchParams(location.search);
+    const verifyToken = params.get('verify');
+    if (verifyToken) {
+      navigate(`/verify?token=${verifyToken}`);
     }
-  }, []);
+  }, [location.search, navigate]);
 
-  // Auth Guards
-  if (page === 'dashboard' && !user) {
-    setPage('login');
-    return null;
-  }
-  
-  if (page === 'dashboard' && user && !user.hasPaid) {
-    setPage('payment');
-    return null;
-  }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(prev => prev || {
+          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
+          email: session.user.email || '',
+          hasPaid: true,
+          role: 'tutor'
+        });
+      }
+    });
 
-  if (page === 'payment' && !user) {
-    setPage('login');
-    return null;
-  }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
+          email: session.user.email || '',
+          hasPaid: true,
+          role: 'tutor'
+        });
+        if (_event === 'SIGNED_IN') {
+          navigate('/tutor/dashboard');
+        }
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const showNavbar = ['/', '/how-it-works', '/pricing', '/privacy', '/terms', '/contact', '/about'].includes(location.pathname);
+
+  // Helper function to pass to legacy components that still use onNavigate
+  const handleNavigate = (page: string) => {
+    const routes: Record<string, string> = {
+      'landing': '/',
+      'login': '/login',
+      'signup': '/signup',
+      'dashboard': '/tutor/dashboard',
+      'portal': '/student/portal',
+      'payment': '/payment',
+      'verify': '/verify',
+      'how-it-works': '/how-it-works',
+      'pricing': '/pricing',
+      'privacy': '/privacy',
+      'terms': '/terms',
+      'contact': '/contact',
+      'about': '/about',
+      'emails': '/emails',
+      'unauthorized': '/unauthorized'
+    };
+    navigate(routes[page] || '/');
+  };
 
   return (
     <>
-      {page === 'login' && <Login onNavigate={setPage} setUser={setUser} />}
-      {page === 'signup' && <Signup onNavigate={setPage} />}
-      {page === 'payment' && <Payment onNavigate={setPage} user={user} setUser={setUser} />}
-      {page === 'dashboard' && <Dashboard onNavigate={setPage} user={user} onLogout={() => { setUser(null); setPage('landing'); }} />}
-      {page === 'landing' && <Landing onNavigate={setPage} />}
-      {page === 'verify' && verificationToken && <Verify token={verificationToken} onNavigate={setPage} />}
-      {page === 'privacy' && <Privacy onNavigate={setPage} />}
-      {page === 'contact' && <Contact onNavigate={setPage} />}
+      {showNavbar && <Navbar onNavigate={handleNavigate} />}
+      <Routes>
+        <Route path="/" element={<Landing onNavigate={handleNavigate} setUser={setUser} />} />
+        <Route path="/login" element={<Login onNavigate={handleNavigate} setUser={setUser} />} />
+        <Route path="/signup" element={<Signup onNavigate={handleNavigate} />} />
+        <Route path="/payment" element={<Payment onNavigate={handleNavigate} user={user} setUser={setUser} />} />
+        
+        {/* Kun lærere kan se dashboardet sitt */}
+        <Route path="/tutor/dashboard" element={
+          <ProtectedRoute allowedRole="tutor" user={user}>
+            <Dashboard onNavigate={handleNavigate} user={user} onLogout={async () => { 
+              await supabase.auth.signOut();
+              setUser(null); 
+              navigate('/'); 
+            }} />
+          </ProtectedRoute>
+        } />
+        
+        {/* Kun eleven kan se sin portal */}
+        <Route path="/student/portal" element={
+          <ProtectedRoute allowedRole="student" user={user}>
+            <ClientPortal portalId="default" />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/verify" element={<Verify onNavigate={handleNavigate} setUser={setUser} />} />
+        <Route path="/how-it-works" element={<HowItWorks onNavigate={handleNavigate} />} />
+        <Route path="/pricing" element={<Pricing onNavigate={handleNavigate} />} />
+        <Route path="/privacy" element={<Privacy onNavigate={handleNavigate} />} />
+        <Route path="/terms" element={<Terms onNavigate={handleNavigate} />} />
+        <Route path="/contact" element={<Contact onNavigate={handleNavigate} />} />
+        <Route path="/about" element={<About onNavigate={handleNavigate} />} />
+        <Route path="/emails" element={<EmailPreview onNavigate={handleNavigate} />} />
+        <Route path="/unauthorized" element={<Unauthorized onNavigate={handleNavigate} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 }

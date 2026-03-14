@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
+import { supabase } from '../supabaseClient';
 
 export default function Login({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
   const [email, setEmail] = useState('');
@@ -79,23 +80,20 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setError('');
 
     try {
-      const response = await fetch('/api/auth/magic-link', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/tutor/dashboard`,
         },
-        body: JSON.stringify({ email }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Kunne ikke sende magisk lenke');
+      if (error) {
+        throw error;
       }
 
       setIsMagicLinkSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'En ukjent feil oppstod');
+      setError(err instanceof Error ? err.message : 'Kunne ikke sende magisk lenke');
     } finally {
       setIsLoading(false);
     }
@@ -115,28 +113,28 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Innlogging feilet');
       }
 
+      const data = await response.json();
       setUser(data.user);
       
-      if (data.user.hasPaid) {
-        onNavigate('dashboard');
+      if (data.user.role === 'student') {
+        onNavigate('portal');
       } else {
-        onNavigate('payment');
+        onNavigate('dashboard');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'En ukjent feil oppstod');
+      setError(err instanceof Error ? err.message : 'Innlogging feilet');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative">
+    <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative">
       <button 
         onClick={() => onNavigate('landing')}
         className="absolute top-6 left-6 sm:top-8 sm:left-8 flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -149,11 +147,12 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
         <div className="flex justify-center cursor-pointer" onClick={() => onNavigate('landing')}>
           <Logo iconSize="w-16 h-16 text-4xl" textSize="text-3xl" showText={false} />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-          TutorFlyt
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight flex items-center justify-center gap-3">
+          Velkommen til TutorFlyt
+          <Send className="w-8 h-8 text-teal-600" />
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Strømlinjeform din veiledningsvirksomhet
+          Ditt verktøy for en enklere undervisningshverdag
         </p>
       </div>
 
@@ -180,7 +179,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
               </p>
               <button
                 onClick={() => setIsMagicLinkSent(false)}
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                className="text-sm font-medium text-teal-600 hover:text-teal-500"
               >
                 Prøv en annen e-postadresse
               </button>
@@ -202,7 +201,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                    className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
                     placeholder="din@epost.no"
                     required
                   />
@@ -225,7 +224,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                      className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
                       placeholder="••••••••"
                       required
                     />
@@ -239,7 +238,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                    className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-300 rounded cursor-pointer"
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
                     Husk meg
@@ -250,7 +249,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                   <button 
                     type="button" 
                     onClick={() => setUsePassword(!usePassword)}
-                    className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                    className="font-medium text-teal-600 hover:text-teal-500 transition-colors"
                   >
                     {usePassword ? 'Bruk magisk lenke' : 'Logg inn med passord'}
                   </button>
@@ -261,7 +260,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Sender...' : (
                     <>
@@ -325,7 +324,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
         
         <p className="mt-8 text-center text-sm text-slate-500">
           Har du ikke en konto?{' '}
-          <button onClick={() => onNavigate('signup')} className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+          <button onClick={() => onNavigate('signup')} className="font-medium text-teal-600 hover:text-teal-500 transition-colors">
             Registrer deg her
           </button>
         </p>

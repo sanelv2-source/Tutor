@@ -1,25 +1,11 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Logo from './Logo';
+import Footer from './Footer';
 
 export default function Privacy({ onNavigate }: { onNavigate: (page: string) => void }) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      <header className="border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('landing')}>
-            <Logo iconSize="w-10 h-10 text-xl" textSize="text-2xl" />
-          </div>
-          <button 
-            onClick={() => onNavigate('landing')}
-            className="flex items-center text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Tilbake til forsiden
-          </button>
-        </div>
-      </header>
-
       <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12">
           <h1 className="text-3xl font-bold text-slate-900 mb-8">Personvernerklæring</h1>
@@ -62,14 +48,7 @@ export default function Privacy({ onNavigate }: { onNavigate: (page: string) => 
           </div>
         </div>
       </main>
-      
-      <footer className="bg-white border-t border-slate-100 py-8 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-center">
-          <p className="text-sm text-slate-500">
-            © {new Date().getFullYear()} TutorFlyt.
-          </p>
-        </div>
-      </footer>
+      <Footer onNavigate={onNavigate} />
     </div>
   );
 }

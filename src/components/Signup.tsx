@@ -167,7 +167,25 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
                   onChange={(e) => setPassword(e.target.value)}
                   className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
                   placeholder="Minst 8 tegn"
+                  required
                 />
+              </div>
+            </div>
+
+            <div className="flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="terms"
+                  name="terms"
+                  type="checkbox"
+                  required
+                  className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-slate-300 rounded cursor-pointer"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="terms" className="font-medium text-slate-700 cursor-pointer">
+                  Jeg har lest og aksepterer TutorFlyt sine <button type="button" onClick={() => onNavigate('terms')} className="text-indigo-600 hover:underline">bruksvilkår</button>.
+                </label>
               </div>
             </div>
 

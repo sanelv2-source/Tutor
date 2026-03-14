@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle, ArrowRight } from 'lucide-react';
 
-export default function Verify({ token, onNavigate }: { token: string, onNavigate: (page: string) => void }) {
+export default function Verify({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Bekrefter e-postadressen din...');
+  const [message, setMessage] = useState('Logger inn...');
+  const location = useLocation();
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+
+    if (!token) {
+      setStatus('error');
+      setMessage('Ugyldig lenke: Mangler token');
+      return;
+    }
+
     const verifyEmail = async () => {
       try {
         const response = await fetch('/api/auth/verify', {
@@ -16,12 +27,29 @@ export default function Verify({ token, onNavigate }: { token: string, onNavigat
           body: JSON.stringify({ token }),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-          throw new Error('Ugyldig eller utløpt lenke');
+          throw new Error(data.error || 'Ugyldig eller utløpt lenke');
         }
 
         setStatus('success');
-        setMessage('E-postadressen din er nå bekreftet!');
+        setMessage('Du er nå logget inn!');
+        
+        // Log the user in
+        setUser(data.user);
+        
+        // Remove the token from the URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Redirect to dashboard after a short delay
+        setTimeout(() => {
+          if (data.user.role === 'student') {
+            onNavigate('portal');
+          } else {
+            onNavigate('dashboard');
+          }
+        }, 1500);
       } catch (err) {
         setStatus('error');
         setMessage(err instanceof Error ? err.message : 'Noe gikk galt');
@@ -29,7 +57,7 @@ export default function Verify({ token, onNavigate }: { token: string, onNavigat
     };
 
     verifyEmail();
-  }, [token]);
+  }, [location.search, onNavigate, setUser]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center py-12 sm:px-6 lg:px-8 font-sans">
@@ -59,17 +87,9 @@ export default function Verify({ token, onNavigate }: { token: string, onNavigat
         <p className="text-slate-600 mb-8">{message}</p>
 
         {status === 'success' && (
-          <button
-            onClick={() => {
-              // Remove the token from the URL
-              window.history.replaceState({}, document.title, window.location.pathname);
-              onNavigate('login');
-            }}
-            className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all"
-          >
-            Gå til innlogging
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </button>
+          <div className="w-full flex justify-center items-center py-3 px-4 text-sm font-medium text-indigo-600">
+            Omdirigerer til dashboard...
+          </div>
         )}
 
         {status === 'error' && (

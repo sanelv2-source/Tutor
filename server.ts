@@ -3,6 +3,8 @@ import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
 import crypto from "crypto";
 import Stripe from "stripe";
+import fs from "fs";
+import path from "path";
 
 const app = express();
 const PORT = 3000;
@@ -23,8 +25,32 @@ function getStripe(): Stripe {
   return stripeClient;
 }
 
-// In-memory store for prototype
-const users = new Map(); // email -> { name, email, password, verified, hasPaid, token }
+// File-based store for prototype to survive restarts
+const USERS_FILE = path.join(process.cwd(), 'users.json');
+
+function loadUsers() {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const data = fs.readFileSync(USERS_FILE, 'utf-8');
+      const parsed = JSON.parse(data);
+      return new Map(Object.entries(parsed));
+    }
+  } catch (err) {
+    console.error("Failed to load users:", err);
+  }
+  return new Map();
+}
+
+function saveUsers(usersMap: Map<string, any>) {
+  try {
+    const obj = Object.fromEntries(usersMap);
+    fs.writeFileSync(USERS_FILE, JSON.stringify(obj, null, 2));
+  } catch (err) {
+    console.error("Failed to save users:", err);
+  }
+}
+
+const users = loadUsers(); // email -> { name, email, password, verified, hasPaid, token }
 
 async function startServer() {
   // Initialize Resend with API key if available
@@ -44,34 +70,56 @@ async function startServer() {
     // Create user if they don't exist
     if (!users.has(email)) {
       users.set(email, { name: email.split('@')[0], email, password: '', verified: false, hasPaid: false, token: null });
+      saveUsers(users);
     }
 
     const user = users.get(email);
     const token = crypto.randomBytes(32).toString("hex");
     user.token = token;
     users.set(email, user);
+    saveUsers(users);
 
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const magicLink = `${appUrl}/?verify=${token}`;
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
 
     if (resend) {
       try {
         const data = await resend.emails.send({
-          from: "TutorFlyt <onboarding@resend.dev>",
+          from: fromEmail,
           to: email,
           subject: "Innlogging til TutorFlyt",
           html: `
-            <h1>Logg inn på TutorFlyt</h1>
-            <p>Klikk på lenken under for å logge inn på din konto:</p>
-            <a href="${magicLink}" style="display:inline-block;padding:12px 24px;background-color:#4f46e5;color:white;text-decoration:none;border-radius:6px;font-weight:bold;margin-top:16px;">Logg inn</a>
-            <p style="margin-top:24px;font-size:12px;color:#666;">Eller kopier og lim inn denne lenken i nettleseren din:</p>
-            <p style="font-size:12px;color:#666;">${magicLink}</p>
+            <div style="background-color: #f8fafc; font-family: sans-serif; padding: 40px 20px;">
+              <div style="margin: 0 auto; padding: 40px 32px; background-color: #ffffff; border-radius: 12px; max-width: 600px; border: 1px solid #e2e8f0; text-align: center;">
+                <div style="margin: 0 auto 32px; display: flex; justify-content: center; align-items: center;">
+                  <span style="font-size: 24px; font-weight: bold; color: #0f172a; letter-spacing: -0.025em;">
+                    <span style="color: #4f46e5; margin-right: 8px;">✦</span>
+                    TutorFlyt
+                  </span>
+                </div>
+                <h1 style="color: #0f172a; font-size: 24px; font-weight: bold; margin: 0 0 24px;">Logg inn på TutorFlyt</h1>
+                <p style="color: #475569; font-size: 16px; line-height: 26px; margin: 0 0 20px; text-align: center;">Hei!</p>
+                <p style="color: #475569; font-size: 16px; line-height: 26px; margin: 0 0 20px; text-align: center;">
+                  Klikk på knappen under for å logge inn på din TutorFlyt-konto. Denne lenken er gyldig i 24 timer for din sikkerhet.
+                </p>
+                <div style="margin: 32px 0; text-align: center;">
+                  <a href="${magicLink}" style="background-color: #4f46e5; border-radius: 8px; color: #ffffff; display: inline-block; font-size: 16px; font-weight: bold; text-decoration: none; padding: 16px 32px;">
+                    Logg inn
+                  </a>
+                </div>
+                <hr style="border-color: #e2e8f0; border-style: solid; border-width: 1px 0 0 0; margin: 32px 0 24px;" />
+                <p style="color: #94a3b8; font-size: 14px; line-height: 22px; text-align: center;">
+                  Hvis du ikke ba om denne e-posten, kan du trygt ignorere den.
+                </p>
+              </div>
+            </div>
           `,
         });
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          return res.status(500).json({ error: "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend." });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend." });
         }
       } catch (error) {
         console.error("Failed to send email:", error);
@@ -86,6 +134,116 @@ async function startServer() {
     }
 
     res.json({ message: "Magisk lenke sendt", token });
+  });
+
+  app.post("/api/portal/reschedule", async (req, res) => {
+    const { portalId, lessonId } = req.body;
+
+    if (!portalId || !lessonId) {
+      return res.status(400).json({ error: "Mangler portalId eller lessonId" });
+    }
+
+    // In a real app, we would look up the tutor's email based on the portalId/lessonId
+    const tutorEmail = "tutor@example.com"; 
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
+    if (resend) {
+      try {
+        const data = await resend.emails.send({
+          from: fromEmail,
+          to: tutorEmail,
+          subject: "Forespørsel om endring av time",
+          html: `
+            <h1>Endring av time</h1>
+            <p>En elev (Portal ID: ${portalId}) har bedt om å endre tidspunktet for timen med ID: ${lessonId}.</p>
+            <p>Vennligst ta kontakt med eleven for å avtale nytt tidspunkt.</p>
+          `,
+        });
+        
+        if (data.error) {
+          console.error("Resend API returned an error:", data.error);
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
+        }
+      } catch (error) {
+        console.error("Failed to send reschedule email:", error);
+        return res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
+      }
+    } else {
+      console.log("=========================================");
+      console.log("RESEND_API_KEY not set. Simulating reschedule email:");
+      console.log(`To: ${tutorEmail}`);
+      console.log(`Subject: Forespørsel om endring av time`);
+      console.log(`Body: Elev (Portal ID: ${portalId}) vil endre time ${lessonId}`);
+      console.log("=========================================");
+    }
+
+    res.json({ message: "Forespørsel sendt" });
+  });
+
+  app.post("/api/send-invite", async (req, res) => {
+    const { email, tutorId } = req.body;
+
+    if (!email || !tutorId) {
+      return res.status(400).json({ error: "Mangler e-post eller tutorId" });
+    }
+
+    // In a real app, we would look up the tutor's name based on the tutorId
+    const tutorName = "Læreren din"; 
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+    const loginUrl = `${appUrl}/login`;
+
+    if (resend) {
+      try {
+        const data = await resend.emails.send({
+          from: fromEmail,
+          to: email,
+          subject: "Velkommen til din nye læringsportal!",
+          html: `
+            <div style="background-color: #f8fafc; font-family: sans-serif; padding: 40px 20px;">
+              <div style="margin: 0 auto; padding: 40px 32px; background-color: #ffffff; border-radius: 12px; max-width: 600px; border: 1px solid #e2e8f0; text-align: center;">
+                <div style="margin: 0 auto 32px; display: flex; justify-content: center; align-items: center;">
+                  <span style="font-size: 24px; font-weight: bold; color: #0f172a; letter-spacing: -0.025em;">
+                    <span style="color: #4f46e5; margin-right: 8px;">✦</span>
+                    TutorFlyt
+                  </span>
+                </div>
+                <h1 style="color: #0f172a; font-size: 24px; font-weight: bold; margin: 0 0 24px;">Velkommen til din nye læringsportal!</h1>
+                <p style="color: #475569; font-size: 16px; line-height: 26px; margin: 0 0 20px; text-align: center;">
+                  <strong>${tutorName}</strong> har invitert deg til TutorFlyt. Her vil du få full oversikt over dine timer, læringsressurser og fremgang.
+                </p>
+                <div style="margin: 32px 0; text-align: center;">
+                  <a href="${loginUrl}" style="background-color: #4f46e5; border-radius: 8px; color: #ffffff; display: inline-block; font-size: 16px; font-weight: bold; text-decoration: none; padding: 16px 32px;">
+                    Logg inn på din portal
+                  </a>
+                </div>
+                <hr style="border-color: #e2e8f0; border-style: solid; border-width: 1px 0 0 0; margin: 32px 0 24px;" />
+                <p style="color: #94a3b8; font-size: 14px; line-height: 22px; text-align: center;">
+                  TutorFlyt brukes av profesjonelle lærere for å sikre en trygg og effektiv læringsopplevelse.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+        
+        if (data.error) {
+          console.error("Resend API returned an error:", data.error);
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
+        }
+      } catch (error) {
+        console.error("Failed to send invite email:", error);
+        return res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
+      }
+    } else {
+      console.log("=========================================");
+      console.log("RESEND_API_KEY not set. Simulating invite email:");
+      console.log(`To: ${email}`);
+      console.log(`Subject: Velkommen til din nye læringsportal!`);
+      console.log(`Body: ${tutorName} har invitert deg til TutorFlyt.`);
+      console.log("=========================================");
+    }
+
+    res.json({ message: "Invitasjon sendt" });
   });
 
   app.post("/api/auth/signup", async (req, res) => {
@@ -104,29 +262,49 @@ async function startServer() {
     
     // Store user data
     users.set(email, { name, email, password, verified: false, hasPaid: false, token });
+    saveUsers(users);
 
     // Construct the verification URL
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const verificationUrl = `${appUrl}/?verify=${token}`;
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
 
     if (resend) {
       try {
         const data = await resend.emails.send({
-          from: "TutorFlyt <onboarding@resend.dev>",
+          from: fromEmail,
           to: email,
-          subject: "Bekreft din e-postadresse - TutorFlyt",
+          subject: "Velkommen til TutorFlyt! 🎉",
           html: `
-            <h1>Velkommen til TutorFlyt, ${name}!</h1>
-            <p>Takk for at du registrerte deg. Vennligst bekreft din e-postadresse ved å klikke på lenken under:</p>
-            <a href="${verificationUrl}" style="display:inline-block;padding:10px 20px;background-color:#4f46e5;color:white;text-decoration:none;border-radius:5px;">Bekreft e-post</a>
-            <p>Eller kopier og lim inn denne lenken i nettleseren din:</p>
-            <p>${verificationUrl}</p>
+            <div style="background-color: #f8fafc; font-family: sans-serif; padding: 40px 20px;">
+              <div style="margin: 0 auto; padding: 40px 32px; background-color: #ffffff; border-radius: 12px; max-width: 600px; border: 1px solid #e2e8f0; text-align: center;">
+                <div style="margin: 0 auto 32px; display: flex; justify-content: center; align-items: center;">
+                  <span style="font-size: 24px; font-weight: bold; color: #0f172a; letter-spacing: -0.025em;">
+                    <span style="color: #4f46e5; margin-right: 8px;">✦</span>
+                    TutorFlyt
+                  </span>
+                </div>
+                <h1 style="color: #0f172a; font-size: 24px; font-weight: bold; margin: 0 0 24px;">Gratulerer! 🎉</h1>
+                <p style="color: #475569; font-size: 16px; line-height: 26px; margin: 0 0 20px; text-align: center;">
+                  Du er nå i gang med TutorFlyt. Nå kan du invitere din første elev og profesjonalisere hverdagen din.
+                </p>
+                <div style="margin: 32px 0; text-align: center;">
+                  <a href="${verificationUrl}" style="background-color: #4f46e5; border-radius: 8px; color: #ffffff; display: inline-block; font-size: 16px; font-weight: bold; text-decoration: none; padding: 16px 32px;">
+                    Gå til dashbordet
+                  </a>
+                </div>
+                <hr style="border-color: #e2e8f0; border-style: solid; border-width: 1px 0 0 0; margin: 32px 0 24px;" />
+                <p style="color: #94a3b8; font-size: 14px; line-height: 22px; text-align: center;">
+                  Trenger du hjelp? Vi er her for deg. Bare svar på denne e-posten, så hjelper vi deg i gang.
+                </p>
+              </div>
+            </div>
           `,
         });
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          return res.status(500).json({ error: "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend (gratisplan krever at du sender til din egen e-post)." });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend (gratisplan krever at du sender til din egen e-post)." });
         }
         
         console.log("Verification email sent to:", email);
@@ -164,8 +342,17 @@ async function startServer() {
     foundUser.verified = true;
     foundUser.token = null; // consume token
     users.set(foundUser.email, foundUser);
+    saveUsers(users);
 
-    res.json({ message: "Email verified successfully", user: { name: foundUser.name, email: foundUser.email } });
+    res.json({ 
+      message: "Email verified successfully", 
+      user: { 
+        name: foundUser.name, 
+        email: foundUser.email,
+        hasPaid: foundUser.hasPaid || true,
+        role: foundUser.role || 'tutor'
+      } 
+    });
   });
 
   app.post("/api/auth/login", (req, res) => {
@@ -181,7 +368,7 @@ async function startServer() {
       return res.status(403).json({ error: "Vennligst bekreft e-postadressen din først" });
     }
 
-    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid } });
+    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid || true, role: user.role || 'tutor' } });
   });
 
   // Endpoint for completing OAuth login (called by frontend after popup closes)
@@ -193,7 +380,7 @@ async function startServer() {
       return res.status(404).json({ error: "Bruker ikke funnet" });
     }
 
-    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid } });
+    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid || true, role: user.role || 'tutor' } });
   });
 
   // --- GOOGLE OAUTH ---
@@ -247,10 +434,12 @@ async function startServer() {
       // Store user (auto-verified since it's Google)
       if (!users.has(email)) {
         users.set(email, { name, email, password: '', verified: true, hasPaid: false, token: null });
+        saveUsers(users);
       } else {
         const u = users.get(email);
         u.verified = true;
         users.set(email, u);
+        saveUsers(users);
       }
 
       // Send success message to popup opener
@@ -307,10 +496,12 @@ async function startServer() {
 
       if (!users.has(email)) {
         users.set(email, { name, email, password: '', verified: true, hasPaid: false, token: null });
+        saveUsers(users);
       } else {
         const u = users.get(email);
         u.verified = true;
         users.set(email, u);
+        saveUsers(users);
       }
 
       res.send(`
@@ -361,6 +552,7 @@ async function startServer() {
     
     user.hasPaid = true;
     users.set(email, user);
+    saveUsers(users);
     
     res.json({ success: true });
   });
@@ -372,10 +564,12 @@ async function startServer() {
       return res.status(400).json({ error: "Mangler nødvendig informasjon" });
     }
 
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
     if (resend) {
       try {
         const data = await resend.emails.send({
-          from: "TutorFlyt <onboarding@resend.dev>",
+          from: fromEmail,
           to: parentEmail,
           subject: `Vipps-krav fra ${teacherName} - TutorFlyt`,
           html: `
@@ -395,7 +589,7 @@ async function startServer() {
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          return res.status(500).json({ error: "Kunne ikke sende e-post." });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
         }
       } catch (error) {
         console.error("Failed to send email:", error);
@@ -421,6 +615,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {

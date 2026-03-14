@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Calendar as CalendarIcon, 
@@ -16,15 +16,57 @@ import {
   Meh,
   Frown,
   Link as LinkIcon,
-  FileText
+  FileText,
+  BookOpen
 } from 'lucide-react';
 import Logo from './Logo';
+import InviteStudent from './InviteStudent';
+import CalendarModal from './CalendarModal';
+import PaymentWall from './PaymentWall';
+import WelcomeGuide from './WelcomeGuide';
+import { supabase } from '../supabaseClient';
 
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('rapporter');
   const [reportStatus, setReportStatus] = useState<'great' | 'good' | 'needs_focus'>('great');
   const [masteryLevel, setMasteryLevel] = useState(80);
   const [isSendingVipps, setIsSendingVipps] = useState<number | null>(null);
+  
+  const [profile, setProfile] = useState<{ name?: string, trial_ends_at: string, subscription_status: string } | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          setAuthUserId(authUser.id);
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('name, trial_ends_at, subscription_status')
+            .eq('id', authUser.id)
+            .single();
+            
+          if (data) {
+            setProfile(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+    
+    fetchProfile();
+  }, []);
+
+  const isTrialExpired = profile && 
+    profile.subscription_status !== 'active' && 
+    new Date(profile.trial_ends_at) < new Date();
+    
+  const needsOnboarding = profile && !profile.name;
 
   // Mock data
   const [students, setStudents] = useState([
@@ -44,6 +86,98 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
     { id: 2, student: 'Sofie Lien', amount: 500, date: '10. Okt', status: 'pending', method: 'Faktura' },
     { id: 3, student: 'Emil Hansen', amount: 400, date: '05. Okt', status: 'paid', method: 'Vipps' },
   ]);
+
+  const [resources, setResources] = useState([
+    { id: 1, title: 'Gitar-skalaer_uke4.pdf', type: 'PDF', url: '#', date: 'Lagt til i går', icon: '📄', color: 'red' },
+    { id: 2, title: 'Øvingsvideo - Akustisk', type: 'Video', url: '#', date: '8. okt', icon: '🎥', color: 'blue' }
+  ]);
+  const [newResource, setNewResource] = useState({ title: '', url: '', type: 'PDF' });
+  const [resourceSource, setResourceSource] = useState<'link' | 'file'>('file');
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '' });
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [calendarModal, setCalendarModal] = useState<{ isOpen: boolean, title: string, mode: 'faste_tider' | 'ferie' } | null>(null);
+
+  if (isLoadingProfile) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (needsOnboarding && authUserId) {
+    return <WelcomeGuide userId={authUserId} onComplete={(name) => setProfile({ ...profile, name })} />;
+  }
+
+  if (isTrialExpired) {
+    return <PaymentWall onUpgrade={() => onNavigate('payment')} />;
+  }
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleAddAction = () => {
+    if (activeTab === 'rapporter') {
+      showToast('Bruk skjemaet under for å opprette en ny rapport.');
+      return;
+    }
+    if (activeTab === 'ressurser') {
+      showToast('Bruk skjemaet "Legg til ny ressurs" for å legge til filer eller lenker.');
+      return;
+    }
+    setShowAddModal(true);
+    setNewItemData({ name: '', detail: '', email: '' });
+  };
+
+  const handleSaveNewItem = async () => {
+    if (!newItemData.name) return;
+    
+    if (activeTab === 'oversikt') {
+      setIsSaving(true);
+      try {
+        setStudents([...students, { 
+          id: Date.now(), 
+          name: newItemData.name, 
+          subject: newItemData.detail || 'Nytt fag', 
+          parent: 'Ikke oppgitt', 
+          phone: 'Ikke oppgitt', 
+          parentEmail: newItemData.email 
+        }]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSaving(false);
+        setShowAddModal(false);
+      }
+    } else if (activeTab === 'timeplan') {
+      setSchedule([...schedule, {
+        id: Date.now(),
+        time: newItemData.detail || '12:00 - 13:00',
+        student: newItemData.name,
+        subject: 'Ny time',
+        status: 'upcoming',
+        amount: 500
+      }]);
+    } else if (activeTab === 'betaling') {
+      setInvoices([{
+        id: Date.now(),
+        student: newItemData.name,
+        amount: parseInt(newItemData.detail) || 500,
+        date: new Date().toLocaleDateString('no-NB', { day: '2-digit', month: 'short' }),
+        status: 'pending',
+        method: 'Faktura'
+      }, ...invoices]);
+    }
+    
+    setShowAddModal(false);
+    showToast('Lagret vellykket!');
+  };
 
   const handleSendVippsRequest = async (sessionId: number) => {
     setIsSendingVipps(sessionId);
@@ -92,7 +226,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
 
     } catch (error) {
       console.error('Error sending Vipps request:', error);
-      alert('Det oppstod en feil ved sending av Vipps-krav.');
+      showToast('Det oppstod en feil ved sending av Vipps-krav.');
     } finally {
       setIsSendingVipps(null);
     }
@@ -144,6 +278,13 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
             <MessageSquare className="h-5 w-5" />
             Progresjonsrapporter
           </button>
+          <button 
+            onClick={() => setActiveTab('ressurser')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'ressurser' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <BookOpen className="h-5 w-5" />
+            Ressurser
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-200">
@@ -187,6 +328,13 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
           <MessageSquare className="h-5 w-5" />
           <span className="text-[10px] font-medium">Rapporter</span>
         </button>
+        <button 
+          onClick={() => setActiveTab('ressurser')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'ressurser' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <BookOpen className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Ressurser</span>
+        </button>
       </nav>
 
       {/* Main Content */}
@@ -200,18 +348,24 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
-          <button className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+          <button 
+            onClick={handleAddAction}
+            className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          >
             <Plus className="h-4 w-4 mr-2" />
             {activeTab === 'oversikt' && 'Legg til elev'}
             {activeTab === 'timeplan' && 'Ny time'}
             {activeTab === 'betaling' && 'Ny faktura'}
             {activeTab === 'rapporter' && 'Ny rapport'}
+            {activeTab === 'ressurser' && 'Ny ressurs'}
           </button>
         </div>
 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
           <div className="space-y-6">
+            <InviteStudent tutorId={user?.id || 'demo-tutor-id'} />
+            
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
                 <div className="relative w-full max-w-md">
@@ -274,7 +428,10 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                       </div>
                       <div className="flex items-center gap-2">
                         {session.status === 'upcoming' && (
-                          <button className="text-sm font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 bg-white transition-colors">
+                          <button 
+                            onClick={() => showToast('Funksjon for å flytte timer kommer snart!')}
+                            className="text-sm font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 bg-white transition-colors"
+                          >
                             Flytt
                           </button>
                         )}
@@ -296,11 +453,50 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-lg font-bold text-slate-900 mb-4">Hurtighandlinger</h2>
                 <div className="space-y-3">
-                  <button className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left">
+                  <button 
+                    onClick={() => showToast('Google Kalender-integrasjon krever at du kobler til Google-kontoen din under Innstillinger. (Kommer snart)')}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+                  >
                     <span className="font-medium text-slate-700">Synkroniser med Google Kalender</span>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   </button>
-                  <button className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left">
+                  <button 
+                    onClick={() => {
+                      setCalendarModal({
+                        isOpen: true,
+                        title: 'Sett opp faste tider',
+                        mode: 'faste_tider'
+                      });
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+                  >
+                    <span className="font-medium text-slate-700">Sett opp faste tider</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const url = `${window.location.origin}/?portal=demo-id-123`;
+                      navigator.clipboard.writeText(url);
+                      showToast('Lenke til elevportal kopiert til utklippstavlen!');
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+                  >
+                    <span className="font-medium text-slate-700 flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4 text-indigo-600" />
+                      Kopier lenke til elevportal
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setCalendarModal({
+                        isOpen: true,
+                        title: 'Legg inn ferie/fravær',
+                        mode: 'ferie'
+                      });
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+                  >
                     <span className="font-medium text-slate-700">Legg inn ferie/fravær</span>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   </button>
@@ -365,9 +561,19 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                         </td>
                         <td className="px-6 py-4 text-right">
                           {inv.status === 'pending' ? (
-                            <button className="text-indigo-600 hover:text-indigo-800 font-medium">Send purring</button>
+                            <button 
+                              onClick={() => showToast(`Purring sendt til ${inv.student}`)}
+                              className="text-indigo-600 hover:text-indigo-800 font-medium"
+                            >
+                              Send purring
+                            </button>
                           ) : (
-                            <button className="text-slate-400 hover:text-slate-600 font-medium">Kvittering</button>
+                            <button 
+                              onClick={() => showToast(`Kvittering lastet ned for ${inv.student}`)}
+                              className="text-slate-400 hover:text-slate-600 font-medium"
+                            >
+                              Kvittering
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -471,7 +677,11 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                       <LinkIcon className="h-4 w-4" />
                       Sendes som Magic Link
                     </div>
-                    <button type="button" className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                    <button 
+                      type="button" 
+                      onClick={() => showToast('Rapport sendt! Eleven vil motta en SMS med lenke.')}
+                      className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                    >
                       <Send className="h-4 w-4 mr-2" />
                       Send rapport
                     </button>
@@ -485,7 +695,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl opacity-20"></div>
                   
                   <div className="flex items-center justify-between mb-6 relative z-10">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Slik ser foreldrene det</h3>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Slik ser eleven det</h3>
                     <span className="px-2 py-1 bg-slate-800 rounded text-xs font-medium text-slate-300">Magic Link</span>
                   </div>
 
@@ -539,10 +749,10 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Lekser</p>
-                        <p className="text-sm text-slate-700 flex items-center gap-2">
+                        <div className="text-sm text-slate-700 flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-indigo-600"></div>
                           Gjør oppgave 3.14 til 3.20
-                        </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -555,7 +765,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                     Automatisering (Base44)
                   </h4>
                   <p className="text-sm text-indigo-700 leading-relaxed">
-                    Når du trykker send, lagres dataene i databasen. En trigger sender automatisk en SMS med en unik, sikker "Magic Link" til forelderen. På sikt kan dette også generere en PDF.
+                    Når du trykker send, lagres dataene i databasen. En trigger sender automatisk en SMS med en unik, sikker "Magic Link" til eleven eller forelderen. På sikt kan dette også generere en PDF.
                   </p>
                 </div>
               </div>
@@ -564,7 +774,236 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
           </div>
         )}
 
+        {/* Tab Content: Ressurser */}
+        {activeTab === 'ressurser' && (
+          <div className="space-y-6">
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-200 flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-slate-900">Ditt bibliotek</h3>
+                  <span className="text-xs font-medium text-slate-500">{resources.length} filer delt av lærer</span>
+                </div>
+                
+                <ul className="divide-y divide-slate-100">
+                  {resources.map((res) => {
+                    const iconBg = res.color === 'red' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
+                    const btnClass = res.color === 'red' 
+                      ? 'text-red-600 border-red-200 hover:bg-red-50' 
+                      : 'text-blue-600 border-blue-200 hover:bg-blue-50';
+                      
+                    return (
+                      <li key={res.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-2 ${iconBg} rounded-lg text-xl`}>
+                            {res.icon}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{res.title}</p>
+                            <p className="text-xs text-slate-500">{res.date}</p>
+                          </div>
+                        </div>
+                        <a href={res.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${btnClass}`}>
+                          {res.type === 'Video' ? 'Se video' : 'Åpne'}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h2 className="text-lg font-bold text-slate-900 mb-6">Legg til ny ressurs</h2>
+                <form 
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newResource.title) return;
+                    if (resourceSource === 'link' && !newResource.url) return;
+                    
+                    const isVideo = newResource.url.includes('youtube') || newResource.url.includes('vimeo');
+                    const newRes = {
+                      id: Date.now(),
+                      title: newResource.title,
+                      type: resourceSource === 'file' ? 'PDF' : (isVideo ? 'Video' : 'Lenke'),
+                      url: resourceSource === 'file' ? '#' : newResource.url,
+                      date: 'Akkurat nå',
+                      icon: resourceSource === 'file' ? '📄' : (isVideo ? '🎥' : '🔗'),
+                      color: resourceSource === 'file' ? 'red' : 'blue'
+                    };
+                    
+                    setResources([newRes, ...resources]);
+                    setNewResource({ title: '', url: '', type: 'PDF' });
+                    showToast('Ressurs lagt til!');
+                  }}
+                >
+                  <div className="flex gap-4 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="sourceType" 
+                        checked={resourceSource === 'file'} 
+                        onChange={() => setResourceSource('file')}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Last opp fil
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="sourceType" 
+                        checked={resourceSource === 'link'} 
+                        onChange={() => setResourceSource('link')}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Nettlenke
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Tittel</label>
+                    <input 
+                      type="text"
+                      value={newResource.title || ''}
+                      onChange={(e) => setNewResource({...newResource, title: e.target.value})}
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder={resourceSource === 'file' ? "F.eks. Gitar-skalaer_uke4.pdf" : "F.eks. Øvingsvideo"}
+                      required
+                    />
+                  </div>
+
+                  {resourceSource === 'link' ? (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">URL (Lenke)</label>
+                      <input 
+                        type="url"
+                        value={newResource.url || ''}
+                        onChange={(e) => setNewResource({...newResource, url: e.target.value})}
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="https://..."
+                        required={resourceSource === 'link'}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Velg fil</label>
+                      <input 
+                        type="file"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && !newResource.title) {
+                            setNewResource({...newResource, title: file.name});
+                          }
+                        }}
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                        required={resourceSource === 'file'}
+                      />
+                    </div>
+                  )}
+
+                  <button type="submit" className="w-full py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors mt-2">
+                    Legg til ressurs
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
+
+      {/* Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-900">
+                {activeTab === 'oversikt' && 'Legg til ny elev'}
+                {activeTab === 'timeplan' && 'Legg til ny time'}
+                {activeTab === 'betaling' && 'Opprett ny faktura'}
+              </h3>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {activeTab === 'oversikt' && 'Elevens navn'}
+                  {activeTab === 'timeplan' && 'Elevens navn'}
+                  {activeTab === 'betaling' && 'Elevens navn'}
+                </label>
+                <input 
+                  type="text" 
+                  value={newItemData.name || ''}
+                  onChange={(e) => setNewItemData({...newItemData, name: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="F.eks. Ola Nordmann"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {activeTab === 'oversikt' && 'Fag / Emne'}
+                  {activeTab === 'timeplan' && 'Tidspunkt'}
+                  {activeTab === 'betaling' && 'Beløp (kr)'}
+                </label>
+                <input 
+                  type="text" 
+                  value={newItemData.detail || ''}
+                  onChange={(e) => setNewItemData({...newItemData, detail: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder={
+                    activeTab === 'oversikt' ? 'F.eks. Matte R1' : 
+                    activeTab === 'timeplan' ? 'F.eks. 14:00 - 15:00' : 
+                    'F.eks. 500'
+                  }
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowAddModal(false)}
+                disabled={isSaving}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
+              >
+                Avbryt
+              </button>
+              <button 
+                onClick={handleSaveNewItem}
+                disabled={isSaving}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50"
+              >
+                {isSaving ? 'Lagrer...' : 'Lagre'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Modal */}
+      {calendarModal && (
+        <CalendarModal
+          isOpen={calendarModal.isOpen}
+          mode={calendarModal.mode}
+          title={calendarModal.title}
+          onClose={() => setCalendarModal(null)}
+          onSave={(dates, time) => {
+            if (calendarModal.mode === 'faste_tider') {
+              showToast(`Faste tider lagret for ${dates.length} dager kl ${time}!`);
+            } else {
+              showToast(`Ferie/fravær registrert for ${dates.length} dager. Elevene får beskjed.`);
+            }
+            setCalendarModal(null);
+          }}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-bottom-4">
+          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+          <span className="font-medium">{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

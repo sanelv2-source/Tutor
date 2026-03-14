@@ -11,6 +11,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import Logo from './Logo';
+import Footer from './Footer';
 
 // FAQ Accordion Component
 const AccordionItem = ({ question, answer }: { question: string, answer: string }) => {
@@ -33,7 +34,7 @@ const AccordionItem = ({ question, answer }: { question: string, answer: string 
   );
 };
 
-export default function Landing({ onNavigate }: { onNavigate: (page: string) => void }) {
+export default function Landing({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser?: (user: any) => void }) {
   const [email, setEmail] = useState('');
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -41,31 +42,15 @@ export default function Landing({ onNavigate }: { onNavigate: (page: string) => 
     onNavigate('signup');
   };
 
+  const handleDemoLogin = () => {
+    if (setUser) {
+      setUser({ name: 'Demo Lærer', email: 'demo@tutorflyt.no', hasPaid: true });
+      onNavigate('dashboard');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Header */}
-      <header className="border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
-            <Logo iconSize="w-10 h-10 text-xl" textSize="text-2xl" />
-          </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => onNavigate('login')} 
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 hidden sm:block"
-            >
-              Logg inn
-            </button>
-            <button 
-              onClick={() => onNavigate('signup')}
-              className="text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors px-5 py-2.5 rounded-lg shadow-sm"
-            >
-              Bli med i beta
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main>
         {/* 1. Hero Section */}
         <section className="pt-16 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -75,7 +60,7 @@ export default function Landing({ onNavigate }: { onNavigate: (page: string) => 
                 Slutt å mase om betaling. <span className="text-indigo-600">Begynn å undervise.</span>
               </h1>
               <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-                Det enkle kontrollpanelet bygget for norske privatlærere. Automatiser fakturering, styr timeplanen og imponerer foreldre – alt fra mobilen.
+                Det enkle kontrollpanelet bygget for norske privatlærere. Automatiser fakturering, styr timeplanen og imponerer elevene – alt fra mobilen.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <button 
@@ -83,6 +68,17 @@ export default function Landing({ onNavigate }: { onNavigate: (page: string) => 
                   className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 text-lg font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                 >
                   Bli med i betaen (50% rabatt for alltid)
+                </button>
+                <button 
+                  onClick={() => {
+                    if (setUser) {
+                      setUser({ name: 'Demo Lærer', email: 'demo@tutorflyt.no', hasPaid: true });
+                      onNavigate('dashboard');
+                    }
+                  }} 
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 text-lg font-bold rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-all"
+                >
+                  Se Lærer-Dashboard (Demo)
                 </button>
               </div>
               <p className="mt-3 text-sm text-slate-500 font-medium">
@@ -96,9 +92,14 @@ export default function Landing({ onNavigate }: { onNavigate: (page: string) => 
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-slate-600 font-medium">
-                  Allerede <span className="text-indigo-600 font-bold">4 lærere i Agder</span> venter på tilgang
-                </p>
+                <div className="flex flex-col">
+                  <p className="text-sm text-slate-600 font-medium">
+                    Allerede <span className="text-indigo-600 font-bold">4 lærere i Agder</span> venter på tilgang
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Brukt av lærere som ønsker stålkontroll på sin egen undervisning business
+                  </p>
+                </div>
               </div>
             </div>
             
@@ -275,9 +276,9 @@ export default function Landing({ onNavigate }: { onNavigate: (page: string) => 
                 <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
                   <MessageCircle className="h-6 w-6 text-indigo-600" />
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6">Proffere kommunikasjon med foreldre.</h2>
+                <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6">Proffere kommunikasjon med elevene.</h2>
                 <p className="text-lg text-slate-600 leading-relaxed">
-                  Send en 30-sekunders oppdatering etter hver time. Foreldre elsker å se fremgang, og fornøyde foreldre betyr lengre kundeforhold.
+                  Send en 30-sekunders oppdatering etter hver time. Elever elsker å se fremgang, og fornøyde elever betyr lengre kundeforhold.
                 </p>
               </div>
               <div className="flex-1 w-full max-w-md mx-auto">
@@ -398,22 +399,7 @@ export default function Landing({ onNavigate }: { onNavigate: (page: string) => 
       </main>
 
       {/* 7. Footer */}
-      <footer className="bg-white border-t border-slate-100 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2 opacity-70 grayscale">
-            <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" textColor="text-slate-500" />
-          </div>
-          
-          <p className="text-sm text-slate-500">
-            © {new Date().getFullYear()} TutorFlyt.
-          </p>
-          
-          <div className="flex gap-6 text-sm font-medium text-slate-500">
-            <button onClick={() => onNavigate('privacy')} className="hover:text-slate-900 transition-colors">Personvern</button>
-            <button onClick={() => onNavigate('contact')} className="hover:text-slate-900 transition-colors">Kontakt</button>
-          </div>
-        </div>
-      </footer>
+      <Footer onNavigate={onNavigate} />
     </div>
   );
 }
