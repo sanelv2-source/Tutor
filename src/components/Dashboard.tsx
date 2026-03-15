@@ -68,31 +68,14 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
     
   const needsOnboarding = profile && !profile.name;
 
-  // Mock data
-  const [students, setStudents] = useState([
-    { id: 1, name: 'Jonas Berg', subject: 'Matte R1', parent: 'Kari Berg', phone: '987 65 432', parentEmail: 'sanelv2@gmail.com' },
-    { id: 2, name: 'Sofie Lien', subject: 'Fysikk 1', parent: 'Ola Lien', phone: '456 78 901', parentEmail: 'sanelv2@gmail.com' },
-    { id: 3, name: 'Emil Hansen', subject: 'Gitar', parent: 'Ingrid Hansen', phone: '123 45 678', parentEmail: 'sanelv2@gmail.com' },
-  ]);
-
-  const [schedule, setSchedule] = useState([
-    { id: 1, time: '14:00 - 15:00', student: 'Jonas Berg', subject: 'Matte R1', status: 'upcoming', amount: 450 },
-    { id: 2, time: '16:30 - 17:30', student: 'Sofie Lien', subject: 'Fysikk 1', status: 'upcoming', amount: 500 },
-    { id: 3, time: '18:00 - 19:00', student: 'Emil Hansen', subject: 'Gitar', status: 'completed', amount: 400 },
-  ]);
-
-  const [invoices, setInvoices] = useState([
-    { id: 1, student: 'Jonas Berg', amount: 450, date: '12. Okt', status: 'paid', method: 'Vipps' },
-    { id: 2, student: 'Sofie Lien', amount: 500, date: '10. Okt', status: 'pending', method: 'Faktura' },
-    { id: 3, student: 'Emil Hansen', amount: 400, date: '05. Okt', status: 'paid', method: 'Vipps' },
-  ]);
-
-  const [resources, setResources] = useState([
-    { id: 1, title: 'Gitar-skalaer_uke4.pdf', type: 'PDF', url: '#', date: 'Lagt til i går', icon: '📄', color: 'red' },
-    { id: 2, title: 'Øvingsvideo - Akustisk', type: 'Video', url: '#', date: '8. okt', icon: '🎥', color: 'blue' }
-  ]);
+  // Mock data fjernet, starter med tomme lister
+  const [students, setStudents] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
   const [newResource, setNewResource] = useState({ title: '', url: '', type: 'PDF' });
   const [resourceSource, setResourceSource] = useState<'link' | 'file'>('file');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '' });
@@ -149,11 +132,13 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
           phone: 'Ikke oppgitt', 
           parentEmail: newItemData.email 
         }]);
+        showToast(newItemData.email ? `Invitasjon sendt til ${newItemData.email}!` : 'Elev lagt til!');
       } catch (err) {
         console.error(err);
       } finally {
         setIsSaving(false);
         setShowAddModal(false);
+        setNewItemData({ name: '', detail: '', email: '' });
       }
     } else if (activeTab === 'timeplan') {
       setSchedule([...schedule, {
@@ -164,6 +149,9 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
         status: 'upcoming',
         amount: 500
       }]);
+      setShowAddModal(false);
+      setNewItemData({ name: '', detail: '', email: '' });
+      showToast('Time lagret!');
     } else if (activeTab === 'betaling') {
       setInvoices([{
         id: Date.now(),
@@ -173,10 +161,10 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
         status: 'pending',
         method: 'Faktura'
       }, ...invoices]);
+      setShowAddModal(false);
+      setNewItemData({ name: '', detail: '', email: '' });
+      showToast('Faktura opprettet!');
     }
-    
-    setShowAddModal(false);
-    showToast('Lagret vellykket!');
   };
 
   const handleSendVippsRequest = async (sessionId: number) => {
@@ -364,7 +352,20 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
           <div className="space-y-6">
-            <InviteStudent tutorId={user?.id || 'demo-tutor-id'} />
+            <InviteStudent 
+              tutorId={user?.id || ''} 
+              onInviteSuccess={(email) => {
+                setStudents([...students, { 
+                  id: Date.now(), 
+                  name: email.split('@')[0], 
+                  subject: 'Nytt fag', 
+                  parent: 'Ikke oppgitt', 
+                  phone: 'Ikke oppgitt', 
+                  parentEmail: email 
+                }]);
+                showToast(`Invitasjon sendt til ${email}!`);
+              }}
+            />
             
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
@@ -378,23 +379,31 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                 </div>
               </div>
               <div className="divide-y divide-slate-100">
-                {students.map((student) => (
-                  <div key={student.id} className="p-4 sm:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
-                        {student.name.charAt(0)}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900">{student.name}</h3>
-                        <p className="text-sm text-slate-500">{student.subject}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:items-end text-sm text-slate-600">
-                      <span className="flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Forelder: {student.parent}</span>
-                      <span className="flex items-center gap-2 mt-1"><MessageSquare className="h-4 w-4 text-slate-400"/> {student.phone}</span>
-                    </div>
+                {students.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500">
+                    <Users className="h-12 w-12 mx-auto text-slate-300 mb-3" />
+                    <p>Du har ingen elever enda.</p>
+                    <p className="text-sm mt-1">Bruk skjemaet over for å invitere din første elev!</p>
                   </div>
-                ))}
+                ) : (
+                  students.map((student) => (
+                    <div key={student.id} className="p-4 sm:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
+                          {student.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900">{student.name}</h3>
+                          <p className="text-sm text-slate-500">{student.subject}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:items-end text-sm text-slate-600">
+                        <span className="flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Forelder: {student.parent}</span>
+                        <span className="flex items-center gap-2 mt-1"><MessageSquare className="h-4 w-4 text-slate-400"/> {student.phone}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -410,43 +419,51 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                   <span className="text-sm font-medium text-indigo-600 cursor-pointer">Se hele uken</span>
                 </h2>
                 <div className="space-y-4">
-                  {schedule.map((session) => (
-                    <div key={session.id} className={`p-4 rounded-xl border-l-4 flex items-center justify-between ${session.status === 'completed' || session.status === 'pending_payment' ? 'bg-slate-50 border-slate-300 opacity-70' : 'bg-indigo-50 border-indigo-600'}`}>
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${session.status === 'completed' || session.status === 'pending_payment' ? 'bg-slate-200 text-slate-500' : 'bg-indigo-100 text-indigo-600'}`}>
-                          {session.status === 'completed' || session.status === 'pending_payment' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                  {schedule.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                      <CalendarIcon className="h-12 w-12 mx-auto text-slate-300 mb-3" />
+                      <p>Du har ingen timer i dag.</p>
+                      <p className="text-sm mt-1">Bruk "Sett opp faste tider" for å legge til timer i kalenderen.</p>
+                    </div>
+                  ) : (
+                    schedule.map((session) => (
+                      <div key={session.id} className={`p-4 rounded-xl border-l-4 flex items-center justify-between ${session.status === 'completed' || session.status === 'pending_payment' ? 'bg-slate-50 border-slate-300 opacity-70' : 'bg-indigo-50 border-indigo-600'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${session.status === 'completed' || session.status === 'pending_payment' ? 'bg-slate-200 text-slate-500' : 'bg-indigo-100 text-indigo-600'}`}>
+                            {session.status === 'completed' || session.status === 'pending_payment' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                          </div>
+                          <div>
+                            <p className={`font-bold ${session.status === 'completed' || session.status === 'pending_payment' ? 'text-slate-700' : 'text-indigo-900'}`}>{session.time}</p>
+                            <p className="text-sm text-slate-600">{session.student} • {session.subject}</p>
+                            {session.status === 'pending_payment' && (
+                              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
+                                Venter på betaling
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className={`font-bold ${session.status === 'completed' || session.status === 'pending_payment' ? 'text-slate-700' : 'text-indigo-900'}`}>{session.time}</p>
-                          <p className="text-sm text-slate-600">{session.student} • {session.subject}</p>
-                          {session.status === 'pending_payment' && (
-                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
-                              Venter på betaling
-                            </span>
+                        <div className="flex items-center gap-2">
+                          {session.status === 'upcoming' && (
+                            <button 
+                              onClick={() => showToast('Funksjon for å flytte timer kommer snart!')}
+                              className="text-sm font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 bg-white transition-colors"
+                            >
+                              Flytt
+                            </button>
+                          )}
+                          {session.status === 'completed' && (
+                            <button 
+                              onClick={() => handleSendVippsRequest(session.id)}
+                              disabled={isSendingVipps === session.id}
+                              className="text-sm font-medium text-white bg-[#ff5b24] hover:bg-[#e04a1a] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70 flex items-center gap-2"
+                            >
+                              {isSendingVipps === session.id ? 'Sender...' : 'Send Vipps-krav'}
+                            </button>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {session.status === 'upcoming' && (
-                          <button 
-                            onClick={() => showToast('Funksjon for å flytte timer kommer snart!')}
-                            className="text-sm font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 bg-white transition-colors"
-                          >
-                            Flytt
-                          </button>
-                        )}
-                        {session.status === 'completed' && (
-                          <button 
-                            onClick={() => handleSendVippsRequest(session.id)}
-                            disabled={isSendingVipps === session.id}
-                            className="text-sm font-medium text-white bg-[#ff5b24] hover:bg-[#e04a1a] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70 flex items-center gap-2"
-                          >
-                            {isSendingVipps === session.id ? 'Sender...' : 'Send Vipps-krav'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
               
@@ -475,7 +492,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                   </button>
                   <button 
                     onClick={() => {
-                      const url = `${window.location.origin}/?portal=demo-id-123`;
+                      const url = `${window.location.origin}/student/portal`;
                       navigator.clipboard.writeText(url);
                       showToast('Lenke til elevportal kopiert til utklippstavlen!');
                     }}
@@ -542,42 +559,51 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{inv.student}</td>
-                        <td className="px-6 py-4 text-slate-500">{inv.date}</td>
-                        <td className="px-6 py-4 font-medium text-slate-900">{inv.amount} kr</td>
-                        <td className="px-6 py-4 text-slate-500">{inv.method}</td>
-                        <td className="px-6 py-4">
-                          {inv.status === 'paid' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Betalt
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                              <AlertCircle className="h-3.5 w-3.5" /> Venter
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          {inv.status === 'pending' ? (
-                            <button 
-                              onClick={() => showToast(`Purring sendt til ${inv.student}`)}
-                              className="text-indigo-600 hover:text-indigo-800 font-medium"
-                            >
-                              Send purring
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => showToast(`Kvittering lastet ned for ${inv.student}`)}
-                              className="text-slate-400 hover:text-slate-600 font-medium"
-                            >
-                              Kvittering
-                            </button>
-                          )}
+                    {invoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                          <CreditCard className="h-12 w-12 mx-auto text-slate-300 mb-3" />
+                          <p>Ingen fakturaer å vise enda.</p>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      invoices.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 font-medium text-slate-900">{inv.student}</td>
+                          <td className="px-6 py-4 text-slate-500">{inv.date}</td>
+                          <td className="px-6 py-4 font-medium text-slate-900">{inv.amount} kr</td>
+                          <td className="px-6 py-4 text-slate-500">{inv.method}</td>
+                          <td className="px-6 py-4">
+                            {inv.status === 'paid' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Betalt
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                                <AlertCircle className="h-3.5 w-3.5" /> Venter
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {inv.status === 'pending' ? (
+                              <button 
+                                onClick={() => showToast(`Purring sendt til ${inv.student}`)}
+                                className="text-indigo-600 hover:text-indigo-800 font-medium"
+                              >
+                                Send purring
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => showToast(`Kvittering lastet ned for ${inv.student}`)}
+                                className="text-slate-400 hover:text-slate-600 font-medium"
+                              >
+                                Kvittering
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -596,10 +622,21 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                 <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Velg elev</label>
-                    <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                      <option>Jonas Berg (Matte R1)</option>
-                      <option>Sofie Lien (Fysikk 1)</option>
-                      <option>Emil Hansen (Gitar)</option>
+                    <select 
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      value={selectedStudentId}
+                      onChange={(e) => setSelectedStudentId(e.target.value)}
+                    >
+                      {students.length === 0 ? (
+                        <option value="">Ingen elever lagt til enda</option>
+                      ) : (
+                        <>
+                          <option value="">Velg elev...</option>
+                          {students.map(student => (
+                            <option key={student.id} value={student.id}>{student.name} ({student.subject})</option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -658,7 +695,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                     <textarea 
                       rows={3}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                      placeholder="Jonas knakk koden på algebra i dag! Til neste gang må vi øve mer på..."
+                      placeholder="Eleven knakk koden på algebra i dag! Til neste gang må vi øve mer på..."
                     ></textarea>
                   </div>
 
@@ -702,8 +739,16 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                   <div className="bg-white text-slate-900 rounded-xl p-5 relative z-10">
                     <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
                       <div>
-                        <h4 className="font-bold text-lg">Jonas Berg</h4>
-                        <p className="text-sm text-slate-500">Matte R1 • 14. Okt</p>
+                        <h4 className="font-bold text-lg">
+                          {selectedStudentId 
+                            ? students.find(s => s.id === selectedStudentId)?.name || 'Elevens navn'
+                            : 'Elevens navn'}
+                        </h4>
+                        <p className="text-sm text-slate-500">
+                          {selectedStudentId 
+                            ? students.find(s => s.id === selectedStudentId)?.subject || 'Fag'
+                            : 'Fag'} • {new Date().toLocaleDateString('no-NO', { day: 'numeric', month: 'short' })}
+                        </p>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
                         <Smile className="h-7 w-7 text-emerald-600" />
@@ -744,7 +789,9 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                       <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Lærerens kommentar</p>
                         <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                          Jonas knakk koden på algebra i dag! Til neste gang må vi øve mer på å sette prøve på svaret.
+                          {selectedStudentId 
+                            ? students.find(s => s.id === selectedStudentId)?.name.split(' ')[0] || 'Eleven'
+                            : 'Eleven'} knakk koden på algebra i dag! Til neste gang må vi øve mer på å sette prøve på svaret.
                         </p>
                       </div>
                       <div>
@@ -785,29 +832,37 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                 </div>
                 
                 <ul className="divide-y divide-slate-100">
-                  {resources.map((res) => {
-                    const iconBg = res.color === 'red' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
-                    const btnClass = res.color === 'red' 
-                      ? 'text-red-600 border-red-200 hover:bg-red-50' 
-                      : 'text-blue-600 border-blue-200 hover:bg-blue-50';
-                      
-                    return (
-                      <li key={res.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className={`p-2 ${iconBg} rounded-lg text-xl`}>
-                            {res.icon}
+                  {resources.length === 0 ? (
+                    <li className="p-8 text-center text-slate-500">
+                      <BookOpen className="h-12 w-12 mx-auto text-slate-300 mb-3" />
+                      <p>Ingen ressurser lagt til enda.</p>
+                      <p className="text-sm mt-1">Bruk skjemaet til høyre for å dele filer eller lenker.</p>
+                    </li>
+                  ) : (
+                    resources.map((res) => {
+                      const iconBg = res.color === 'red' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
+                      const btnClass = res.color === 'red' 
+                        ? 'text-red-600 border-red-200 hover:bg-red-50' 
+                        : 'text-blue-600 border-blue-200 hover:bg-blue-50';
+                        
+                      return (
+                        <li key={res.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className={`p-2 ${iconBg} rounded-lg text-xl`}>
+                              {res.icon}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{res.title}</p>
+                              <p className="text-xs text-slate-500">{res.date}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">{res.title}</p>
-                            <p className="text-xs text-slate-500">{res.date}</p>
-                          </div>
-                        </div>
-                        <a href={res.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${btnClass}`}>
-                          {res.type === 'Video' ? 'Se video' : 'Åpne'}
-                        </a>
-                      </li>
-                    );
-                  })}
+                          <a href={res.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${btnClass}`}>
+                            {res.type === 'Video' ? 'Se video' : 'Åpne'}
+                          </a>
+                        </li>
+                      );
+                    })
+                  )}
                 </ul>
               </div>
 
@@ -958,6 +1013,20 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                   }
                 />
               </div>
+              {activeTab === 'oversikt' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    E-post (for invitasjon)
+                  </label>
+                  <input 
+                    type="email" 
+                    value={newItemData.email || ''}
+                    onChange={(e) => setNewItemData({...newItemData, email: e.target.value})}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="F.eks. ola@eksempel.no"
+                  />
+                </div>
+              )}
             </div>
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
               <button 
