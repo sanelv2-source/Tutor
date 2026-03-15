@@ -25,7 +25,7 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
           data: {
             name: name,
           },
-          emailRedirectTo: `${window.location.origin}/tutor/dashboard`,
+          emailRedirectTo: `${window.location.origin}/`,
         }
       });
 
@@ -34,8 +34,18 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
       }
 
       setIsSubmitted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'En ukjent feil oppstod');
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      let errorMessage = err instanceof Error ? err.message : 'En ukjent feil oppstod';
+      
+      // Handle the specific case where Supabase returns an empty JSON object as the error message
+      // This often happens when SMTP is not configured but email confirmations are enabled,
+      // or when email/password sign-in is disabled in the Supabase project.
+      if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
+        errorMessage = 'Kunne ikke registrere bruker. Dette skyldes ofte at e-postinnlogging er deaktivert, eller at e-postbekreftelse er påkrevd men SMTP ikke er konfigurert i Supabase-prosjektet ditt.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

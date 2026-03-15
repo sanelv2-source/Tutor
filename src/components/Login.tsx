@@ -19,7 +19,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/tutor/dashboard`,
+          redirectTo: `${window.location.origin}/`,
           skipBrowserRedirect: true,
         }
       });
@@ -55,7 +55,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/tutor/dashboard`,
+          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 
@@ -64,8 +64,15 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
 
       setIsMagicLinkSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kunne ikke sende magisk lenke');
+    } catch (err: any) {
+      console.error('Magic link error:', err);
+      let errorMessage = err instanceof Error ? err.message : 'Kunne ikke sende magisk lenke';
+      
+      if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
+        errorMessage = 'Kunne ikke sende magisk lenke. Sjekk at magiske lenker er aktivert i Supabase-prosjektet ditt, og at SMTP er konfigurert.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -91,8 +98,15 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       if (data.user) {
         // We'll let App.tsx handle the redirect to ensure state is consistent
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Innlogging feilet');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      let errorMessage = err instanceof Error ? err.message : 'Innlogging feilet';
+      
+      if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
+        errorMessage = 'Kunne ikke logge inn. Sjekk at e-post/passord-innlogging er aktivert i Supabase-prosjektet ditt.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
