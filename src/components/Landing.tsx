@@ -65,20 +65,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <button 
                   onClick={() => onNavigate('signup')}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 text-lg font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 text-base font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                 >
-                  Bli med i betaen (50% rabatt for alltid)
-                </button>
-                <button 
-                  onClick={() => {
-                    if (setUser) {
-                      setUser({ name: 'Demo Lærer', email: 'demo@tutorflyt.no', hasPaid: true });
-                      onNavigate('dashboard');
-                    }
-                  }} 
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 text-lg font-bold rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-all"
-                >
-                  Se Lærer-Dashboard (Demo)
+                  Bli med og få (50% de tre første månedene)
                 </button>
               </div>
               <p className="mt-3 text-sm text-slate-500 font-medium">

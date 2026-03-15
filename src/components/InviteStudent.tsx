@@ -19,6 +19,10 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            role: 'student',
+            invited_by: tutorId
+          }
         },
       });
 

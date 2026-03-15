@@ -46,11 +46,14 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        // Simple heuristic for prototype: if they have a specific metadata flag or we can just check if they were invited
+        // For now, let's assume if they don't have a name set, they might be a student, but actually we should check metadata
+        const role = session.user.user_metadata?.role || 'tutor';
         setUser(prev => prev || {
           name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
           email: session.user.email || '',
           hasPaid: true,
-          role: 'tutor'
+          role: role
         });
       }
     });
@@ -59,14 +62,19 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        const role = session.user.user_metadata?.role || 'tutor';
         setUser({
           name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
           email: session.user.email || '',
           hasPaid: true,
-          role: 'tutor'
+          role: role
         });
         if (_event === 'SIGNED_IN') {
-          navigate('/tutor/dashboard');
+          if (role === 'student') {
+            navigate('/student/dashboard');
+          } else {
+            navigate('/tutor/dashboard');
+          }
         }
       } else {
         setUser(null);
@@ -85,7 +93,7 @@ export default function App() {
       'login': '/login',
       'signup': '/signup',
       'dashboard': '/tutor/dashboard',
-      'portal': '/student/portal',
+      'portal': '/student/dashboard',
       'payment': '/payment',
       'verify': '/verify',
       'how-it-works': '/how-it-works',
@@ -121,7 +129,7 @@ export default function App() {
         } />
         
         {/* Kun eleven kan se sin portal */}
-        <Route path="/student/portal" element={
+        <Route path="/student/dashboard" element={
           <ProtectedRoute allowedRole="student" user={user}>
             <ClientPortal portalId="default" />
           </ProtectedRoute>
