@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 import Logo from './Logo';
+import { supabase } from '../supabaseClient';
 
 export default function Signup({ onNavigate }: { onNavigate: (page: string) => void }) {
   const [name, setName] = useState('');
@@ -17,16 +18,19 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
     setError('');
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password }),
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+          },
+          emailRedirectTo: `${window.location.origin}/tutor/dashboard`,
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Noe gikk galt under registreringen');
+      if (signUpError) {
+        throw signUpError;
       }
 
       setIsSubmitted(true);

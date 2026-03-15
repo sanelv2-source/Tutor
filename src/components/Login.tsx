@@ -11,62 +11,34 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
   const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
 
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Validate origin is from AI Studio preview or localhost
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
-        return;
-      }
-      
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.email) {
-        setIsLoading(true);
-        try {
-          const response = await fetch('/api/auth/oauth-login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: event.data.email }),
-          });
-          
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || 'OAuth login failed');
-          
-          setUser(data.user);
-          if (data.user.hasPaid) {
-            onNavigate('dashboard');
-          } else {
-            onNavigate('payment');
-          }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'En ukjent feil oppstod under OAuth innlogging');
-          setIsLoading(false);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onNavigate, setUser]);
-
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       setIsLoading(true);
       setError('');
       
-      const response = await fetch(`/api/auth/${provider}/url`);
-      if (!response.ok) throw new Error(`Kunne ikke starte ${provider} innlogging`);
-      
-      const { url } = await response.json();
-      
-      const authWindow = window.open(
-        url,
-        'oauth_popup',
-        'width=600,height=700'
-      );
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+          redirectTo: `${window.location.origin}/tutor/dashboard`,
+          skipBrowserRedirect: true,
+        }
+      });
 
-      if (!authWindow) {
-        setError('Vennligst tillat popup-vinduer for å logge inn med ' + provider);
-        setIsLoading(false);
+      if (error) {
+        throw error;
+      }
+
+      if (data?.url) {
+        const authWindow = window.open(
+          data.url,
+          'oauth_popup',
+          'width=600,height=700'
+        );
+
+        if (!authWindow) {
+          setError('Vennligst tillat popup-vinduer for å logge inn med ' + provider);
+          setIsLoading(false);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'En feil oppstod');
@@ -105,26 +77,19 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Innlogging feilet');
+      if (signInError) {
+        throw signInError;
       }
 
-      const data = await response.json();
-      setUser(data.user);
-      
-      if (data.user.role === 'student') {
-        onNavigate('portal');
-      } else {
-        onNavigate('dashboard');
+      // The onAuthStateChange listener in App.tsx will handle the redirect
+      // but we can also do it here for immediate feedback
+      if (data.user) {
+        // We'll let App.tsx handle the redirect to ensure state is consistent
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Innlogging feilet');

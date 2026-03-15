@@ -44,15 +44,6 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    // Check for verify token in URL
-    const params = new URLSearchParams(location.search);
-    const verifyToken = params.get('verify');
-    if (verifyToken) {
-      navigate(`/verify?token=${verifyToken}`);
-    }
-  }, [location.search, navigate]);
-
-  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(prev => prev || {
