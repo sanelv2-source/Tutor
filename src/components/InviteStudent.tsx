@@ -32,10 +32,13 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         }]);
       }
 
-      const { error } = await supabase.auth.signInWithOtp({
+      // Generer et tilfeldig passord for eleven
+      const randomPassword = Math.random().toString(36).slice(-10) + 'A1!';
+
+      const { error } = await supabase.auth.signUp({
         email,
+        password: randomPassword,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
             role: 'student',
             invited_by: tutorId
@@ -44,7 +47,10 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       });
 
       if (error) {
+        console.error("Feil:", error);
         throw error;
+      } else {
+        console.log("Elev invitert med rollen: student");
       }
 
       setStatus('Invitasjon sendt til ' + email + '!');

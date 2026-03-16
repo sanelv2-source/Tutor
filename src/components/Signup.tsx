@@ -24,6 +24,7 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
         options: {
           data: {
             name: name,
+            role: 'tutor'
           },
           emailRedirectTo: `${window.location.origin}/`,
         }

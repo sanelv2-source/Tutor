@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
 export default function Login({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -93,10 +95,16 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
         throw signInError;
       }
 
-      // The onAuthStateChange listener in App.tsx will handle the redirect
-      // but we can also do it here for immediate feedback
       if (data.user) {
-        // We'll let App.tsx handle the redirect to ensure state is consistent
+        // Nå leser vi rollen fra metadataene som vi nettopp lagret
+        const userRole = data.user.user_metadata?.role;
+        
+        // Ruting basert på rolle
+        if (userRole === 'student') {
+          navigate('/student/dashboard');
+        } else {
+          navigate('/tutor/dashboard');
+        }
       }
     } catch (err: any) {
       console.error('Login error:', err);
