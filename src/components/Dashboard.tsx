@@ -17,7 +17,8 @@ import {
   Frown,
   Link as LinkIcon,
   FileText,
-  BookOpen
+  BookOpen,
+  Video
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -32,9 +33,28 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [masteryLevel, setMasteryLevel] = useState(80);
   const [isSendingVipps, setIsSendingVipps] = useState<number | null>(null);
   
-  const [profile, setProfile] = useState<{ name?: string, trial_ends_at: string, subscription_status: string } | null>(null);
+  const [profile, setProfile] = useState<{ name?: string, trial_ends_at: string, subscription_status: string, meet_link?: string } | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [meetLinkInput, setMeetLinkInput] = useState('');
+  const [isSavingLink, setIsSavingLink] = useState(false);
+
+  const saveMeetLink = async (link: string) => {
+    if (!authUserId) return;
+    setIsSavingLink(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ meet_link: link })
+      .eq('id', authUserId);
+    setIsSavingLink(false);
+    if (error) {
+      console.error("Feil ved lagring av lenke:", error);
+      showToast("Feil ved lagring av lenke");
+    } else {
+      showToast("Videolenke lagret!");
+      setProfile(prev => prev ? { ...prev, meet_link: link } : null);
+    }
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -44,12 +64,15 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
           setAuthUserId(authUser.id);
           const { data, error } = await supabase
             .from('profiles')
-            .select('name, trial_ends_at, subscription_status')
+            .select('name, trial_ends_at, subscription_status, meet_link')
             .eq('id', authUser.id)
             .single();
             
           if (data) {
             setProfile(data);
+            if (data.meet_link) {
+              setMeetLinkInput(data.meet_link);
+            }
           }
         }
       } catch (error) {
@@ -80,6 +103,29 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '' });
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [taskModal, setTaskModal] = useState<{ isOpen: boolean, studentId: string, studentName: string } | null>(null);
+  const [taskContent, setTaskContent] = useState('');
+  const [isSendingTask, setIsSendingTask] = useState(false);
+
+  const sendTaskToStudent = async (studentId: string, content: string) => {
+    if (!authUserId) return;
+    setIsSendingTask(true);
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([
+        { sender_id: authUserId, receiver_id: studentId, content: content, is_task: true }
+      ]);
+    setIsSendingTask(false);
+    if (error) {
+      console.error("Feil ved sending:", error);
+      showToast("Feil ved sending av oppgave");
+    } else {
+      showToast("Oppgave sendt!");
+      setTaskModal(null);
+      setTaskContent('');
+    }
+  };
   
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [calendarModal, setCalendarModal] = useState<{ isOpen: boolean, title: string, mode: 'faste_tider' | 'ferie' } | null>(null);
@@ -352,6 +398,30 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
           <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
+                <Video className="w-5 h-5 text-indigo-600" />
+                Din faste videolenke (f.eks. Google Meet, Zoom)
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">Denne lenken vil vises for elevene dine når de logger inn i elevportalen.</p>
+              <div className="flex gap-3">
+                <input 
+                  type="url" 
+                  value={meetLinkInput}
+                  onChange={(e) => setMeetLinkInput(e.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button 
+                  onClick={() => saveMeetLink(meetLinkInput)}
+                  disabled={isSavingLink}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {isSavingLink ? 'Lagrer...' : 'Lagre lenke'}
+                </button>
+              </div>
+            </div>
+
             <InviteStudent 
               tutorId={user?.id || ''} 
               onInviteSuccess={(email) => {
@@ -397,9 +467,18 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                           <p className="text-sm text-slate-500">{student.subject}</p>
                         </div>
                       </div>
-                      <div className="flex flex-col sm:items-end text-sm text-slate-600">
-                        <span className="flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Forelder: {student.parent}</span>
-                        <span className="flex items-center gap-2 mt-1"><MessageSquare className="h-4 w-4 text-slate-400"/> {student.phone}</span>
+                      <div className="flex flex-col sm:items-end text-sm text-slate-600 gap-2">
+                        <div className="flex flex-col sm:items-end">
+                          <span className="flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Forelder: {student.parent}</span>
+                          <span className="flex items-center gap-2 mt-1"><MessageSquare className="h-4 w-4 text-slate-400"/> {student.phone}</span>
+                        </div>
+                        <button 
+                          onClick={() => setTaskModal({ isOpen: true, studentId: student.id.toString(), studentName: student.name })}
+                          className="mt-2 sm:mt-0 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          <Send className="w-4 h-4" />
+                          Send oppgave
+                        </button>
                       </div>
                     </div>
                   ))
@@ -965,6 +1044,55 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
         )}
 
       </main>
+
+      {/* Task Modal */}
+      {taskModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-slate-900">Send oppgave til {taskModal.studentName}</h3>
+              <button onClick={() => setTaskModal(null)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Oppgavebeskrivelse</label>
+                <textarea 
+                  value={taskContent}
+                  onChange={(e) => setTaskContent(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[120px]"
+                  placeholder="Skriv inn oppgaven her..."
+                  required
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setTaskModal(null)}
+                  className="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button 
+                  onClick={() => sendTaskToStudent(taskModal.studentId, taskContent)}
+                  disabled={!taskContent.trim() || isSendingTask}
+                  className="flex-1 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {isSendingTask ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Send oppgave
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       {showAddModal && (

@@ -12,7 +12,7 @@ import Terms from './components/Terms';
 import Contact from './components/Contact';
 import About from './components/About';
 import EmailPreview from './components/EmailPreview';
-import ClientPortal from './components/ClientPortal';
+import StudentDashboard from './components/StudentDashboard';
 import HowItWorks from './components/HowItWorks';
 import Pricing from './components/Pricing';
 import Navbar from './components/Navbar';
@@ -131,7 +131,7 @@ export default function App() {
         {/* Kun eleven kan se sin portal */}
         <Route path="/student/dashboard" element={
           <ProtectedRoute allowedRole="student" user={user}>
-            <ClientPortal portalId="default" />
+            <StudentDashboard />
           </ProtectedRoute>
         } />
         
