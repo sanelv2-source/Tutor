@@ -44,41 +44,50 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        // Simple heuristic for prototype: if they have a specific metadata flag or we can just check if they were invited
-        // For now, let's assume if they don't have a name set, they might be a student, but actually we should check metadata
-        const role = session.user.user_metadata?.role || 'tutor';
-        setUser(prev => prev || {
-          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
-          email: session.user.email || '',
-          hasPaid: true,
-          role: role
-        });
+    const checkRoleAndSetUser = async (session: any, event?: string) => {
+      if (!session?.user || !session.user.email) {
+        setUser(null);
+        return;
       }
-    });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const role = session.user.user_metadata?.role || 'tutor';
-        setUser({
-          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
-          email: session.user.email || '',
-          hasPaid: true,
-          role: role
-        });
-        if (_event === 'SIGNED_IN') {
+      // Sjekk om brukeren ligger i students-tabellen
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('id')
+        .eq('email', session.user.email)
+        .maybeSingle();
+
+      const isStudent = !!studentData || session.user.user_metadata?.role === 'student';
+      const role = isStudent ? 'student' : 'tutor';
+
+      setUser({
+        name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
+        email: session.user.email || '',
+        hasPaid: true,
+        role: role
+      });
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        // Sørg for at vi bare tvinger navigering hvis de er på forsiden eller innloggingssider
+        const path = window.location.pathname;
+        if (path === '/' || path === '/login' || path === '/signup') {
           if (role === 'student') {
             navigate('/student/dashboard');
           } else {
             navigate('/tutor/dashboard');
           }
         }
-      } else {
-        setUser(null);
       }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      checkRoleAndSetUser(session, 'INITIAL_SESSION');
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      checkRoleAndSetUser(session, _event);
     });
 
     return () => subscription.unsubscribe();

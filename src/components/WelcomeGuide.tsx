@@ -38,6 +38,7 @@ export default function WelcomeGuide({ userId, onComplete }: WelcomeGuideProps) 
               tutor_id: userId, 
               name: studentName, 
               subject: subject || 'Generelt', 
+              email: email || null,
               parent_email: email || null 
             }
           ]);

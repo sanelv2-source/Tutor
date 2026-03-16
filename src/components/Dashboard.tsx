@@ -100,6 +100,30 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [resourceSource, setResourceSource] = useState<'link' | 'file'>('file');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
+  useEffect(() => {
+    if (!authUserId) return;
+    
+    const fetchStudents = async () => {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('tutor_id', authUserId);
+        
+      if (data) {
+        setStudents(data.map(s => ({
+          id: s.id,
+          name: s.name,
+          subject: s.subject || 'Generelt',
+          parent: s.parent_email ? 'Oppgitt' : 'Ikke oppgitt',
+          phone: 'Ikke oppgitt',
+          parentEmail: s.parent_email || s.email
+        })));
+      }
+    };
+    
+    fetchStudents();
+  }, [authUserId]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '' });
   const [isSaving, setIsSaving] = useState(false);

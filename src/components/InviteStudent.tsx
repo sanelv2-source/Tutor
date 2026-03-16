@@ -15,6 +15,23 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
     setStatus('Sender invitasjon...');
 
     try {
+      // Sjekk om eleven allerede finnes i students-tabellen
+      const { data: existingStudent } = await supabase
+        .from('students')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (!existingStudent) {
+        // Legg til elev i students-tabellen slik at vi vet hvem de tilhører
+        await supabase.from('students').insert([{
+          tutor_id: tutorId,
+          name: email.split('@')[0],
+          email: email,
+          subject: 'Nytt fag'
+        }]);
+      }
+
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
