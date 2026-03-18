@@ -27,7 +27,7 @@ export default function WelcomeGuide({ userId, onComplete }: WelcomeGuideProps) 
         // Oppdaterer profil med navn
         await supabase
           .from('profiles')
-          .update({ name: tutorName })
+          .update({ full_name: tutorName })
           .eq('id', userId);
 
         // Forsøker å legge til elev i students-tabellen
@@ -36,7 +36,7 @@ export default function WelcomeGuide({ userId, onComplete }: WelcomeGuideProps) 
           .insert([
             { 
               tutor_id: userId, 
-              name: studentName, 
+              full_name: studentName, 
               subject: subject || 'Generelt', 
               email: email || null,
               parent_email: email || null 

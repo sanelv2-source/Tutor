@@ -64,12 +64,17 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
           setAuthUserId(authUser.id);
           const { data, error } = await supabase
             .from('profiles')
-            .select('name, trial_ends_at, subscription_status, meet_link')
+            .select('full_name, trial_ends_at, subscription_status, meet_link')
             .eq('id', authUser.id)
             .single();
             
           if (data) {
-            setProfile(data);
+            setProfile({
+              name: data.full_name,
+              trial_ends_at: data.trial_ends_at,
+              subscription_status: data.subscription_status,
+              meet_link: data.meet_link
+            });
             if (data.meet_link) {
               setMeetLinkInput(data.meet_link);
             }

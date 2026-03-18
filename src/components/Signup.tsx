@@ -42,7 +42,6 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
           { 
             id: data.user.id, 
             email: email, 
-            name: name,
             full_name: name 
           }
         ]);
