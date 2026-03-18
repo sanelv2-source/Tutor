@@ -18,12 +18,14 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
     setError('');
 
     try {
+      // 1. Opprett bruker i Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name: name,
+            full_name: name,
             role: 'tutor'
           },
           emailRedirectTo: `${window.location.origin}/`,
@@ -34,14 +36,30 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
         throw signUpError;
       }
 
+      // 2. Opprett profil i databasen umiddelbart
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert([
+          { 
+            id: data.user.id, 
+            email: email, 
+            name: name,
+            full_name: name 
+          }
+        ]);
+        
+        if (profileError) {
+          // Kast feil slik at vi ikke går videre til suksess-skjermen
+          throw new Error(`Kunne ikke opprette profil i databasen: ${profileError.message}`);
+        }
+      }
+
+      // 3. Begge deler er bekreftet lagret, gå videre
       setIsSubmitted(true);
     } catch (err: any) {
       console.error('Signup error:', err);
       let errorMessage = err instanceof Error ? err.message : 'En ukjent feil oppstod';
       
       // Handle the specific case where Supabase returns an empty JSON object as the error message
-      // This often happens when SMTP is not configured but email confirmations are enabled,
-      // or when email/password sign-in is disabled in the Supabase project.
       if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
         errorMessage = 'Kunne ikke registrere bruker. Dette skyldes ofte at e-postinnlogging er deaktivert, eller at e-postbekreftelse er påkrevd men SMTP ikke er konfigurert i Supabase-prosjektet ditt.';
       }
