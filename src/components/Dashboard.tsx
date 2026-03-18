@@ -18,7 +18,9 @@ import {
   Link as LinkIcon,
   FileText,
   BookOpen,
-  Video
+  Video,
+  Trash2,
+  X
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -105,31 +107,62 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [resourceSource, setResourceSource] = useState<'link' | 'file'>('file');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
-  useEffect(() => {
+  const fetchStudents = React.useCallback(async () => {
     if (!authUserId) return;
     
-    const fetchStudents = async () => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('tutor_id', authUserId);
-        
-      if (data) {
-        setStudents(data.map(s => ({
-          id: s.id,
-          name: s.full_name || s.name,
-          subject: s.subject || 'Generelt',
-          parent: s.parent_email ? 'Oppgitt' : 'Ikke oppgitt',
-          phone: 'Ikke oppgitt',
-          parentEmail: s.parent_email || s.email
-        })));
-      }
-    };
-    
-    fetchStudents();
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('tutor_id', authUserId);
+      
+    if (data) {
+      setStudents(data.map(s => ({
+        id: s.id,
+        name: s.full_name || s.name,
+        subject: s.subject || 'Fag: Ikke oppgitt',
+        parent: s.parent_email ? 'Oppgitt' : 'Ikke oppgitt',
+        phone: 'Ikke oppgitt',
+        parentEmail: s.parent_email || s.email
+      })));
+    }
   }, [authUserId]);
 
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
+
+  const handleDeleteStudent = async (studentId: string, studentName: string) => {
+    setDeleteConfirmModal({ isOpen: true, studentId, studentName });
+  };
+
+  const confirmDeleteStudent = async () => {
+    if (!deleteConfirmModal) return;
+    
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', deleteConfirmModal.studentId);
+        
+      if (error) throw error;
+      
+      // Oppdater state umiddelbart for at eleven skal forsvinne fra skjermen
+      setStudents(prev => prev.filter(s => s.id.toString() !== deleteConfirmModal.studentId.toString()));
+      
+      showToast(`${deleteConfirmModal.studentName} er slettet.`);
+      // Vi kan fortsatt kalle fetchStudents for å sikre at alt er synkronisert, 
+      // men UI-et oppdateres umiddelbart takket være linjen over.
+      fetchStudents();
+    } catch (err: any) {
+      console.error('Feil ved sletting av elev:', err);
+      showToast(`Kunne ikke slette elev: ${err.message}`);
+    } finally {
+      setDeleteConfirmModal(null);
+    }
+  };
+
   const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ isOpen: boolean, studentId: string, studentName: string } | null>(null);
   const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '' });
   const [isSaving, setIsSaving] = useState(false);
   
@@ -199,17 +232,25 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
     if (activeTab === 'oversikt') {
       setIsSaving(true);
       try {
-        setStudents([...students, { 
-          id: Date.now(), 
-          name: newItemData.name, 
-          subject: newItemData.detail || 'Nytt fag', 
-          parent: 'Ikke oppgitt', 
-          phone: 'Ikke oppgitt', 
-          parentEmail: newItemData.email 
-        }]);
+        const { error } = await supabase
+          .from('students')
+          .insert([
+            { 
+              full_name: newItemData.name,
+              subject: newItemData.detail || 'Nytt fag',
+              email: newItemData.email || '',
+              tutor_id: authUserId,
+              status: 'active'
+            }
+          ]);
+          
+        if (error) throw error;
+        
         showToast(newItemData.email ? `Invitasjon sendt til ${newItemData.email}!` : 'Elev lagt til!');
-      } catch (err) {
-        console.error(err);
+        fetchStudents();
+      } catch (err: any) {
+        console.error('Feil ved lagring av elev:', err);
+        showToast(`Kunne ikke legge til elev: ${err.message}`);
       } finally {
         setIsSaving(false);
         setShowAddModal(false);
@@ -411,17 +452,18 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
-          <button 
-            onClick={handleAddAction}
-            className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {activeTab === 'oversikt' && 'Legg til elev'}
-            {activeTab === 'timeplan' && 'Ny time'}
-            {activeTab === 'betaling' && 'Ny faktura'}
-            {activeTab === 'rapporter' && 'Ny rapport'}
-            {activeTab === 'ressurser' && 'Ny ressurs'}
-          </button>
+          {activeTab !== 'oversikt' && (
+            <button 
+              onClick={handleAddAction}
+              className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {activeTab === 'timeplan' && 'Ny time'}
+              {activeTab === 'betaling' && 'Ny faktura'}
+              {activeTab === 'rapporter' && 'Ny rapport'}
+              {activeTab === 'ressurser' && 'Ny ressurs'}
+            </button>
+          )}
         </div>
 
         {/* Tab Content: Elevoversikt */}
@@ -454,14 +496,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
             <InviteStudent 
               tutorId={user?.id || ''} 
               onInviteSuccess={(email) => {
-                setStudents([...students, { 
-                  id: Date.now(), 
-                  name: email.split('@')[0], 
-                  subject: 'Nytt fag', 
-                  parent: 'Ikke oppgitt', 
-                  phone: 'Ikke oppgitt', 
-                  parentEmail: email 
-                }]);
+                fetchStudents();
                 showToast(`Invitasjon sendt til ${email}!`);
               }}
             />
@@ -501,13 +536,22 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                           <span className="flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Forelder: {student.parent}</span>
                           <span className="flex items-center gap-2 mt-1"><MessageSquare className="h-4 w-4 text-slate-400"/> {student.phone}</span>
                         </div>
-                        <button 
-                          onClick={() => setTaskModal({ isOpen: true, studentId: student.id.toString(), studentName: student.name })}
-                          className="mt-2 sm:mt-0 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors"
-                        >
-                          <Send className="w-4 h-4" />
-                          Send oppgave
-                        </button>
+                        <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                          <button 
+                            onClick={() => setTaskModal({ isOpen: true, studentId: student.id.toString(), studentName: student.name })}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            <Send className="w-4 h-4" />
+                            Send oppgave
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(student.id, student.name)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Slett elev"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -1116,6 +1160,44 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                       Send oppgave
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteConfirmModal?.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-900">
+                Slett elev
+              </h3>
+              <button 
+                onClick={() => setDeleteConfirmModal(null)}
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-600 mb-6">
+                Er du sikker på at du vil slette eleven <strong>{deleteConfirmModal.studentName}</strong>? Denne handlingen kan ikke angres.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button 
+                  onClick={() => setDeleteConfirmModal(null)}
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button 
+                  onClick={confirmDeleteStudent}
+                  className="px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  Ja, slett elev
                 </button>
               </div>
             </div>

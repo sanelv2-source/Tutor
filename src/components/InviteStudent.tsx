@@ -9,6 +9,7 @@ interface InviteStudentProps {
 const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess }) => {
   const [email, setEmail] = useState('');
   const [studentName, setStudentName] = useState('');
+  const [subject, setSubject] = useState('');
   const [status, setStatus] = useState('');
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -18,6 +19,7 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
     try {
       // 1. Hent din egen ID (Læreren)
       const { data: { user: admin } } = await supabase.auth.getUser();
+      console.log("Min ID som lærer:", admin?.id);
 
       if (!admin) {
         alert("Du må være logget inn som lærer!");
@@ -59,7 +61,8 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
             email: email,
             full_name: studentName,
             tutor_id: admin.id, // Dette er din ID fra profiles-tabellen
-            status: 'active'
+            status: 'active',
+            subject: subject
           }
         ]);
 
@@ -75,6 +78,7 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         }
         setEmail('');
         setStudentName('');
+        setSubject('');
       }
     } catch (err: any) {
       console.error('Invite error:', err);
@@ -93,6 +97,14 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
           value={studentName}
           onChange={(e) => setStudentName(e.target.value)}
           placeholder="Elevens fulle navn"
+          className="flex-1 border border-slate-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          required
+        />
+        <input 
+          type="text" 
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Fag (f.eks. Matematikk)"
           className="flex-1 border border-slate-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           required
         />
