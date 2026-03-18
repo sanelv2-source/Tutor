@@ -15,58 +15,66 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
     setStatus('Sender invitasjon...');
 
     try {
-      // Sjekk om eleven allerede finnes i students-tabellen
-      const { data: existingStudent } = await supabase
-        .from('students')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
+      // 1. Hent læreren som er logget inn (deg)
+      const { data: { user: tutor } } = await supabase.auth.getUser();
 
-      if (!existingStudent) {
-        // Legg til elev i students-tabellen slik at vi vet hvem de tilhører
-        await supabase.from('students').insert([{
-          tutor_id: tutorId,
-          name: email.split('@')[0],
-          email: email,
-          subject: 'Nytt fag'
-        }]);
+      if (!tutor) {
+        console.error("Ingen lærer logget inn");
+        setStatus("Ingen lærer logget inn");
+        return;
       }
 
       // Generer et tilfeldig passord for eleven
       const randomPassword = Math.random().toString(36).slice(-10) + 'A1!';
+      const studentName = email.split('@')[0];
 
-      const { error } = await supabase.auth.signUp({
-        email,
+      // 2. Opprett eleven i Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
         password: randomPassword,
         options: {
           data: {
             role: 'student',
-            invited_by: tutorId
+            full_name: studentName // Lagres i metadata for enkel tilgang
           }
-        },
+        }
       });
 
-      if (error) {
-        console.error("Feil:", error);
-        throw error;
-      } else {
-        console.log("Elev invitert med rollen: student");
+      if (authError) {
+        console.error("Kunne ikke opprette Auth-bruker:", authError.message);
+        setStatus("Feil: " + authError.message);
+        return;
       }
 
-      setStatus('Invitasjon sendt til ' + email + '!');
-      if (onInviteSuccess) {
-        onInviteSuccess(email);
+      // 3. Lagre koblingen i 'students'-tabellen
+      if (authData.user) {
+        const { error: dbError } = await supabase
+          .from('students')
+          .insert([
+            { 
+              auth_id: authData.user.id,    // Kobler raden til elevens innlogging
+              tutor_id: tutor.id,           // Kobler eleven til deg (læreren)
+              email: email,
+              full_name: studentName,       // Matcher kolonnen i SQL-en din
+              status: 'pending'
+            }
+          ]);
+
+        if (dbError) {
+          console.error("Database-feil ved lagring av elev-rad:", dbError.message);
+          setStatus("Auth-bruker opprettet, men kunne ikke lagre i students-tabellen.");
+        } else {
+          console.log("Suksess! Elev er nå registrert i systemet.");
+          setStatus("Elev invitert og lagret!");
+          if (onInviteSuccess) {
+            onInviteSuccess(email);
+          }
+          setEmail('');
+        }
       }
-      setEmail('');
     } catch (err: any) {
       console.error('Invite error:', err);
-      // For the sake of the prototype, if Supabase fails (e.g. rate limit or config), 
-      // we still simulate success in the UI so the user can continue testing.
-      setStatus('Invitasjon sendt til ' + email + '! (Simulert pga. manglende e-postoppsett)');
-      if (onInviteSuccess) {
-        onInviteSuccess(email);
-      }
-      setEmail('');
+      setStatus('En uventet feil oppstod.');
     }
   };
 

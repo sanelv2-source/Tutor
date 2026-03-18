@@ -112,7 +112,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
       if (data) {
         setStudents(data.map(s => ({
           id: s.id,
-          name: s.name,
+          name: s.full_name || s.name,
           subject: s.subject || 'Generelt',
           parent: s.parent_email ? 'Oppgitt' : 'Ikke oppgitt',
           phone: 'Ikke oppgitt',
