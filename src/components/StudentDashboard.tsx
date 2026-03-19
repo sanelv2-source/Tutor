@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient'; // Pass på at banen til din supabase-klient er riktig
 import { useNavigate } from 'react-router-dom';
 
-interface Task {
+interface Assignment {
   id: string;
-  content: string;
+  title: string;
+  description: string;
+  due_date: string;
+  status: string;
   created_at: string;
 }
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [meetLink, setMeetLink] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,14 +23,14 @@ const StudentDashboard = () => {
       if (!user) return;
 
       // Hent oppgaver
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('messages')
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('assignments')
         .select('*')
-        .eq('receiver_id', user.id) // Henter kun for denne eleven
+        .eq('student_id', user.id) // Henter kun for denne eleven
         .order('created_at', { ascending: false });
         
-      if (tasksData) setTasks(tasksData);
-      if (tasksError) console.error("Feil ved henting av oppgaver:", tasksError);
+      if (assignmentsData) setAssignments(assignmentsData);
+      if (assignmentsError) console.error("Feil ved henting av oppgaver:", assignmentsError);
 
       // Hent videolenke (meet_link)
       if (user.email) {
@@ -95,14 +98,30 @@ const StudentDashboard = () => {
         <section style={{ backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '10px' }}>
           <h3>Dine oppgaver og meldinger</h3>
           
-          {tasks.length === 0 && (
-            <p>Her vil oppgavene fra læreren din dukke opp etter hvert.</p>
+          {assignments.length === 0 && (
+            <p>Du har ingen oppgaver ennå. Ta det med ro!</p>
           )}
 
-          {tasks.map(task => (
-            <div key={task.id} style={{ border: '1px solid #ccc', margin: '15px 0', padding: '15px', borderRadius: '8px', backgroundColor: 'white' }}>
-              <p style={{ margin: '0 0 10px 0', whiteSpace: 'pre-wrap' }}>{task.content}</p>
-              <small style={{ color: '#666' }}>{new Date(task.created_at).toLocaleDateString('no-NO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</small>
+          {assignments.map(assignment => (
+            <div key={assignment.id} style={{ border: '1px solid #ccc', margin: '15px 0', padding: '15px', borderRadius: '8px', backgroundColor: 'white' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>{assignment.title}</h4>
+                <span style={{ 
+                  padding: '4px 8px', 
+                  backgroundColor: '#e0e7ff', 
+                  color: '#4338ca', 
+                  borderRadius: '9999px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 'bold' 
+                }}>
+                  {assignment.status || 'Ny oppgave'}
+                </span>
+              </div>
+              <p style={{ margin: '0 0 15px 0', whiteSpace: 'pre-wrap', color: '#334155' }}>{assignment.description}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                <span>Frist: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString('no-NO') : 'Ingen frist'}</span>
+                <span>Lagt til: {new Date(assignment.created_at).toLocaleDateString('no-NO')}</span>
+              </div>
             </div>
           ))}
         </section>
