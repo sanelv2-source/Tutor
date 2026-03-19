@@ -167,25 +167,40 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [isSaving, setIsSaving] = useState(false);
   
   const [taskModal, setTaskModal] = useState<{ isOpen: boolean, studentId: string, studentName: string } | null>(null);
+  const [taskTitle, setTaskTitle] = useState('');
   const [taskContent, setTaskContent] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
   const [isSendingTask, setIsSendingTask] = useState(false);
 
-  const sendTaskToStudent = async (studentId: string, content: string) => {
+  const sendTaskToStudent = async (studentId: string) => {
     if (!authUserId) return;
     setIsSendingTask(true);
-    const { data, error } = await supabase
-      .from('messages')
-      .insert([
-        { sender_id: authUserId, receiver_id: studentId, content: content, is_task: true }
-      ]);
-    setIsSendingTask(false);
-    if (error) {
-      console.error("Feil ved sending:", error);
-      showToast("Feil ved sending av oppgave");
-    } else {
+    
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .insert([
+          { 
+            tutor_id: authUserId, 
+            student_id: studentId, 
+            title: taskTitle,
+            description: taskContent,
+            due_date: taskDueDate || null
+          }
+        ]);
+        
+      if (error) throw error;
+      
       showToast("Oppgave sendt!");
       setTaskModal(null);
+      setTaskTitle('');
       setTaskContent('');
+      setTaskDueDate('');
+    } catch (err: any) {
+      console.error("Feil ved sending av oppgave:", err);
+      showToast("Kunne ikke sende oppgave: " + err.message);
+    } finally {
+      setIsSendingTask(false);
     }
   };
   
@@ -1130,12 +1145,33 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Oppgavebeskrivelse</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tittel på oppgaven</label>
+                <input 
+                  type="text"
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="f.eks. Matteinnlevering uke 12"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Beskrivelse / Instruksjoner</label>
                 <textarea 
                   value={taskContent}
                   onChange={(e) => setTaskContent(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[120px]"
-                  placeholder="Skriv inn oppgaven her..."
+                  placeholder="Skriv inn instruksjoner her..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Frist</label>
+                <input 
+                  type="date"
+                  value={taskDueDate}
+                  onChange={(e) => setTaskDueDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
@@ -1148,8 +1184,8 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
                   Avbryt
                 </button>
                 <button 
-                  onClick={() => sendTaskToStudent(taskModal.studentId, taskContent)}
-                  disabled={!taskContent.trim() || isSendingTask}
+                  onClick={() => sendTaskToStudent(taskModal.studentId)}
+                  disabled={!taskTitle.trim() || !taskContent.trim() || !taskDueDate || isSendingTask}
                   className="flex-1 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
                 >
                   {isSendingTask ? (
