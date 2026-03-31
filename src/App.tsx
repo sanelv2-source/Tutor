@@ -18,6 +18,7 @@ import Pricing from './components/Pricing';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
+import { InvoicePage } from './components/InvoicePage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -153,6 +154,7 @@ export default function App() {
         <Route path="/about" element={<About onNavigate={handleNavigate} />} />
         <Route path="/emails" element={<EmailPreview onNavigate={handleNavigate} />} />
         <Route path="/unauthorized" element={<Unauthorized onNavigate={handleNavigate} />} />
+        <Route path="/invoice/:publicToken" element={<InvoicePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

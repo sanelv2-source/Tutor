@@ -1,1 +1,351 @@
 @import "tailwindcss";
+
+/* Report Box CSS */
+.report-box {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  margin-top: 20px;
+  border: 1px solid #e1e1e1;
+}
+
+.report-header h3 {
+  margin-top: 0;
+  color: #2d3436;
+  font-size: 1.2rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin: 15px 0;
+}
+
+.report-item span {
+  display: block;
+  font-size: 0.85rem;
+  color: #636e72;
+}
+
+.report-item strong {
+  font-size: 1.1rem;
+  color: #2d3436;
+}
+
+.text-success {
+  color: #2ecc71 !important;
+}
+
+.progress-bar-container {
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #6c5ce7; /* Din lilla farge */
+  transition: width 0.5s ease-in-out;
+}
+
+.calendar-view {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  min-height: 400px;
+}
+
+.calendar-view h3 {
+  color: #2d3436;
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #f1f3f5;
+  padding-bottom: 10px;
+}
+
+/* Selve kortet for hver time */
+.lesson-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-bg, #f8f9fa);
+  border-left: 5px solid var(--card-border, #00d2d3);
+  padding: 15px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lesson-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+}
+
+/* Teksten inni kortet */
+.lesson-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.lesson-student {
+  font-weight: 700;
+  color: #2d3436;
+  font-size: 1rem;
+}
+
+.lesson-time {
+  font-size: 0.85rem;
+  color: #636e72;
+  margin-top: 4px;
+}
+
+/* En liten "tag" som viser varighet eller status */
+.lesson-tag {
+  background: #e1faf9;
+  color: #00b894;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Tom tilstand for kalenderen */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #dfe6e9;
+  color: #636e72;
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2d3436;
+}
+
+.empty-state small {
+  font-size: 0.9rem;
+}
+
+/* Ukeskalender Grid */
+.weekly-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 10px;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  margin-top: 20px;
+}
+
+.calendar-day {
+  text-align: center;
+  border-right: 1px solid #f0f0f0;
+  min-height: 200px;
+}
+
+.calendar-day:last-child { border-right: none; }
+
+.day-name {
+  font-weight: bold;
+  font-size: 0.8rem;
+  color: #636e72;
+  margin-bottom: 10px;
+  display: block;
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  .weekly-calendar {
+    grid-template-columns: 1fr;
+    padding: 15px;
+  }
+  .calendar-day {
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 15px;
+    text-align: left;
+  }
+  .calendar-day:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .day-name {
+    margin-bottom: 5px;
+  }
+}
+
+/* Modal / Pop-up stiler */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modal-content input, .modal-content select {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.btn-save { background: #00d2d3; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+.btn-cancel { background: #ff7675; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; }
+
+/* Månedskalender */
+.month-view-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* 7 dager i uka */
+  gap: 1px;
+  background: #eee; /* Lager linjene mellom cellene */
+  border: 1px solid #eee;
+  margin-top: 20px;
+  min-width: 500px; /* Tvinger grid til å beholde en viss bredde på mobil */
+}
+
+.grid-cell {
+  background: white;
+  min-height: 80px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  font-weight: 500;
+  color: #2d3436;
+  transition: background 0.1s ease;
+}
+
+.grid-cell:not(.empty-cell):hover {
+  background: #f8f9fa;
+}
+
+.grid-cell.empty-cell {
+  background: transparent;
+}
+
+.grid-cell.red-day {
+  color: #ff4757; /* Norsk rød-dag farge */
+}
+
+.indicators {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  height: 6px;
+}
+
+.dot-vacation {
+  width: 6px;
+  height: 6px;
+  background: #7d5fff; /* Lilla prikk som på bildet */
+  border-radius: 50%;
+  margin: 2px;
+}
+
+.mobile-weekday {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .mobile-weekday {
+    display: inline;
+  }
+  .month-grid {
+    grid-template-columns: 1fr;
+    min-width: 100%;
+    gap: 10px;
+    background: transparent;
+    border: none;
+  }
+  .month-grid-header {
+    display: none;
+  }
+  .grid-cell {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    min-height: auto;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 15px;
+  }
+  .grid-cell.empty-cell {
+    display: none;
+  }
+  .grid-cell > div:first-child > span:last-child {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+  .indicators {
+    margin-top: 0;
+    align-items: center;
+  }
+}
+
+.dot-lesson {
+  width: 6px;
+  height: 6px;
+  background: #00d2d3; /* Blågrønn prikk for timer */
+  border-radius: 50%;
+  margin: 2px;
+}
+
+.vipps-btn {
+  background-color: #ff5b24; /* Vipps Oransje/Rød-aktig */
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: transform 0.2s;
+}
+
+.vipps-btn:hover {
+  transform: scale(1.05);
+  background-color: #e84a1a;
+}
+
+.done-btn {
+  background-color: #2ecc71; /* Grønn for "Mottatt" */
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 20px;
+  margin-left: 5px;
+  cursor: pointer;
+}

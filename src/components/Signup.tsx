@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Phone, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
@@ -7,6 +7,7 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [teacherPhone, setTeacherPhone] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +43,9 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
           { 
             id: data.user.id, 
             email: email, 
-            full_name: name 
+            full_name: name,
+            phone: teacherPhone,
+            role: 'teacher'
           }
         ]);
         
@@ -178,8 +181,35 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
                   onChange={(e) => setEmail(e.target.value)}
                   className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
                   placeholder="din@epost.no"
+                  required
                 />
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
+                Mobilnummer (for Vipps-betaling)
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-slate-500 sm:text-sm">+47</span>
+                </div>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={teacherPhone}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setTeacherPhone(val);
+                  }}
+                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-12 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                  placeholder="900 00 000"
+                  required
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Dette nummeret brukes til å generere Vipps-krav i fakturaene dine.</p>
             </div>
 
             <div>

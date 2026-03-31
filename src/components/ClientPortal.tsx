@@ -94,8 +94,9 @@ export default function ClientPortal({ portalId }: { portalId: string }) {
         setRescheduleStatus('Forespørsel sendt!');
         setTimeout(() => setRescheduleStatus(null), 3000);
       } else {
-        setRescheduleStatus('Kunne ikke sende forespørsel.');
-        setTimeout(() => setRescheduleStatus(null), 3000);
+        const errData = await response.json().catch(() => ({}));
+        setRescheduleStatus(errData.error || 'Kunne ikke sende forespørsel.');
+        setTimeout(() => setRescheduleStatus(null), 5000);
       }
     } catch (e) {
       setRescheduleStatus('En feil oppstod.');

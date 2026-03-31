@@ -14,6 +14,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
+    "types": ["vite/client"],
     "jsx": "react-jsx",
     "paths": {
       "@/*": [
@@ -22,5 +23,8 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "supabase/functions"
+  ]
 }

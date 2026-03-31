@@ -23,6 +23,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
         options: {
           redirectTo: `${window.location.origin}/`,
           skipBrowserRedirect: true,
+          scopes: provider === 'google' ? 'https://www.googleapis.com/auth/calendar.readonly' : undefined,
         }
       });
 
@@ -115,6 +116,88 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
       
       setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    const testEmail = 'jamalino312@gmail.com';
+    const testPassword = 'Guzica32.';
+    
+    setEmail(testEmail);
+    setPassword(testPassword);
+    setUsePassword(true);
+
+    try {
+      // Prøv å logge inn først med Guzica32.
+      let { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: testEmail,
+        password: testPassword,
+      });
+
+      // Hvis det feiler, prøv standardpassordet fra invitasjonen (Password123!)
+      if (signInError && signInError.message.includes('Invalid login credentials')) {
+        const { data: fallbackData, error: fallbackError } = await supabase.auth.signInWithPassword({
+          email: testEmail,
+          password: 'Password123!',
+        });
+
+        if (!fallbackError && fallbackData?.session) {
+          // Suksess med fallback-passord! Oppdater passordet til Guzica32.
+          await supabase.auth.updateUser({ password: testPassword });
+          data = fallbackData;
+          signInError = null as any;
+        }
+      }
+
+      if (signInError) {
+        // Hvis brukeren ikke finnes, prøv å opprette den
+        if (signInError.message.includes('Invalid login credentials')) {
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: testEmail,
+            password: testPassword,
+            options: {
+              data: {
+                role: 'student',
+                full_name: 'Test Elev'
+              }
+            }
+          });
+          
+          if (signUpError) {
+            if (signUpError.message.includes('User already registered')) {
+              throw new Error('Brukeren er allerede registrert, men verken "Guzica32." eller "Password123!" fungerte som passord. Vennligst logg inn med magisk lenke for å sette et nytt passord.');
+            }
+            throw signUpError;
+          }
+          
+          // Sjekk om vi faktisk fikk en session (avhenger av Supabase-innstillinger)
+          if (signUpData.session) {
+            window.location.href = '/student/dashboard';
+            return;
+          } else {
+            setError('Brukeren ble opprettet, men Supabase krever e-postbekreftelse. For å logge inn direkte med passord må du slå av "Confirm email" i Supabase (Authentication -> Providers -> Email).');
+            setIsLoading(false);
+            return;
+          }
+        } else if (signInError.message.includes('Email not confirmed')) {
+          setError('E-posten er ikke bekreftet. Slå av "Confirm email" i Supabase for å tillate direkte innlogging med passord.');
+          setIsLoading(false);
+          return;
+        } else {
+          throw signInError;
+        }
+      }
+
+      if (data?.session) {
+        window.location.href = '/student/dashboard';
+      }
+    } catch (err: any) {
+      console.error('Test login error:', err);
+      setError('Test-innlogging feilet: ' + (err instanceof Error ? err.message : 'Ukjent feil'));
     } finally {
       setIsLoading(false);
     }
@@ -304,6 +387,17 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                   </svg>
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={handleTestLogin}
+                disabled={isLoading}
+                className="w-full inline-flex justify-center items-center py-2.5 px-4 border border-indigo-200 rounded-lg shadow-sm bg-indigo-50 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+              >
+                Hurtiginnlogging (Elev: jamalino312@gmail.com)
+              </button>
             </div>
           </div>
           )}

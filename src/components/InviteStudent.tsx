@@ -22,38 +22,11 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       console.log("Min ID som lærer:", admin?.id);
 
       if (!admin) {
-        alert("Du må være logget inn som lærer!");
         setStatus("Ingen lærer logget inn");
         return;
       }
 
-      // 2. Opprett eleven
-      // Merk: supabase.auth.admin er normalt ikke tilgjengelig på klientsiden,
-      // så vi bruker optional chaining for å unngå kræsj, og faller tilbake til signUp.
-      let authError = null;
-      if (supabase.auth.admin) {
-        const { error } = await supabase.auth.admin.createUser({
-          email: email,
-          password: 'Password123!', // Vi setter et standardpassord de kan bytte
-          email_confirm: true,       // Dette "bekrefter" dem automatisk
-          user_metadata: { role: 'student', full_name: studentName }
-        });
-        authError = error;
-      } else {
-        authError = new Error("Admin API ikke tilgjengelig på klienten");
-      }
-
-      // Hvis admin-opprettelse feiler (pga rettigheter eller manglende API), prøv vanlig signUp:
-      if (authError) {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: email,
-          password: 'Password123!',
-          options: { data: { role: 'student', full_name: studentName } }
-        });
-        if (signUpError) throw signUpError;
-      }
-
-      // 3. Lagre i tabellen - VIKTIG: Bruk din ID som tutor_id
+      // 2. Lagre i tabellen - VIKTIG: Bruk din ID som tutor_id
       const { error: dbError } = await supabase
         .from('students')
         .insert([
@@ -68,11 +41,11 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
 
       if (dbError) {
         console.error("Databasefeil:", dbError.message);
-        alert("Kunne ikke lagre i tabell: " + dbError.message);
         setStatus("Kunne ikke lagre i tabell: " + dbError.message);
       } else {
-        alert("Elev lagt til i listen!");
         setStatus("Elev lagt til i listen!");
+        alert("Elev lagt til i listen!"); // Viser en popup-beskjed
+        
         if (onInviteSuccess) {
           onInviteSuccess(email);
         }
