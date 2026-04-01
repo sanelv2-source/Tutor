@@ -19,9 +19,11 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
     setError('');
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      
       // 1. Opprett bruker i Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           data: {
@@ -39,15 +41,15 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
 
       // 2. Opprett profil i databasen umiddelbart
       if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert([
+        const { error: profileError } = await supabase.from('profiles').upsert([
           { 
             id: data.user.id, 
-            email: email, 
+            email: normalizedEmail, 
             full_name: name,
             phone: teacherPhone,
             role: 'tutor'
           }
-        ]);
+        ], { onConflict: 'id' });
         
         if (profileError) {
           // Kast feil slik at vi ikke går videre til suksess-skjermen

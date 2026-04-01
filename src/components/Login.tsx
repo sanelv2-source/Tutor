@@ -55,8 +55,9 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setError('');
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: normalizedEmail,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
         },
@@ -87,8 +88,9 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setError('');
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 

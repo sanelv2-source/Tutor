@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import Logo from './Logo';
+import { linkStudentProfileByEmail } from '../utils/studentLinking';
 
 export default function CompleteProfile() {
   const navigate = useNavigate();
@@ -40,20 +41,22 @@ export default function CompleteProfile() {
     setError('');
 
     try {
-      const { error: profileError } = await supabase.from('profiles').insert([
+      const normalizedEmail = user.email.trim().toLowerCase();
+      const { error: profileError } = await supabase.from('profiles').upsert([
         { 
           id: user.id, 
-          email: user.email, 
+          email: normalizedEmail, 
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0],
           role: role
         }
-      ]);
+      ], { onConflict: 'id' });
 
       if (profileError) throw profileError;
 
       if (role === 'tutor') {
         window.location.href = '/tutor/dashboard';
       } else {
+        await linkStudentProfileByEmail();
         window.location.href = '/student/dashboard';
       }
     } catch (err: any) {

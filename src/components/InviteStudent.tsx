@@ -27,11 +27,12 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       }
 
       // 2. Lagre i tabellen - VIKTIG: Bruk din ID som tutor_id
+      const normalizedEmail = email.trim().toLowerCase();
       const { error: dbError } = await supabase
         .from('students')
         .insert([
           { 
-            email: email,
+            email: normalizedEmail,
             full_name: studentName,
             tutor_id: admin.id, // Dette er din ID fra profiles-tabellen
             status: 'active',

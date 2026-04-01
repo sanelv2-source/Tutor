@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
 import StudentSidebar from './StudentSidebar';
 import { ChatList } from './ChatList';
+import { linkStudentProfileByEmail } from '../utils/studentLinking';
 
 interface Assignment {
   id: string;
@@ -115,6 +116,8 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      await linkStudentProfileByEmail();
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !user.email) return;
 
@@ -125,23 +128,8 @@ const StudentDashboard = () => {
         .maybeSingle();
 
       if (!studentRecord) {
-        // Fallback to email if profile_id is not set yet
-        const { data: fallbackRecord, error: fallbackError } = await supabase
-          .from('students')
-          .select('id, tutor_id, profile_id')
-          .eq('email', user.email)
-          .maybeSingle();
-
-        if (fallbackError || !fallbackRecord) {
-          console.error("Fant ikke eleven i students-tabellen:", fallbackError);
-          return;
-        }
-
-        studentRecord = fallbackRecord;
-        
-        if (!studentRecord.profile_id) {
-          await supabase.from('students').update({ profile_id: user.id }).eq('id', studentRecord.id);
-        }
+        console.error("Fant ikke eleven i students-tabellen:", studentError);
+        return;
       }
 
       setStudentId(studentRecord.id);

@@ -20,6 +20,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
 import CompleteProfile from './components/CompleteProfile';
 import { InvoicePage } from './components/InvoicePage';
+import { linkStudentProfileByEmail } from './utils/studentLinking';
 
 export default function App() {
   const navigate = useNavigate();
@@ -61,6 +62,10 @@ export default function App() {
         .single();
 
       const role = profile?.role;
+
+      if (role === 'student') {
+        await linkStudentProfileByEmail();
+      }
 
       setUser({
         name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
