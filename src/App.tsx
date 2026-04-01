@@ -18,6 +18,7 @@ import Pricing from './components/Pricing';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
+import CompleteProfile from './components/CompleteProfile';
 import { InvoicePage } from './components/InvoicePage';
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
     }
     return null;
   });
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Save user to localStorage whenever it changes
   useEffect(() => {
@@ -48,18 +50,17 @@ export default function App() {
     const checkRoleAndSetUser = async (session: any, event?: string) => {
       if (!session?.user || !session.user.email) {
         setUser(null);
+        setIsInitializing(false);
         return;
       }
 
-      // Sjekk om brukeren ligger i students-tabellen
-      const { data: studentData } = await supabase
-        .from('students')
-        .select('id')
-        .eq('email', session.user.email)
-        .maybeSingle();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
 
-      const isStudent = !!studentData || session.user.user_metadata?.role === 'student';
-      const role = isStudent ? 'student' : 'tutor';
+      const role = profile?.role;
 
       setUser({
         name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
@@ -72,13 +73,16 @@ export default function App() {
         // Sørg for at vi bare tvinger navigering hvis de er på forsiden eller innloggingssider
         const path = window.location.pathname;
         if (path === '/' || path === '/login' || path === '/signup') {
-          if (role === 'student') {
+          if (role === 'tutor') {
+            navigate('/tutor/dashboard');
+          } else if (role === 'student') {
             navigate('/student/dashboard');
           } else {
-            navigate('/tutor/dashboard');
+            navigate('/complete-profile');
           }
         }
       }
+      setIsInitializing(false);
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -118,6 +122,14 @@ export default function App() {
     navigate(routes[page] || '/');
   };
 
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <>
       {showNavbar && <Navbar onNavigate={handleNavigate} />}
@@ -154,6 +166,7 @@ export default function App() {
         <Route path="/about" element={<About onNavigate={handleNavigate} />} />
         <Route path="/emails" element={<EmailPreview onNavigate={handleNavigate} />} />
         <Route path="/unauthorized" element={<Unauthorized onNavigate={handleNavigate} />} />
+        <Route path="/complete-profile" element={<CompleteProfile />} />
         <Route path="/invoice/:publicToken" element={<InvoicePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

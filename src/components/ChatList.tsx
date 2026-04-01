@@ -264,96 +264,15 @@ export const ChatList = () => {
     return date.toLocaleDateString('no-NO', { day: 'numeric', month: 'short' });
   };
 
-  if (activeConversation) {
-    const chatName = getChatName(activeConversation, currentUserId);
-    const initials = getInitials(chatName);
-
-    return (
-      <div className="bg-[#121212] flex flex-col h-[calc(100vh-8rem)] text-slate-200 font-sans rounded-2xl shadow-xl border border-[#2a2a2a] overflow-hidden">
-        {/* Chat Header */}
-        <div className="flex items-center gap-4 p-4 sm:p-6 border-b border-[#2a2a2a] bg-[#1a1a1a]">
-          <button 
-            onClick={handleBack}
-            className="p-2 hover:bg-[#2a2a2a] rounded-full transition-colors text-slate-400 hover:text-white"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2a1b3d] to-purple-900 flex items-center justify-center text-purple-200 font-bold text-sm shadow-inner border border-purple-800/50">
-              {initials}
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">{chatName}</h2>
-              <p className="text-xs text-purple-400">Aktiv nå</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[#121212]">
-          {messagesLoading ? (
-            <div className="flex justify-center items-center h-full text-slate-500">
-              Henter meldinger...
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="flex justify-center items-center h-full text-slate-500">
-              Ingen meldinger ennå. Start samtalen!
-            </div>
-          ) : (
-            messages.map((msg) => {
-              // Guessing sender logic: if it has sender_id and it matches active user, it's sent by me.
-              // For now, let's assume msg.sender_id === activeConversation.student.id means it's from the student.
-              const studentId = Array.isArray(activeConversation.student) ? activeConversation.student[0]?.id : activeConversation.student?.id;
-              const isStudent = msg.sender_id === studentId;
-              
-              return (
-                <div key={msg.id} className={`flex ${isStudent ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[75%] sm:max-w-[60%] rounded-2xl px-4 py-3 ${
-                    isStudent 
-                      ? 'bg-[#2a2a2a] text-slate-200 rounded-tl-sm' 
-                      : 'bg-purple-600 text-white rounded-tr-sm'
-                  }`}>
-                    <p className="text-sm">{msg.body || msg.content || msg.message || '...'}</p>
-                    <span className={`text-[10px] block mt-1 ${isStudent ? 'text-slate-500' : 'text-purple-200'}`}>
-                      {formatTime(msg.created_at)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Input Area */}
-        <div className="p-4 sm:p-6 border-t border-[#2a2a2a] bg-[#1a1a1a]">
-          <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Skriv en melding..."
-              className="flex-1 bg-[#2a2a2a] text-slate-200 placeholder-slate-500 border border-[#333] rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-            />
-            <button 
-              type="submit"
-              disabled={!newMessage.trim()}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 text-white p-3 rounded-full transition-colors flex-shrink-0"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-[#121212] min-h-full text-slate-200 p-4 sm:p-6 md:p-8 font-sans rounded-2xl shadow-xl border border-[#2a2a2a]">
-      <div className="max-w-3xl mx-auto">
+    <div className="bg-[#121212] flex h-[calc(100vh-8rem)] text-slate-200 font-sans rounded-2xl shadow-xl border border-[#2a2a2a] overflow-hidden">
+      
+      {/* Sidebar / Chat List */}
+      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-[#2a2a2a] flex flex-col ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <MessageSquare className="w-6 h-6 text-purple-500" />
+        <div className="p-4 border-b border-[#2a2a2a] flex items-center justify-between bg-[#1a1a1a]">
+          <h1 className="text-lg font-bold text-white flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-purple-500" />
             Meldinger
           </h1>
           <button 
@@ -361,79 +280,53 @@ export const ChatList = () => {
               fetchAvailableStudents();
               setShowNewChatModal(true);
             }}
-            className="bg-purple-600 hover:bg-purple-500 text-white p-2.5 rounded-full transition-all shadow-lg shadow-purple-900/50"
+            className="bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-full transition-all shadow-lg shadow-purple-900/50"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
           </button>
         </div>
 
-        {/* New Chat Modal */}
-        {showNewChatModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md border border-[#333]">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-white">Start ny samtale</h2>
-                <button onClick={() => setShowNewChatModal(false)} className="text-slate-400 hover:text-white">
-                  &times;
-                </button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {availableStudents.length === 0 ? (
-                  <p className="text-slate-500 text-center py-4">Ingen nye elever å starte samtale med.</p>
-                ) : (
-                  availableStudents.map(student => (
-                    <button
-                      key={student.id}
-                      onClick={() => handleStartNewChat(student.id)}
-                      className="w-full text-left p-3 rounded-xl hover:bg-[#2a2a2a] transition-colors text-slate-200"
-                    >
-                      {student.full_name || 'Ukjent elev'}
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Search Bar */}
-        <div className="relative mb-6">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-slate-500" />
+        <div className="p-3 border-b border-[#2a2a2a] bg-[#121212]">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-500" />
+            </div>
+            <input
+              type="text"
+              className="block w-full pl-9 pr-3 py-2 border border-[#333] rounded-xl leading-5 bg-[#1a1a1a] text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm transition-colors"
+              placeholder="Søk..."
+            />
           </div>
-          <input
-            type="text"
-            className="block w-full pl-10 pr-3 py-3 border border-[#333] rounded-xl leading-5 bg-[#1a1a1a] text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 sm:text-sm transition-colors"
-            placeholder="Søk etter elev eller melding..."
-          />
         </div>
 
         {/* Chat List */}
-        <div className="space-y-2">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-[#121212]">
           {loading ? (
-            <div className="text-center py-8 text-slate-500">Henter samtaler...</div>
+            <div className="text-center py-8 text-slate-500 text-sm">Henter samtaler...</div>
           ) : conversations.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">Ingen samtaler funnet.</div>
+            <div className="text-center py-8 text-slate-500 text-sm">Ingen samtaler funnet.</div>
           ) : (
             conversations.map((chat) => {
               const chatName = getChatName(chat, currentUserId);
               const initials = getInitials(chatName);
               const unread = getUnreadCount(chat, currentUserId);
               const lastMessage = chat.last_message || '...';
+              const isActive = activeConversation?.id === chat.id;
               
               return (
                 <div 
                   key={chat.id} 
                   onClick={() => handleConversationClick(chat)}
-                  className="flex items-center gap-4 p-3 sm:p-4 rounded-2xl hover:bg-[#1a1a1a] transition-colors cursor-pointer border border-transparent hover:border-[#333] group"
+                  className={`chat-item flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer group ${isActive ? 'active' : ''}`}
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#2a1b3d] to-purple-900 flex items-center justify-center text-purple-200 font-bold text-lg shadow-inner border border-purple-800/50">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#2a1b3d] to-purple-900 flex items-center justify-center text-purple-200 font-bold text-sm sm:text-base shadow-inner border border-purple-800/50">
                       {initials}
                     </div>
                     {unread > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border-2 border-[#121212] shadow-sm">
+                      <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#121212] shadow-sm">
                         {unread}
                       </span>
                     )}
@@ -441,15 +334,15 @@ export const ChatList = () => {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <h3 className={`text-base sm:text-lg font-semibold truncate ${unread > 0 ? 'text-white' : 'text-slate-300 group-hover:text-white transition-colors'}`}>
+                    <div className="flex justify-between items-baseline mb-0.5">
+                      <h3 className={`text-sm sm:text-base font-semibold truncate ${unread > 0 || isActive ? 'text-white' : 'text-slate-300 group-hover:text-white transition-colors'}`}>
                         {chatName}
                       </h3>
-                      <span className={`text-xs whitespace-nowrap ml-2 ${unread > 0 ? 'text-purple-400 font-medium' : 'text-slate-500'}`}>
+                      <span className={`text-[10px] sm:text-xs whitespace-nowrap ml-2 ${unread > 0 ? 'text-purple-400 font-medium' : 'text-slate-500'}`}>
                         {formatTime(chat.last_message_at || chat.created_at)}
                       </span>
                     </div>
-                    <p className={`text-sm truncate ${unread > 0 ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                    <p className={`text-xs sm:text-sm truncate ${unread > 0 ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
                       {lastMessage}
                     </p>
                   </div>
@@ -459,6 +352,120 @@ export const ChatList = () => {
           )}
         </div>
       </div>
+
+      {/* Main Chat Area */}
+      <div className={`flex-1 flex flex-col bg-[#121212] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
+        {activeConversation ? (
+          <>
+            {/* Chat Header */}
+            <div className="flex items-center gap-4 p-4 sm:p-6 border-b border-[#2a2a2a] bg-[#1a1a1a]">
+              <button 
+                onClick={handleBack}
+                className="md:hidden p-2 hover:bg-[#2a2a2a] rounded-full transition-colors text-slate-400 hover:text-white"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2a1b3d] to-purple-900 flex items-center justify-center text-purple-200 font-bold text-sm shadow-inner border border-purple-800/50">
+                  {getInitials(getChatName(activeConversation, currentUserId))}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">{getChatName(activeConversation, currentUserId)}</h2>
+                  <p className="text-xs text-purple-400">Aktiv nå</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[#121212]">
+              {messagesLoading ? (
+                <div className="flex justify-center items-center h-full text-slate-500">
+                  Henter meldinger...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex justify-center items-center h-full text-slate-500">
+                  Ingen meldinger ennå. Start samtalen!
+                </div>
+              ) : (
+                messages.map((msg) => {
+                  const studentId = Array.isArray(activeConversation.student) ? activeConversation.student[0]?.id : activeConversation.student?.id;
+                  const isStudent = msg.sender_id === studentId;
+                  
+                  return (
+                    <div key={msg.id} className={`flex ${isStudent ? 'justify-start' : 'justify-end'}`}>
+                      <div className={`max-w-[75%] sm:max-w-[60%] rounded-2xl px-4 py-3 ${
+                        isStudent 
+                          ? 'bg-[#2a2a2a] text-slate-200 rounded-tl-sm' 
+                          : 'bg-purple-600 text-white rounded-tr-sm'
+                      }`}>
+                        <p className="text-sm">{msg.body || msg.content || msg.message || '...'}</p>
+                        <span className={`text-[10px] block mt-1 ${isStudent ? 'text-slate-500' : 'text-purple-200'}`}>
+                          {formatTime(msg.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input Area */}
+            <div className="p-4 sm:p-6 border-t border-[#2a2a2a] bg-[#1a1a1a]">
+              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Skriv en melding..."
+                  className="flex-1 bg-[#2a2a2a] text-slate-200 placeholder-slate-500 border border-[#333] rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                />
+                <button 
+                  type="submit"
+                  disabled={!newMessage.trim()}
+                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 text-white p-3 rounded-full transition-colors flex-shrink-0"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center">
+            <MessageSquare className="w-16 h-16 text-[#2a2a2a] mb-4" />
+            <h2 className="text-xl font-medium text-slate-300 mb-2">Dine meldinger</h2>
+            <p className="max-w-md text-sm">Velg en samtale fra listen til venstre for å starte å chatte, eller start en ny samtale.</p>
+          </div>
+        )}
+      </div>
+
+      {/* New Chat Modal */}
+      {showNewChatModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md border border-[#333]">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Start ny samtale</h2>
+              <button onClick={() => setShowNewChatModal(false)} className="text-slate-400 hover:text-white">
+                &times;
+              </button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {availableStudents.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">Ingen nye elever å starte samtale med.</p>
+              ) : (
+                availableStudents.map(student => (
+                  <button
+                    key={student.id}
+                    onClick={() => handleStartNewChat(student.id)}
+                    className="w-full text-left p-3 rounded-xl hover:bg-[#2a2a2a] transition-colors text-slate-200"
+                  >
+                    {student.full_name || 'Ukjent elev'}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

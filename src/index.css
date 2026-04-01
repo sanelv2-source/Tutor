@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+.chat-item {
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.chat-item:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.chat-item.active {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
 /* Report Box CSS */
 .report-box {
   background: #fff;

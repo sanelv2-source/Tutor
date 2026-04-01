@@ -45,7 +45,7 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
             email: email, 
             full_name: name,
             phone: teacherPhone,
-            role: 'teacher'
+            role: 'tutor'
           }
         ]);
         

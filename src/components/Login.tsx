@@ -97,14 +97,18 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
 
       if (data.user) {
-        // Nå leser vi rollen fra metadataene som vi nettopp lagret
-        const userRole = data.user.user_metadata?.role;
-        
-        // Ruting basert på rolle
-        if (userRole === 'student') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile?.role === 'tutor') {
+          navigate('/tutor/dashboard');
+        } else if (profile?.role === 'student') {
           navigate('/student/dashboard');
         } else {
-          navigate('/tutor/dashboard');
+          navigate('/complete-profile');
         }
       }
     } catch (err: any) {
@@ -176,7 +180,19 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
           
           // Sjekk om vi faktisk fikk en session (avhenger av Supabase-innstillinger)
           if (signUpData.session) {
-            window.location.href = '/student/dashboard';
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', signUpData.session.user.id)
+              .single();
+
+            if (profile?.role === 'tutor') {
+              window.location.href = '/tutor/dashboard';
+            } else if (profile?.role === 'student') {
+              window.location.href = '/student/dashboard';
+            } else {
+              window.location.href = '/complete-profile';
+            }
             return;
           } else {
             setError('Brukeren ble opprettet, men Supabase krever e-postbekreftelse. For å logge inn direkte med passord må du slå av "Confirm email" i Supabase (Authentication -> Providers -> Email).');
@@ -193,7 +209,19 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
 
       if (data?.session) {
-        window.location.href = '/student/dashboard';
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .single();
+
+        if (profile?.role === 'tutor') {
+          window.location.href = '/tutor/dashboard';
+        } else if (profile?.role === 'student') {
+          window.location.href = '/student/dashboard';
+        } else {
+          window.location.href = '/complete-profile';
+        }
       }
     } catch (err: any) {
       console.error('Test login error:', err);
