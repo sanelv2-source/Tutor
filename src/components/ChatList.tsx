@@ -61,12 +61,17 @@ export const ChatList = () => {
       }
       if (!userData.user) return;
 
+      console.log("Fetching available students for tutor:", userData.user.id);
       const { data, error } = await supabase
         .from('students')
         .select('id, full_name')
         .eq('tutor_id', userData.user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching students from DB:", error);
+        throw error;
+      }
+      console.log("Fetched students from DB:", data);
       
       // Filter out students that already have a conversation
       const existingStudentIds = conversations.map(c => 
@@ -74,6 +79,7 @@ export const ChatList = () => {
       );
       
       const filtered = (data || []).filter(s => !existingStudentIds.includes(s.id));
+      console.log("Filtered available students:", filtered);
       setAvailableStudents(filtered);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -381,8 +387,14 @@ export const ChatList = () => {
         throw new Error('Fant ikke elev for samtalen.');
       }
 
-      const recipientId =
-        senderId === conversation.tutor_id ? (student.profile_id || null) : conversation.tutor_id;
+      const isTutor = senderId === conversation.tutor_id;
+      const recipientId = isTutor ? (student.profile_id || null) : conversation.tutor_id;
+
+      if (isTutor && !recipientId) {
+        alert("Eleven har ikke aktivert kontoen sin ennå.");
+        setNewMessage(trimmed); // Revert optimistic clear
+        return;
+      }
 
       const { error: insertError } = await supabase
         .from('messages')

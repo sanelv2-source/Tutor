@@ -160,6 +160,11 @@ const AcceptInvite: React.FC = () => {
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: invitation.email,
           password: password,
+          options: {
+            data: {
+              role: 'student'
+            }
+          }
         });
 
         if (authError) {

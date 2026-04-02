@@ -32,19 +32,34 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       const normalizedEmail = email.trim().toLowerCase();
 
       // 2. Sjekk om elev finnes
-      const { data: existingStudent } = await supabase
+      console.log("Checking if student exists with email:", normalizedEmail, "and tutor_id:", admin.id);
+      const { data: existingStudent, error: existingStudentError } = await supabase
         .from('students')
         .select('id')
         .eq('tutor_id', admin.id)
         .eq('email', normalizedEmail)
         .maybeSingle();
 
+      if (existingStudentError) {
+        console.error("Error checking existing student:", existingStudentError);
+        throw existingStudentError;
+      }
+      console.log("Existing student result:", existingStudent);
+
       let studentId;
 
       if (existingStudent) {
         studentId = existingStudent.id;
+        console.log("Using existing student ID:", studentId);
       } else {
         // Opprett elev
+        console.log("Creating new student with:", {
+          email: normalizedEmail,
+          full_name: studentName,
+          tutor_id: admin.id,
+          status: 'active',
+          subject: subject || ''
+        });
         const { data: newStudent, error: studentError } = await supabase
           .from('students')
           .insert([{
@@ -52,46 +67,84 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
             full_name: studentName,
             tutor_id: admin.id,
             status: 'active',
-            subject: subject || ''
+            subject: subject || '',
+            profile_id: null
           }])
           .select()
           .single();
 
-        if (studentError) throw studentError;
+        if (studentError) {
+          console.error("Error creating student:", studentError);
+          throw new Error(`Kunne ikke opprette elev: ${studentError.message}`);
+        }
+        if (!newStudent) {
+          console.error("No student returned after insert");
+          throw new Error("Kunne ikke opprette elev: Ingen data returnert");
+        }
+        console.log("New student created:", newStudent);
         studentId = newStudent.id;
       }
 
-      // 3. Kanseller eksisterende invitasjoner
-      await supabase
+      // 3. Check for existing pending invitation
+      console.log("Checking for existing pending invitation for student:", studentId);
+      const { data: existingInvite, error: existingInviteError } = await supabase
         .from('student_invitations')
-        .update({ status: 'cancelled' })
+        .select('*')
         .eq('student_id', studentId)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .maybeSingle();
 
-      // 4. Opprett ny invitasjon
-      const generateToken = () => {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-          return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      if (existingInviteError) {
+        console.error("Error checking existing invitation:", existingInviteError);
+      }
+
+      let token;
+
+      if (existingInvite) {
+        console.log("Reusing existing invitation:", existingInvite);
+        token = existingInvite.token;
+        
+        // Update expires_at to give them another 7 days
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+        
+        await supabase
+          .from('student_invitations')
+          .update({ expires_at: expiresAt.toISOString() })
+          .eq('id', existingInvite.id);
+      } else {
+        // 4. Opprett ny invitasjon
+        const generateToken = () => {
+          if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+          }
+          // Fallback for non-secure contexts
+          return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        };
+        token = generateToken();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        console.log("Creating new invitation for student:", studentId, "with token:", token);
+        const { data: newInvite, error: inviteError } = await supabase
+          .from('student_invitations')
+          .insert({
+            student_id: studentId,
+            tutor_id: admin.id,
+            email: normalizedEmail,
+            token,
+            status: 'pending',
+            expires_at: expiresAt.toISOString()
+          })
+          .select()
+          .single();
+
+        if (inviteError) {
+          console.error("Error creating invitation:", inviteError);
+          throw new Error(`Kunne ikke opprette invitasjon: ${inviteError.message}`);
         }
-        // Fallback for non-secure contexts
-        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-      };
-      const token = generateToken();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      const { error: inviteError } = await supabase
-        .from('student_invitations')
-        .insert({
-          student_id: studentId,
-          tutor_id: admin.id,
-          email: normalizedEmail,
-          token,
-          status: 'pending',
-          expires_at: expiresAt.toISOString()
-        });
-
-      if (inviteError) throw inviteError;
+        console.log("New invitation created:", newInvite);
+      }
 
       // 5. Send e-post via backend
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
