@@ -79,6 +79,63 @@ const AcceptInvite: React.FC = () => {
     validateToken();
   }, [token]);
 
+  const finalizeStudentInvitation = async (token: string) => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user?.id || !user.email) {
+      throw new Error('Fant ikke innlogget bruker.');
+    }
+
+    const normalizedEmail = user.email.trim().toLowerCase();
+
+    const { data: invitation, error: invitationError } = await supabase
+      .from('student_invitations')
+      .select('id, student_id, email, status, expires_at')
+      .eq('token', token)
+      .single();
+
+    if (invitationError || !invitation) {
+      throw new Error('Fant ikke invitasjonen.');
+    }
+
+    if (invitation.email.trim().toLowerCase() !== normalizedEmail) {
+      throw new Error('E-post matcher ikke invitasjonen.');
+    }
+
+    if (invitation.status !== 'pending') {
+      return;
+    }
+
+    if (new Date(invitation.expires_at) <= new Date()) {
+      throw new Error('Invitasjonen er utløpt.');
+    }
+
+    const { error: linkError } = await supabase
+      .from('students')
+      .update({
+        profile_id: user.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invitation.student_id);
+
+    if (linkError) {
+      throw new Error('Kunne ikke koble student til brukerkonto.');
+    }
+
+    const { error: acceptError } = await supabase
+      .from('student_invitations')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invitation.id);
+
+    if (acceptError) {
+      throw new Error('Kunne ikke markere invitasjonen som akseptert.');
+    }
+  };
+
   const handleSignup = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
@@ -118,60 +175,8 @@ const AcceptInvite: React.FC = () => {
       }
 
       // 2. Accept invitation directly via Supabase
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user?.id || !user.email) {
-        console.error('Failed to get session:', userError);
-        throw new Error('Fant ikke innlogget bruker etter opprettelse av konto.');
-      }
-
-      const { data: inviteData, error: inviteError } = await supabase
-        .from('student_invitations')
-        .select('id, student_id, email, status, expires_at')
-        .eq('token', token)
-        .single();
-
-      if (inviteError || !inviteData) {
-        console.error('Invitation not found:', inviteError);
-        throw new Error('Fant ikke invitasjonen.');
-      }
-
-      if (inviteData.email.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
-        console.error('Email mismatch:', { inviteEmail: inviteData.email, userEmail: user.email });
-        throw new Error('Innlogget bruker matcher ikke invitasjonens e-post.');
-      }
-
-      if (inviteData.status !== 'pending') {
-        console.error('Invitation not pending:', inviteData.status);
-        throw new Error('Invitasjonen er ikke lenger pending.');
-      }
-
-      if (new Date(inviteData.expires_at) <= new Date()) {
-        console.error('Invitation expired:', inviteData.expires_at);
-        throw new Error('Invitasjonen er utløpt.');
-      }
-
-      const { error: linkError } = await supabase
-        .from('students')
-        .update({ profile_id: user.id })
-        .eq('id', inviteData.student_id);
-
-      if (linkError) {
-        console.error('Failed to update students.profile_id:', linkError);
-        throw new Error(`Kunne ikke koble elevkonto til studentraden: ${linkError.message}`);
-      }
-
-      const { error: acceptError } = await supabase
-        .from('student_invitations')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', inviteData.id);
-
-      if (acceptError) {
-        console.error('Failed to mark invitation accepted:', acceptError);
-        throw new Error(`Kunne ikke markere invitasjonen som akseptert: ${acceptError.message}`);
+      if (token) {
+        await finalizeStudentInvitation(token);
       }
 
       // 4. Navigate to dashboard

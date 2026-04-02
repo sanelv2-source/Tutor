@@ -159,6 +159,8 @@ export const ChatList = () => {
   };
 
   const handleStartNewChat = async (studentId: string) => {
+    console.log('Selected student:', studentId);
+    console.log('Starting conversation...');
     try {
       const data = await getOrCreateConversation(studentId);
       
@@ -352,22 +354,48 @@ export const ChatList = () => {
     setNewMessage('');
     
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError && userError.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        throw new Error('Ikke logget inn');
       }
-      const senderId = userData.user?.id;
-      if (!senderId) throw new Error('Ikke logget inn');
 
-      const studentId = Array.isArray(activeConversation.student) ? activeConversation.student[0]?.id : activeConversation.student?.id;
+      const senderId = authData.user.id;
 
-      const { error } = await supabase.from('messages').insert({
-        conversation_id: activeConversation.id,
-        sender_id: senderId,
-        body: trimmed,
-      });
+      const { data: conversation, error: conversationError } = await supabase
+        .from('conversations')
+        .select('id, tutor_id, student_id')
+        .eq('id', activeConversation.id)
+        .single();
 
-      if (error) throw error;
+      if (conversationError || !conversation) {
+        throw new Error('Fant ikke samtalen.');
+      }
+
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('id, profile_id')
+        .eq('id', conversation.student_id)
+        .single();
+
+      if (studentError || !student) {
+        throw new Error('Fant ikke elev for samtalen.');
+      }
+
+      const recipientId =
+        senderId === conversation.tutor_id ? (student.profile_id || null) : conversation.tutor_id;
+
+      const { error: insertError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: activeConversation.id,
+          sender_id: senderId,
+          recipient_id: recipientId,
+          body: trimmed,
+        });
+
+      if (insertError) {
+        throw insertError;
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       // Revert optimistic clear if failed
