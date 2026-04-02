@@ -193,6 +193,161 @@ async function startServer() {
     res.json({ message: "Forespørsel sendt" });
   });
 
+  app.post("/api/invitations/send-email", async (req, res) => {
+    const { email, tutorName, token } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!email || !token) {
+      return res.status(400).json({ error: "Mangler påkrevde felt" });
+    }
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "Uautorisert" });
+    }
+
+    try {
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const inviteUrl = `${appUrl}/student/accept-invite?token=${token}`;
+      const fromEmail = "TutorFlyt <post@tutorflyt.no>";
+
+      if (resend) {
+        const data = await resend.emails.send({
+          from: fromEmail,
+          to: email,
+          subject: "Invitasjon til TutorFlyt",
+          html: `
+            <div style="background-color: #f8fafc; font-family: sans-serif; padding: 40px 20px;">
+              <div style="margin: 0 auto; padding: 40px 32px; background-color: #ffffff; border-radius: 12px; max-width: 600px; border: 1px solid #e2e8f0; text-align: center;">
+                <h1 style="color: #0f172a; font-size: 24px; font-weight: bold; margin: 0 0 24px;">Velkommen til TutorFlyt!</h1>
+                <p style="color: #475569; font-size: 16px; line-height: 26px; margin: 0 0 20px; text-align: center;">
+                  <strong>${tutorName || "Læreren din"}</strong> har invitert deg til å opprette en elevkonto på TutorFlyt.
+                </p>
+                <div style="margin: 32px 0; text-align: center;">
+                  <a href="${inviteUrl}" style="background-color: #4f46e5; border-radius: 8px; color: #ffffff; display: inline-block; font-size: 16px; font-weight: bold; text-decoration: none; padding: 16px 32px;">
+                    Aksepter invitasjon og opprett konto
+                  </a>
+                </div>
+                <p style="color: #94a3b8; font-size: 14px; line-height: 22px; text-align: center;">
+                  Denne lenken utløper om 7 dager.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+        
+        if (data.error) {
+          console.error("Resend API returned an error:", data.error);
+        }
+      } else {
+        console.log("=========================================");
+        console.log("RESEND_API_KEY not set. Simulating invite email:");
+        console.log(`To: ${email}`);
+        console.log(`Invite Link: ${inviteUrl}`);
+        console.log("=========================================");
+      }
+
+      res.json({ success: true, message: "E-post sendt" });
+    } catch (error: any) {
+      console.error("Failed to send email:", error);
+      res.status(500).json({ error: "En feil oppstod ved sending av e-post" });
+    }
+  });
+
+  app.post("/api/invitations/cancel", async (req, res) => {
+    const { studentId, tutorId } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!studentId || !tutorId) {
+      return res.status(400).json({ error: "Mangler påkrevde felt" });
+    }
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "Uautorisert" });
+    }
+
+    try {
+      const tokenStr = authHeader.replace('Bearer ', '');
+      
+      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${tokenStr}`
+          }
+        }
+      });
+
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+      if (authError || !user || user.id !== tutorId) {
+        return res.status(401).json({ error: "Uautorisert" });
+      }
+
+      await supabaseClient
+        .from('student_invitations')
+        .update({ status: 'cancelled' })
+        .eq('student_id', studentId)
+        .eq('tutor_id', tutorId)
+        .eq('status', 'pending');
+
+      res.json({ success: true, message: "Invitasjon kansellert" });
+    } catch (error: any) {
+      console.error("Failed to cancel invitation:", error);
+      res.status(500).json({ error: "En feil oppstod" });
+    }
+  });
+
+  app.post("/api/invitations/validate", async (req, res) => {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: "Mangler token" });
+
+    try {
+      const { data: invitation, error } = await supabaseAdmin
+        .from('student_invitations')
+        .select('*, tutor:profiles!tutor_id(full_name)')
+        .eq('token', token)
+        .single();
+
+      if (error || !invitation) {
+        return res.status(404).json({ error: "Ugyldig invitasjon" });
+      }
+
+      if (invitation.status !== 'pending') {
+        return res.status(400).json({ error: `Invitasjonen er ${invitation.status === 'accepted' ? 'allerede akseptert' : 'utløpt eller kansellert'}` });
+      }
+
+      if (new Date(invitation.expires_at) < new Date()) {
+        return res.status(400).json({ error: "Invitasjonen har utløpt" });
+      }
+
+      res.json({ valid: true, invitation });
+    } catch (error) {
+      console.error("Validation error:", error);
+      res.status(500).json({ error: "En feil oppstod ved validering" });
+    }
+  });
+
+  app.post("/api/invitations/accept", async (req, res) => {
+    const { token, userId } = req.body;
+    if (!token || !userId) return res.status(400).json({ error: "Mangler token eller userId" });
+
+    try {
+      const { error } = await supabaseAdmin.rpc('accept_student_invitation', {
+        invitation_token: token,
+        new_user_id: userId
+      });
+
+      if (error) {
+        console.error("RPC error:", error);
+        return res.status(400).json({ error: "Ugyldig eller utløpt invitasjon" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Accept error:", error);
+      res.status(500).json({ error: "En feil oppstod ved akseptering" });
+    }
+  });
+
   app.post("/api/send-invite", async (req, res) => {
     const { email, tutorId } = req.body;
 

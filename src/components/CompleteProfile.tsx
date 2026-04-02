@@ -12,7 +12,10 @@ export default function CompleteProfile() {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error && error.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       if (!user) {
         navigate('/login');
         return;
@@ -37,28 +40,23 @@ export default function CompleteProfile() {
 
   const handleComplete = async (role: 'tutor' | 'student') => {
     if (!user) return;
+    
+    if (role === 'student') {
+      setError('Elevkontoer kan kun opprettes via en invitasjonslenke fra læreren din.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      const normalizedEmail = user.email.trim().toLowerCase();
-      const { error: profileError } = await supabase.from('profiles').upsert([
-        { 
-          id: user.id, 
-          email: normalizedEmail, 
-          full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0],
-          role: role
-        }
-      ], { onConflict: 'id' });
+      const { error: profileError } = await supabase.from('profiles').update({ 
+        role: role
+      }).eq('id', user.id);
 
       if (profileError) throw profileError;
 
-      if (role === 'tutor') {
-        window.location.href = '/tutor/dashboard';
-      } else {
-        await linkStudentProfileByEmail();
-        window.location.href = '/student/dashboard';
-      }
+      window.location.href = '/tutor/dashboard';
     } catch (err: any) {
       console.error('Profile completion error:', err);
       setError(err.message || 'Kunne ikke opprette profil');

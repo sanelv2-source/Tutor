@@ -50,8 +50,11 @@ export const useAuth = () => {
             setRole(null);
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Auth error:', err);
+        if (err?.message?.includes('Refresh Token')) {
+          await supabase.auth.signOut().catch(console.error);
+        }
         if (mounted) {
           setUser(null);
           setRole(null);

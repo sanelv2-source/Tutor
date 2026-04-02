@@ -20,6 +20,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
 import CompleteProfile from './components/CompleteProfile';
 import { InvoicePage } from './components/InvoicePage';
+import AcceptInvite from './components/AcceptInvite';
 import { linkStudentProfileByEmail } from './utils/studentLinking';
 
 export default function App() {
@@ -90,8 +91,17 @@ export default function App() {
       setIsInitializing(false);
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("Session error:", error);
+        if (error.message.includes('Refresh Token')) {
+          supabase.auth.signOut().catch(console.error);
+        }
+      }
       checkRoleAndSetUser(session, 'INITIAL_SESSION');
+    }).catch(err => {
+      console.error("Failed to get session:", err);
+      checkRoleAndSetUser(null, 'INITIAL_SESSION');
     });
 
     const {
@@ -172,6 +182,7 @@ export default function App() {
         <Route path="/emails" element={<EmailPreview onNavigate={handleNavigate} />} />
         <Route path="/unauthorized" element={<Unauthorized onNavigate={handleNavigate} />} />
         <Route path="/complete-profile" element={<CompleteProfile />} />
+        <Route path="/student/accept-invite" element={<AcceptInvite />} />
         <Route path="/invoice/:publicToken" element={<InvoicePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

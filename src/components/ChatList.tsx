@@ -20,7 +20,10 @@ export const ChatList = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       if (userData.user) {
         setCurrentUserId(userData.user.id);
         
@@ -52,7 +55,10 @@ export const ChatList = () => {
 
   const fetchAvailableStudents = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       if (!userData.user) return;
 
       const { data, error } = await supabase
@@ -74,39 +80,99 @@ export const ChatList = () => {
     }
   };
 
+  const getOrCreateConversation = async (studentId: string) => {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      throw new Error('Ikke logget inn');
+    }
+
+    const tutorId = authData.user.id;
+
+    const { data: existing, error: existingError } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        tutor_id,
+        created_at,
+        updated_at,
+        last_message_at,
+        tutor_unread_count,
+        student_unread_count,
+        student:students (
+          id,
+          full_name,
+          profile_id
+        ),
+        tutor:profiles!tutor_id (
+          id,
+          full_name
+        )
+      `)
+      .eq('tutor_id', tutorId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    if (existingError) {
+      throw existingError;
+    }
+
+    if (existing) {
+      return existing;
+    }
+
+    const now = new Date().toISOString();
+
+    const { data: created, error: createError } = await supabase
+      .from('conversations')
+      .insert({
+        tutor_id: tutorId,
+        student_id: studentId,
+        created_at: now,
+        updated_at: now,
+        last_message_at: now,
+      })
+      .select(`
+        id,
+        tutor_id,
+        created_at,
+        updated_at,
+        last_message_at,
+        tutor_unread_count,
+        student_unread_count,
+        student:students (
+          id,
+          full_name,
+          profile_id
+        ),
+        tutor:profiles!tutor_id (
+          id,
+          full_name
+        )
+      `)
+      .single();
+
+    if (createError) {
+      throw createError;
+    }
+
+    return created;
+  };
+
   const handleStartNewChat = async (studentId: string) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-
-      const { data, error } = await supabase
-        .from('conversations')
-        .insert({
-          tutor_id: userData.user.id,
-          student_id: studentId,
-        })
-        .select(`
-          id,
-          tutor_id,
-          created_at,
-          updated_at,
-          last_message_at,
-          tutor_unread_count,
-          student:students (
-            id,
-            full_name
-          )
-        `)
-        .single();
-
-      if (error) throw error;
+      const data = await getOrCreateConversation(studentId);
       
-      setConversations(prev => [data, ...prev]);
+      // Check if conversation is already in state
+      const isExisting = conversations.some(c => c.id === data.id);
+      if (!isExisting) {
+        setConversations(prev => [data, ...prev]);
+      }
+      
       setActiveConversation(data);
       setShowNewChatModal(false);
       fetchMessages(data.id);
     } catch (error) {
-      console.error('Error creating conversation:', error);
+      console.error('Error creating/getting conversation:', error);
     }
   };
 
@@ -232,7 +298,10 @@ export const ChatList = () => {
       setMessages(data || []);
 
       // Mark messages as read
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       const userId = userData.user?.id;
       if (userId && data) {
         const unreadMessages = data.filter(m => m.sender_id !== userId && !m.read_at);
@@ -283,7 +352,10 @@ export const ChatList = () => {
     setNewMessage('');
     
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       const senderId = userData.user?.id;
       if (!senderId) throw new Error('Ikke logget inn');
 

@@ -39,21 +39,14 @@ export default function Signup({ onNavigate }: { onNavigate: (page: string) => v
         throw signUpError;
       }
 
-      // 2. Opprett profil i databasen umiddelbart
+      // 2. Oppdater profil med telefonnummer
       if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').upsert([
-          { 
-            id: data.user.id, 
-            email: normalizedEmail, 
-            full_name: name,
-            phone: teacherPhone,
-            role: 'tutor'
-          }
-        ], { onConflict: 'id' });
+        const { error: profileError } = await supabase.from('profiles').update({ 
+          phone: teacherPhone
+        }).eq('id', data.user.id);
         
         if (profileError) {
-          // Kast feil slik at vi ikke går videre til suksess-skjermen
-          throw new Error(`Kunne ikke opprette profil i databasen: ${profileError.message}`);
+          console.error(`Kunne ikke oppdatere profil med telefonnummer: ${profileError.message}`);
         }
       }
 

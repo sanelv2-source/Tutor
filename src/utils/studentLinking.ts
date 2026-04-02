@@ -2,7 +2,13 @@ import { supabase } from '../supabaseClient';
 
 export async function linkStudentProfileByEmail() {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user?.email) return;
+  if (userError) {
+    if (userError.message.includes('Refresh Token')) {
+      await supabase.auth.signOut().catch(console.error);
+    }
+    return;
+  }
+  if (!user?.email) return;
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')

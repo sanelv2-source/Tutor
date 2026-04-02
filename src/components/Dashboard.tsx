@@ -75,7 +75,10 @@ const saveMeetLink = async (link: string) => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+        if (userError && userError.message.includes('Refresh Token')) {
+          await supabase.auth.signOut().catch(console.error);
+        }
         if (authUser) {
           setAuthUserId(authUser.id);
           const { data, error } = await supabase
@@ -897,7 +900,10 @@ const saveMeetLink = async (link: string) => {
         const amount = parseInt(newItemData.detail) || 500;
         
         // 1. Hent den aktive brukeren direkte fra Supabase auth
-        const { data: { user: activeUser } } = await supabase.auth.getUser();
+        const { data: { user: activeUser }, error: userError } = await supabase.auth.getUser();
+        if (userError && userError.message.includes('Refresh Token')) {
+          await supabase.auth.signOut().catch(console.error);
+        }
 
         // 2. Sjekk om vi faktisk fant en bruker før vi går videre
         if (!activeUser || !activeUser.id) {
@@ -1019,7 +1025,10 @@ const saveMeetLink = async (link: string) => {
 
     try {
       // 1. Hent den aktive brukeren direkte fra Supabase auth
-      const { data: { user: activeUser } } = await supabase.auth.getUser();
+      const { data: { user: activeUser }, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
 
       // 2. Sjekk om vi faktisk fant en bruker før vi går videre
       if (!activeUser || !activeUser.id) {
@@ -1481,7 +1490,7 @@ const saveMeetLink = async (link: string) => {
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
-          {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && (
+          {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
             <div className="flex gap-2">
               {activeTab === 'timeplan' && (
                 <button 
@@ -2859,7 +2868,10 @@ const saveMeetLink = async (link: string) => {
                       </button>
                       <button 
                         onClick={async () => {
-                          const { data: { user } } = await supabase.auth.getUser();
+                          const { data: { user }, error: userError } = await supabase.auth.getUser();
+                          if (userError && userError.message.includes('Refresh Token')) {
+                            await supabase.auth.signOut().catch(console.error);
+                          }
                           if (!user) return alert("Vennligst logg inn på nytt.");
 
                           if (selectedVippsInvoice.id) {

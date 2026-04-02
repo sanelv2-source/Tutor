@@ -40,7 +40,10 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
     if (!file) return;
     setUploading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       const authUserId = user?.id;
       
       const fileExt = file.name.split('.').pop();
@@ -113,12 +116,19 @@ const StudentDashboard = () => {
   const [meetLink, setMeetLink] = useState<string | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       await linkStudentProfileByEmail();
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       if (!user || !user.email) return;
 
       let { data: studentRecord, error: studentError } = await supabase
@@ -165,6 +175,32 @@ const StudentDashboard = () => {
       navigate('/login');
     } else {
       console.error('Feil ved utlogging:', error.message);
+    }
+  };
+
+  const handlePasswordUpdate = async () => {
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ text: "Passordene er ikke like", type: 'error' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordMessage({ text: "Passordet må være minst 6 tegn", type: 'error' });
+      return;
+    }
+
+    setSavingPassword(true);
+    setPasswordMessage(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPasswordMessage({ text: "Passordet ble oppdatert!", type: 'success' });
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      console.error("Feil ved oppdatering av passord:", error);
+      setPasswordMessage({ text: "Kunne ikke oppdatere passord: " + error.message, type: 'error' });
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -286,6 +322,51 @@ const StudentDashboard = () => {
         <div className="p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-8">Timeplan</h1>
           <MyCalendar events={calendarEvents} />
+        </div>
+      );
+    } else if (activeTab === 'settings') {
+      return (
+        <div className="p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-8">Innstillinger</h1>
+          <div className="bg-white p-8 rounded-2xl border border-gray-100 max-w-xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Endre passord</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Nytt passord</label>
+                <input 
+                  type="password"
+                  className="w-full p-3 border border-slate-300 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minst 6 tegn"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Bekreft nytt passord</label>
+                <input 
+                  type="password"
+                  className="w-full p-3 border border-slate-300 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Gjenta nytt passord"
+                />
+              </div>
+
+              {passwordMessage && (
+                <div className={`p-3 rounded-lg text-sm ${passwordMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {passwordMessage.text}
+                </div>
+              )}
+
+              <button 
+                onClick={handlePasswordUpdate}
+                disabled={savingPassword || !newPassword || !confirmPassword}
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-slate-400 transition-colors mt-4"
+              >
+                {savingPassword ? 'Oppdaterer...' : 'Oppdater passord'}
+              </button>
+            </div>
+          </div>
         </div>
       );
     } else {

@@ -18,7 +18,10 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
 
     try {
       // 1. Hent din egen ID (Læreren)
-      const { data: { user: admin } } = await supabase.auth.getUser();
+      const { data: { user: admin }, error: adminError } = await supabase.auth.getUser();
+      if (adminError && adminError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(console.error);
+      }
       console.log("Min ID som lærer:", admin?.id);
 
       if (!admin) {
@@ -26,34 +29,107 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         return;
       }
 
-      // 2. Lagre i tabellen - VIKTIG: Bruk din ID som tutor_id
       const normalizedEmail = email.trim().toLowerCase();
-      const { error: dbError } = await supabase
+
+      // 2. Sjekk om elev finnes
+      const { data: existingStudent } = await supabase
         .from('students')
-        .insert([
-          { 
+        .select('id')
+        .eq('tutor_id', admin.id)
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      let studentId;
+
+      if (existingStudent) {
+        studentId = existingStudent.id;
+      } else {
+        // Opprett elev
+        const { data: newStudent, error: studentError } = await supabase
+          .from('students')
+          .insert([{
             email: normalizedEmail,
             full_name: studentName,
-            tutor_id: admin.id, // Dette er din ID fra profiles-tabellen
+            tutor_id: admin.id,
             status: 'active',
-            subject: subject
-          }
-        ]);
+            subject: subject || ''
+          }])
+          .select()
+          .single();
 
-      if (dbError) {
-        console.error("Databasefeil:", dbError.message);
-        setStatus("Kunne ikke lagre i tabell: " + dbError.message);
-      } else {
-        setStatus("Elev lagt til i listen!");
-        alert("Elev lagt til i listen!"); // Viser en popup-beskjed
-        
-        if (onInviteSuccess) {
-          onInviteSuccess(email);
-        }
-        setEmail('');
-        setStudentName('');
-        setSubject('');
+        if (studentError) throw studentError;
+        studentId = newStudent.id;
       }
+
+      // 3. Kanseller eksisterende invitasjoner
+      await supabase
+        .from('student_invitations')
+        .update({ status: 'cancelled' })
+        .eq('student_id', studentId)
+        .eq('status', 'pending');
+
+      // 4. Opprett ny invitasjon
+      const generateToken = () => {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+          return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+        }
+        // Fallback for non-secure contexts
+        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      };
+      const token = generateToken();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const { error: inviteError } = await supabase
+        .from('student_invitations')
+        .insert({
+          student_id: studentId,
+          tutor_id: admin.id,
+          email: normalizedEmail,
+          token,
+          status: 'pending',
+          expires_at: expiresAt.toISOString()
+        });
+
+      if (inviteError) throw inviteError;
+
+      // 5. Send e-post via backend
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        if (sessionError.message.includes('Refresh Token')) {
+          await supabase.auth.signOut().catch(console.error);
+        }
+        throw sessionError;
+      }
+      const jwt = sessionData.session?.access_token;
+
+      const response = await fetch('/api/invitations/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          tutorName: admin.user_metadata?.full_name || "Læreren din",
+          token
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Kunne ikke sende e-post");
+      }
+
+      setStatus("Elev lagt til og invitasjon sendt!");
+      alert("Elev lagt til og invitasjon sendt!"); // Viser en popup-beskjed
+      
+      if (onInviteSuccess) {
+        onInviteSuccess(normalizedEmail);
+      }
+      setEmail('');
+      setStudentName('');
+      setSubject('');
     } catch (err: any) {
       console.error('Invite error:', err);
       setStatus('En uventet feil oppstod: ' + err.message);

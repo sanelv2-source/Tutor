@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
 export default function Login({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -13,15 +14,25 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
   const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
 
+  const getRedirectUrl = () => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get('redirect');
+  };
+
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       setIsLoading(true);
       setError('');
       
+      const redirectUrl = getRedirectUrl();
+      const redirectTo = redirectUrl 
+        ? `${window.location.origin}${redirectUrl}` 
+        : `${window.location.origin}/`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectTo,
           skipBrowserRedirect: true,
           scopes: provider === 'google' ? 'https://www.googleapis.com/auth/calendar.readonly' : undefined,
         }
@@ -56,10 +67,15 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
+      const redirectUrl = getRedirectUrl();
+      const redirectTo = redirectUrl 
+        ? `${window.location.origin}${redirectUrl}` 
+        : `${window.location.origin}/`;
+
       const { error } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: redirectTo,
         },
       });
 
@@ -99,6 +115,12 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
 
       if (data.user) {
+        const redirectUrl = getRedirectUrl();
+        if (redirectUrl) {
+          navigate(redirectUrl);
+          return;
+        }
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')

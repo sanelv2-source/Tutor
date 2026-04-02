@@ -13,6 +13,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
     { id: 'uploads', label: 'Mine Innleveringer', icon: '📤' },
     { id: 'messages', label: 'Meldinger', icon: '💬' },
     { id: 'resources', label: 'Ressurser', icon: '📚' },
+    { id: 'settings', label: 'Innstillinger', icon: '⚙️' },
   ];
 
   return (
