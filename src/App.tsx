@@ -21,7 +21,7 @@ import Unauthorized from './components/Unauthorized';
 import CompleteProfile from './components/CompleteProfile';
 import { InvoicePage } from './components/InvoicePage';
 import AcceptInvite from './components/AcceptInvite';
-import { linkStudentProfileByEmail } from './utils/studentLinking';
+import { linkStudentProfileByEmail, linkStudentProfileByEmailFallback } from './utils/studentLinking';
 
 export default function App() {
   const navigate = useNavigate();
@@ -65,7 +65,7 @@ export default function App() {
       const role = profile?.role;
 
       if (role === 'student') {
-        await linkStudentProfileByEmail();
+        await linkStudentProfileByEmailFallback();
       }
 
       setUser({

@@ -39,3 +39,36 @@ export async function linkStudentProfileByEmail() {
     console.error('Failed to link student profile:', updateError);
   }
 }
+
+export async function linkStudentProfileByEmailFallback() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.id || !user.email) return;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'student') return;
+
+  const normalizedEmail = user.email.trim().toLowerCase();
+
+  const { data: student } = await supabase
+    .from('students')
+    .select('id, profile_id')
+    .ilike('email', normalizedEmail)
+    .is('profile_id', null)
+    .maybeSingle();
+
+  if (!student) return;
+
+  await supabase
+    .from('students')
+    .update({
+      profile_id: user.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', student.id)
+    .is('profile_id', null);
+}
