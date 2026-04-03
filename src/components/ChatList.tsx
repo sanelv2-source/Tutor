@@ -451,14 +451,14 @@ export const ChatList = () => {
   };
 
   return (
-    <div className="bg-[#121212] flex h-[calc(100vh-8rem)] text-slate-200 font-sans rounded-2xl shadow-xl border border-[#2a2a2a] overflow-hidden">
+    <div className="bg-slate-50 flex h-[calc(100vh-8rem)] text-slate-800 font-sans rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
       
       {/* Sidebar / Chat List */}
-      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-[#2a2a2a] flex flex-col ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-slate-200 flex flex-col ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="p-4 border-b border-[#2a2a2a] flex items-center justify-between bg-[#1a1a1a]">
-          <h1 className="text-lg font-bold text-white flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-purple-500" />
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
+          <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-violet-600" />
             {userRole === 'student' ? 'Meldinger med lærer' : 'Meldinger'}
           </h1>
           {userRole === 'student' ? (
@@ -466,7 +466,7 @@ export const ChatList = () => {
               onClick={handleStudentStartChat}
               disabled={!linkedTutorId}
               title="Skriv til lærer"
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 text-white p-2 rounded-full transition-all shadow-lg shadow-purple-900/50"
+              className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:hover:bg-violet-600 text-white p-2 rounded-full transition-all shadow-sm"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -477,7 +477,7 @@ export const ChatList = () => {
                 setShowNewChatModal(true);
               }}
               title="Start ny samtale"
-              className="bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-full transition-all shadow-lg shadow-purple-900/50"
+              className="bg-violet-600 hover:bg-violet-500 text-white p-2 rounded-full transition-all shadow-sm"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -485,21 +485,21 @@ export const ChatList = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="p-3 border-b border-[#2a2a2a] bg-[#121212]">
+        <div className="p-3 border-b border-slate-200 bg-slate-50">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-500" />
+              <Search className="h-4 w-4 text-slate-400" />
             </div>
             <input
               type="text"
-              className="block w-full pl-9 pr-3 py-2 border border-[#333] rounded-xl leading-5 bg-[#1a1a1a] text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm transition-colors"
+              className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl leading-5 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm transition-colors"
               placeholder="Søk..."
             />
           </div>
         </div>
 
         {/* Chat List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-[#121212]">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-slate-50">
           {loading ? (
             <div className="text-center py-8 text-slate-500 text-sm">Henter samtaler...</div>
           ) : conversations.length === 0 ? (
@@ -522,15 +522,15 @@ export const ChatList = () => {
                 <div 
                   key={chat.id} 
                   onClick={() => handleConversationClick(chat)}
-                  className={`chat-item flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer group ${isActive ? 'active' : ''}`}
+                  className={`chat-item flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer group ${isActive ? 'bg-white border border-slate-200 shadow-sm' : 'hover:bg-slate-100 border border-transparent'}`}
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#2a1b3d] to-purple-900 flex items-center justify-center text-purple-200 font-bold text-sm sm:text-base shadow-inner border border-purple-800/50">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm sm:text-base border border-violet-200">
                       {initials}
                     </div>
                     {unread > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#121212] shadow-sm">
+                      <span className="absolute -top-1 -right-1 bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm">
                         {unread}
                       </span>
                     )}
@@ -539,14 +539,14 @@ export const ChatList = () => {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-0.5">
-                      <h3 className={`text-sm sm:text-base font-semibold truncate ${unread > 0 || isActive ? 'text-white' : 'text-slate-300 group-hover:text-white transition-colors'}`}>
+                      <h3 className={`text-sm sm:text-base font-semibold truncate ${unread > 0 || isActive ? 'text-slate-900' : 'text-slate-700 group-hover:text-slate-900 transition-colors'}`}>
                         {chatName}
                       </h3>
-                      <span className={`text-[10px] sm:text-xs whitespace-nowrap ml-2 ${unread > 0 ? 'text-purple-400 font-medium' : 'text-slate-500'}`}>
+                      <span className={`text-[10px] sm:text-xs whitespace-nowrap ml-2 ${unread > 0 ? 'text-violet-600 font-medium' : 'text-slate-400'}`}>
                         {formatTime(chat.last_message_at || chat.created_at)}
                       </span>
                     </div>
-                    <p className={`text-xs sm:text-sm truncate ${unread > 0 ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                    <p className={`text-xs sm:text-sm truncate ${unread > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
                       {lastMessage}
                     </p>
                   </div>
@@ -558,30 +558,30 @@ export const ChatList = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col bg-[#121212] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col bg-white ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {activeConversation ? (
           <>
             {/* Chat Header */}
-            <div className="flex items-center gap-4 p-4 sm:p-6 border-b border-[#2a2a2a] bg-[#1a1a1a]">
+            <div className="flex items-center gap-4 p-4 sm:p-6 border-b border-slate-200 bg-white">
               <button 
                 onClick={handleBack}
-                className="md:hidden p-2 hover:bg-[#2a2a2a] rounded-full transition-colors text-slate-400 hover:text-white"
+                className="md:hidden p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2a1b3d] to-purple-900 flex items-center justify-center text-purple-200 font-bold text-sm shadow-inner border border-purple-800/50">
+                <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm border border-violet-200">
                   {getInitials(getChatName(activeConversation, currentUserId))}
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">{getChatName(activeConversation, currentUserId)}</h2>
-                  <p className="text-xs text-purple-400">Aktiv nå</p>
+                  <h2 className="text-lg font-bold text-slate-900">{getChatName(activeConversation, currentUserId)}</h2>
+                  <p className="text-xs text-violet-600">Aktiv nå</p>
                 </div>
               </div>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[#121212]">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-white">
               {messagesLoading ? (
                 <div className="flex justify-center items-center h-full text-slate-500">
                   Henter meldinger...
@@ -591,21 +591,35 @@ export const ChatList = () => {
                   Ingen meldinger ennå. Start samtalen!
                 </div>
               ) : (
-                messages.map((msg) => {
-                  const studentId = Array.isArray(activeConversation.student) ? activeConversation.student[0]?.id : activeConversation.student?.id;
-                  const isStudent = msg.sender_id === studentId;
+                messages.map((msg, index) => {
+                  const isCurrentUser = msg.sender_id === currentUserId;
+                  const showHeader = index === 0 || messages[index - 1].sender_id !== msg.sender_id;
                   
                   return (
-                    <div key={msg.id} className={`flex ${isStudent ? 'justify-start' : 'justify-end'}`}>
-                      <div className={`max-w-[75%] sm:max-w-[60%] rounded-2xl px-4 py-3 ${
-                        isStudent 
-                          ? 'bg-[#2a2a2a] text-slate-200 rounded-tl-sm' 
-                          : 'bg-purple-600 text-white rounded-tr-sm'
-                      }`}>
-                        <p className="text-sm">{msg.body || msg.content || msg.message || '...'}</p>
-                        <span className={`text-[10px] block mt-1 ${isStudent ? 'text-slate-500' : 'text-purple-200'}`}>
-                          {formatTime(msg.created_at)}
-                        </span>
+                    <div key={msg.id} className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'} mb-2`}>
+                      {showHeader && (
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <span className="text-xs font-medium text-slate-500">
+                            {isCurrentUser ? 'Du' : getChatName(activeConversation, currentUserId)}
+                          </span>
+                        </div>
+                      )}
+                      <div className={`flex items-end gap-2 max-w-[85%] sm:max-w-[70%] ${isCurrentUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {/* Avatar next to message */}
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isCurrentUser ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                          {isCurrentUser ? 'Du' : getInitials(getChatName(activeConversation, currentUserId))[0]}
+                        </div>
+                        
+                        <div className={`rounded-2xl px-4 py-3 ${
+                          isCurrentUser 
+                            ? 'bg-violet-600 text-white rounded-br-sm shadow-sm' 
+                            : 'bg-slate-100 text-slate-800 rounded-bl-sm border border-slate-200'
+                        }`}>
+                          <p className="text-sm leading-relaxed">{msg.body || msg.content || msg.message || '...'}</p>
+                          <span className={`text-[10px] block mt-1.5 ${isCurrentUser ? 'text-violet-200 text-right' : 'text-slate-400 text-left'}`}>
+                            {formatTime(msg.created_at)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -614,19 +628,21 @@ export const ChatList = () => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 sm:p-6 border-t border-[#2a2a2a] bg-[#1a1a1a]">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Skriv en melding..."
-                  className="flex-1 bg-[#2a2a2a] text-slate-200 placeholder-slate-500 border border-[#333] rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white">
+              <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Skriv en melding..."
+                    className="w-full bg-slate-100 text-slate-800 placeholder-slate-400 rounded-full pl-5 pr-12 py-3.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  />
+                </div>
                 <button 
                   type="submit"
                   disabled={!newMessage.trim()}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 text-white p-3 rounded-full transition-colors flex-shrink-0"
+                  className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:hover:bg-violet-600 text-white p-3.5 rounded-full transition-all shadow-sm flex-shrink-0"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -635,8 +651,8 @@ export const ChatList = () => {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center">
-            <MessageSquare className="w-16 h-16 text-[#2a2a2a] mb-4" />
-            <h2 className="text-xl font-medium text-slate-300 mb-2">Dine meldinger</h2>
+            <MessageSquare className="w-16 h-16 text-slate-200 mb-4" />
+            <h2 className="text-xl font-medium text-slate-700 mb-2">Dine meldinger</h2>
             <p className="max-w-md text-sm">Velg en samtale fra listen til venstre for å starte å chatte, eller start en ny samtale.</p>
           </div>
         )}
@@ -645,10 +661,10 @@ export const ChatList = () => {
       {/* New Chat Modal (Only for Tutors) */}
       {showNewChatModal && userRole !== 'student' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md border border-[#333]">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-white">Start ny samtale</h2>
-              <button onClick={() => setShowNewChatModal(false)} className="text-slate-400 hover:text-white">
+              <h2 className="text-xl font-bold text-slate-900">Start ny samtale</h2>
+              <button onClick={() => setShowNewChatModal(false)} className="text-slate-400 hover:text-slate-600">
                 &times;
               </button>
             </div>
@@ -660,7 +676,7 @@ export const ChatList = () => {
                   <button
                     key={student.id}
                     onClick={() => handleStartNewChat(student.id)}
-                    className="w-full text-left p-3 rounded-xl hover:bg-[#2a2a2a] transition-colors text-slate-200"
+                    className="w-full text-left p-3 rounded-xl hover:bg-slate-50 transition-colors text-slate-800 border border-transparent hover:border-slate-200"
                   >
                     {student.full_name || 'Ukjent elev'}
                   </button>

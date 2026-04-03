@@ -113,6 +113,7 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('tasks');
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
   const [meetLink, setMeetLink] = useState<string | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -154,6 +155,21 @@ const StudentDashboard = () => {
         setAssignments(assignmentsData as any[]);
       } else {
         setAssignments([]);
+      }
+      
+      const { data: resourcesData, error: resourcesError } = await supabase
+        .from('resources')
+        .select(`
+          *,
+          resource_assignments!inner(student_id)
+        `)
+        .eq('resource_assignments.student_id', studentRecord.id)
+        .order('created_at', { ascending: false });
+        
+      if (resourcesData) {
+        setResources(resourcesData);
+      } else {
+        setResources([]);
       }
       
       const { data: tutorProfile } = await supabase
@@ -374,10 +390,54 @@ const StudentDashboard = () => {
         <div className="p-8">
           {activeTab === 'messages' ? (
             <ChatList />
+          ) : activeTab === 'resources' ? (
+            <>
+              <h1 className="text-2xl font-bold text-gray-900 mb-8">Ressurser</h1>
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <ul className="divide-y divide-gray-100">
+                  {resources.length === 0 ? (
+                    <li className="p-12 text-center text-gray-500">
+                      <p>Ingen ressurser er delt med deg enda.</p>
+                    </li>
+                  ) : (
+                    resources.map((res) => {
+                      const isFile = res.type === 'file';
+                      const isVideo = !isFile && res.url && (res.url.includes('youtube') || res.url.includes('vimeo'));
+                      const iconBg = isFile ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
+                      const btnClass = isFile 
+                        ? 'text-red-600 border-red-200 hover:bg-red-50' 
+                        : 'text-blue-600 border-blue-200 hover:bg-blue-50';
+                      const icon = isFile ? '📄' : (isVideo ? '🎥' : '🔗');
+                      const dateStr = new Date(res.created_at).toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+                      
+                      const fileUrl = isFile && res.file_path 
+                        ? supabase.storage.from('resources').getPublicUrl(res.file_path).data.publicUrl 
+                        : res.url;
+                        
+                      return (
+                        <li key={res.id} className="p-6 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-center space-x-4">
+                            <div className={`p-3 ${iconBg} rounded-xl text-2xl shrink-0`}>
+                              {icon}
+                            </div>
+                            <div>
+                              <p className="text-base font-semibold text-slate-900">{res.title}</p>
+                              <p className="text-sm text-slate-500 mt-1">Delt: {dateStr}</p>
+                            </div>
+                          </div>
+                          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`px-5 py-2.5 text-sm font-bold border rounded-xl transition-colors text-center ${btnClass}`}>
+                            {isVideo ? 'Se video' : 'Åpne ressurs'}
+                          </a>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+              </div>
+            </>
           ) : (
             <>
               <h1 className="text-2xl font-bold text-gray-900 mb-8">
-                {activeTab === 'resources' && 'Ressurser'}
                 {activeTab === 'uploads' && 'Mine Innleveringer'}
               </h1>
               <div className="bg-white p-12 rounded-2xl border border-gray-100 text-center">

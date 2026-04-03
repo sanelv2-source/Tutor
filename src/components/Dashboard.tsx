@@ -125,6 +125,9 @@ const saveMeetLink = async (link: string) => {
   const [resources, setResources] = useState<any[]>([]);
   const [newResource, setNewResource] = useState({ title: '', url: '', type: 'PDF' });
   const [resourceSource, setResourceSource] = useState<'link' | 'file'>('file');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedStudentsForResource, setSelectedStudentsForResource] = useState<string[]>([]);
+  const [isUploadingResource, setIsUploadingResource] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectedVippsInvoice, setSelectedVippsInvoice] = useState<any>(null);
   const [showVippsConfirm, setShowVippsConfirm] = useState(false);
@@ -347,11 +350,26 @@ const saveMeetLink = async (link: string) => {
     }
   }, [authUserId]);
 
+  const fetchResources = React.useCallback(async () => {
+    if (!authUserId) return;
+    const { data, error } = await supabase
+      .from('resources')
+      .select(`
+        *,
+        resource_assignments(student_id)
+      `)
+      .eq('tutor_id', authUserId)
+      .order('created_at', { ascending: false });
+
+    if (data) setResources(data);
+  }, [authUserId]);
+
   useEffect(() => {
     fetchStudents();
     fetchLessons();
     fetchVacations();
-  }, [fetchStudents, fetchLessons, fetchVacations]);
+    fetchResources();
+  }, [fetchStudents, fetchLessons, fetchVacations, fetchResources]);
 
   useEffect(() => {
     fetchCalendar();
@@ -2383,24 +2401,43 @@ const saveMeetLink = async (link: string) => {
                     </li>
                   ) : (
                     resources.map((res) => {
-                      const iconBg = res.color === 'red' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
-                      const btnClass = res.color === 'red' 
+                      const isFile = res.type === 'file';
+                      const isVideo = !isFile && res.url && (res.url.includes('youtube') || res.url.includes('vimeo'));
+                      const iconBg = isFile ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
+                      const btnClass = isFile 
                         ? 'text-red-600 border-red-200 hover:bg-red-50' 
                         : 'text-blue-600 border-blue-200 hover:bg-blue-50';
+                      const icon = isFile ? '📄' : (isVideo ? '🎥' : '🔗');
+                      const dateStr = new Date(res.created_at).toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+                      
+                      const assignedStudentIds = res.resource_assignments?.map((ra: any) => ra.student_id) || [];
+                      const assignedStudentNames = students
+                        .filter(s => assignedStudentIds.includes(s.id))
+                        .map(s => s.full_name)
+                        .join(', ');
+                        
+                      const fileUrl = isFile && res.file_path 
+                        ? supabase.storage.from('resources').getPublicUrl(res.file_path).data.publicUrl 
+                        : res.url;
                         
                       return (
-                        <li key={res.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
+                        <li key={res.id} className="p-4 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center space-x-4">
-                            <div className={`p-2 ${iconBg} rounded-lg text-xl`}>
-                              {res.icon}
+                            <div className={`p-2 ${iconBg} rounded-lg text-xl shrink-0`}>
+                              {icon}
                             </div>
                             <div>
                               <p className="text-sm font-semibold text-slate-900">{res.title}</p>
-                              <p className="text-xs text-slate-500">{res.date}</p>
+                              <div className="flex flex-col gap-0.5 mt-0.5">
+                                <p className="text-xs text-slate-500">Lagt til: {dateStr}</p>
+                                {assignedStudentNames && (
+                                  <p className="text-xs text-indigo-600">Delt med: {assignedStudentNames}</p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <a href={res.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${btnClass}`}>
-                            {res.type === 'Video' ? 'Se video' : 'Åpne'}
+                          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors text-center ${btnClass}`}>
+                            {isVideo ? 'Se video' : 'Åpne'}
                           </a>
                         </li>
                       );
@@ -2413,25 +2450,67 @@ const saveMeetLink = async (link: string) => {
                 <h2 className="text-lg font-bold text-slate-900 mb-6">Legg til ny ressurs</h2>
                 <form 
                   className="space-y-4"
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     if (!newResource.title) return;
                     if (resourceSource === 'link' && !newResource.url) return;
+                    if (resourceSource === 'file' && !selectedFile) return;
+                    if (!authUserId) return;
                     
-                    const isVideo = newResource.url.includes('youtube') || newResource.url.includes('vimeo');
-                    const newRes = {
-                      id: Date.now(),
-                      title: newResource.title,
-                      type: resourceSource === 'file' ? 'PDF' : (isVideo ? 'Video' : 'Lenke'),
-                      url: resourceSource === 'file' ? '#' : newResource.url,
-                      date: 'Akkurat nå',
-                      icon: resourceSource === 'file' ? '📄' : (isVideo ? '🎥' : '🔗'),
-                      color: resourceSource === 'file' ? 'red' : 'blue'
-                    };
-                    
-                    setResources([newRes, ...resources]);
-                    setNewResource({ title: '', url: '', type: 'PDF' });
-                    showToast('Ressurs lagt til!');
+                    setIsUploadingResource(true);
+                    try {
+                      let filePath = null;
+                      
+                      if (resourceSource === 'file' && selectedFile) {
+                        const fileExt = selectedFile.name.split('.').pop();
+                        const fileName = `${Math.random()}.${fileExt}`;
+                        filePath = `${authUserId}/${fileName}`;
+                        
+                        const { error: uploadError } = await supabase.storage
+                          .from('resources')
+                          .upload(filePath, selectedFile);
+                          
+                        if (uploadError) throw uploadError;
+                      }
+                      
+                      const { data: resourceData, error: resourceError } = await supabase
+                        .from('resources')
+                        .insert({
+                          tutor_id: authUserId,
+                          title: newResource.title,
+                          type: resourceSource,
+                          file_path: filePath,
+                          url: resourceSource === 'link' ? newResource.url : null
+                        })
+                        .select()
+                        .single();
+                        
+                      if (resourceError) throw resourceError;
+                      
+                      if (selectedStudentsForResource.length > 0) {
+                        const assignments = selectedStudentsForResource.map(studentId => ({
+                          resource_id: resourceData.id,
+                          student_id: studentId
+                        }));
+                        
+                        const { error: assignError } = await supabase
+                          .from('resource_assignments')
+                          .insert(assignments);
+                          
+                        if (assignError) throw assignError;
+                      }
+                      
+                      setNewResource({ title: '', url: '', type: 'PDF' });
+                      setSelectedFile(null);
+                      setSelectedStudentsForResource([]);
+                      showToast('Ressurs lagt til!');
+                      fetchResources();
+                    } catch (error: any) {
+                      console.error('Error adding resource:', error);
+                      showToast(`Feil ved opplasting: ${error.message}`);
+                    } finally {
+                      setIsUploadingResource(false);
+                    }
                   }}
                 >
                   <div className="flex gap-4 mb-2">
@@ -2488,8 +2567,13 @@ const saveMeetLink = async (link: string) => {
                         type="file"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file && !newResource.title) {
-                            setNewResource({...newResource, title: file.name});
+                          if (file) {
+                            setSelectedFile(file);
+                            if (!newResource.title) {
+                              setNewResource({...newResource, title: file.name});
+                            }
+                          } else {
+                            setSelectedFile(null);
                           }
                         }}
                         className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
@@ -2498,8 +2582,38 @@ const saveMeetLink = async (link: string) => {
                     </div>
                   )}
 
-                  <button type="submit" className="w-full py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors mt-2">
-                    Legg til ressurs
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Tildel til elever (valgfritt)</label>
+                    <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
+                      {students.map(student => (
+                        <label key={student.id} className="flex items-center gap-2 p-2 hover:bg-slate-100 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentsForResource.includes(student.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStudentsForResource(prev => [...prev, student.id]);
+                              } else {
+                                setSelectedStudentsForResource(prev => prev.filter(id => id !== student.id));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm text-slate-700">{student.full_name}</span>
+                        </label>
+                      ))}
+                      {students.length === 0 && (
+                        <p className="text-sm text-slate-500 text-center py-2">Ingen elever lagt til enda.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isUploadingResource}
+                    className="w-full py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors mt-2 disabled:opacity-50"
+                  >
+                    {isUploadingResource ? 'Laster opp...' : 'Legg til ressurs'}
                   </button>
                 </form>
               </div>
