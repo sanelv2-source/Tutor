@@ -2459,12 +2459,15 @@ const saveMeetLink = async (link: string) => {
                     
                     setIsUploadingResource(true);
                     try {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) throw new Error('Ikke logget inn');
+
                       let filePath = null;
                       
                       if (resourceSource === 'file' && selectedFile) {
                         const fileExt = selectedFile.name.split('.').pop();
                         const fileName = `${Math.random()}.${fileExt}`;
-                        filePath = `${authUserId}/${fileName}`;
+                        filePath = `${user.id}/${fileName}`;
                         
                         const { error: uploadError } = await supabase.storage
                           .from('resources')
@@ -2476,16 +2479,20 @@ const saveMeetLink = async (link: string) => {
                       const { data: resourceData, error: resourceError } = await supabase
                         .from('resources')
                         .insert({
-                          tutor_id: authUserId,
+                          tutor_id: user.id,
                           title: newResource.title,
                           type: resourceSource,
-                          file_path: filePath,
+                          file_path: filePath ?? null,
                           url: resourceSource === 'link' ? newResource.url : null
                         })
                         .select()
                         .single();
                         
-                      if (resourceError) throw resourceError;
+                      console.error('RESOURCE INSERT ERROR:', resourceError);
+                        
+                      if (resourceError) {
+                        throw resourceError;
+                      }
                       
                       if (selectedStudentsForResource.length > 0) {
                         const assignments = selectedStudentsForResource.map(studentId => ({
@@ -2497,7 +2504,11 @@ const saveMeetLink = async (link: string) => {
                           .from('resource_assignments')
                           .insert(assignments);
                           
-                        if (assignError) throw assignError;
+                        console.error('ASSIGNMENT INSERT ERROR:', assignError);
+                          
+                        if (assignError) {
+                          throw assignError;
+                        }
                       }
                       
                       setNewResource({ title: '', url: '', type: 'PDF' });
