@@ -20,7 +20,7 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       // 1. Hent din egen ID (Læreren)
       const { data: { user: admin }, error: adminError } = await supabase.auth.getUser();
       if (adminError && adminError.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       console.log("Min ID som lærer:", admin?.id);
 
@@ -150,7 +150,7 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
         if (sessionError.message.includes('Refresh Token')) {
-          await supabase.auth.signOut().catch(console.error);
+          await supabase.auth.signOut().catch(() => {});
         }
         throw sessionError;
       }

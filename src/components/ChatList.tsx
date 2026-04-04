@@ -22,7 +22,7 @@ export const ChatList = () => {
     const fetchUser = async () => {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError && userError.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       if (userData.user) {
         setCurrentUserId(userData.user.id);
@@ -57,7 +57,7 @@ export const ChatList = () => {
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError && userError.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       if (!userData.user) return;
 
@@ -308,7 +308,7 @@ export const ChatList = () => {
       // Mark messages as read
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError && userError.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       const userId = userData.user?.id;
       if (userId && data) {

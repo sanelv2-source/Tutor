@@ -26,7 +26,7 @@ const AcceptInvite: React.FC = () => {
     const checkSession = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error && error.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       } else if (session?.user) {
         setExistingUser(session.user);
       }

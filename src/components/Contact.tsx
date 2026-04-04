@@ -31,7 +31,7 @@ export default function Contact({ onNavigate }: { onNavigate: (page: string) => 
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-slate-900">E-post</h3>
                   <p className="mt-1 text-slate-500">
-                    <a href="mailto:kontakt@tutorflyt.no" className="hover:text-indigo-600 transition-colors">kontakt@tutorflyt.no</a>
+                    <a href="mailto:info@tutorflyt.no" className="hover:text-indigo-600 transition-colors">info@tutorflyt.no</a>
                   </p>
                   <p className="text-sm text-slate-400 mt-1">Vi svarer vanligvis innen 24 timer.</p>
                 </div>

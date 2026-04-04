@@ -31,7 +31,7 @@ export const fetchGoogleCalendarEvents = async (): Promise<GoogleCalendarEvent[]
     
     if (error) {
       if (error.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       throw new Error('Ingen aktiv sesjon funnet');
     }
@@ -87,7 +87,7 @@ export const createGoogleCalendarEvent = async (summary: string, date: string, t
     
     if (error) {
       if (error.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       throw new Error('Ingen aktiv sesjon funnet');
     }

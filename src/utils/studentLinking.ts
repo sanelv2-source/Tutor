@@ -4,7 +4,7 @@ export async function linkStudentProfileByEmail() {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) {
     if (userError.message.includes('Refresh Token')) {
-      await supabase.auth.signOut().catch(console.error);
+      await supabase.auth.signOut().catch(() => {});
     }
     return;
   }

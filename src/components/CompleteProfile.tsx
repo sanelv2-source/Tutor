@@ -14,7 +14,7 @@ export default function CompleteProfile() {
     const checkUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error && error.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
       if (!user) {
         navigate('/login');

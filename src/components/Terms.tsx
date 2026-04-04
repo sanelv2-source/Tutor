@@ -174,7 +174,7 @@ export default function Terms({ onNavigate }: { onNavigate: (page: string) => vo
             </p>
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-4">
               <p className="font-medium text-slate-900 mb-1">Tutorflyt</p>
-              <p>E-post: <a href="mailto:kontakt@tutorflyt.no" className="text-indigo-600 hover:underline">kontakt@tutorflyt.no</a></p>
+              <p>E-post: <a href="mailto:info@tutorflyt.no" className="text-indigo-600 hover:underline">info@tutorflyt.no</a></p>
               <p>Nettside: <a href="https://tutorflyt.no" className="text-indigo-600 hover:underline">tutorflyt.no</a></p>
             </div>
           </div>

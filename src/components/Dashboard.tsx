@@ -77,7 +77,7 @@ const saveMeetLink = async (link: string) => {
       try {
         const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
         if (userError && userError.message.includes('Refresh Token')) {
-          await supabase.auth.signOut().catch(console.error);
+          await supabase.auth.signOut().catch(() => {});
         }
         if (authUser) {
           setAuthUserId(authUser.id);
@@ -128,6 +128,7 @@ const saveMeetLink = async (link: string) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedStudentsForResource, setSelectedStudentsForResource] = useState<string[]>([]);
   const [isUploadingResource, setIsUploadingResource] = useState(false);
+  const [deleteResourceConfirmModal, setDeleteResourceConfirmModal] = useState<{isOpen: boolean, resourceId: string, resourceTitle: string, filePath: string | null} | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectedVippsInvoice, setSelectedVippsInvoice] = useState<any>(null);
   const [showVippsConfirm, setShowVippsConfirm] = useState(false);
@@ -433,6 +434,35 @@ const saveMeetLink = async (link: string) => {
     } catch (error: any) {
       console.error("Feil ved fullføring av time:", error.message);
       showToast("En feil oppstod. Prøv igjen.");
+    }
+  };
+
+  const confirmDeleteResource = async () => {
+    if (!deleteResourceConfirmModal) return;
+    const { resourceId, filePath } = deleteResourceConfirmModal;
+
+    try {
+      if (filePath) {
+        const { error: storageError } = await supabase.storage
+          .from('resources')
+          .remove([filePath]);
+        if (storageError) console.error('Storage deletion error:', storageError);
+      }
+
+      const { error: dbError } = await supabase
+        .from('resources')
+        .delete()
+        .eq('id', resourceId);
+
+      if (dbError) throw dbError;
+
+      setResources(resources.filter(r => r.id !== resourceId));
+      showToast('Ressurs slettet');
+    } catch (error: any) {
+      console.error('Error deleting resource:', error);
+      showToast(`Kunne ikke slette ressurs: ${error.message}`);
+    } finally {
+      setDeleteResourceConfirmModal(null);
     }
   };
 
@@ -920,7 +950,7 @@ const saveMeetLink = async (link: string) => {
         // 1. Hent den aktive brukeren direkte fra Supabase auth
         const { data: { user: activeUser }, error: userError } = await supabase.auth.getUser();
         if (userError && userError.message.includes('Refresh Token')) {
-          await supabase.auth.signOut().catch(console.error);
+          await supabase.auth.signOut().catch(() => {});
         }
 
         // 2. Sjekk om vi faktisk fant en bruker før vi går videre
@@ -1045,7 +1075,7 @@ const saveMeetLink = async (link: string) => {
       // 1. Hent den aktive brukeren direkte fra Supabase auth
       const { data: { user: activeUser }, error: userError } = await supabase.auth.getUser();
       if (userError && userError.message.includes('Refresh Token')) {
-        await supabase.auth.signOut().catch(console.error);
+        await supabase.auth.signOut().catch(() => {});
       }
 
       // 2. Sjekk om vi faktisk fant en bruker før vi går videre
@@ -2436,9 +2466,18 @@ const saveMeetLink = async (link: string) => {
                               </div>
                             </div>
                           </div>
-                          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors text-center ${btnClass}`}>
-                            {isVideo ? 'Se video' : 'Åpne'}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors text-center ${btnClass}`}>
+                              {isVideo ? 'Se video' : 'Åpne'}
+                            </a>
+                            <button
+                              onClick={() => setDeleteResourceConfirmModal({ isOpen: true, resourceId: res.id, resourceTitle: res.title, filePath: res.file_path })}
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Slett ressurs"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
                         </li>
                       );
                     })
@@ -2750,6 +2789,44 @@ const saveMeetLink = async (link: string) => {
         </div>
       )}
 
+      {/* Delete Resource Confirm Modal */}
+      {deleteResourceConfirmModal?.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-900">
+                Slett ressurs
+              </h3>
+              <button 
+                onClick={() => setDeleteResourceConfirmModal(null)}
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-600 mb-6">
+                Er du sikker på at du vil slette ressursen <strong>{deleteResourceConfirmModal.resourceTitle}</strong>? Denne handlingen kan ikke angres.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button 
+                  onClick={() => setDeleteResourceConfirmModal(null)}
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button 
+                  onClick={confirmDeleteResource}
+                  className="px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  Ja, slett ressurs
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Lesson Confirm Modal */}
       {deleteLessonConfirmModal?.isOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -2995,7 +3072,7 @@ const saveMeetLink = async (link: string) => {
                         onClick={async () => {
                           const { data: { user }, error: userError } = await supabase.auth.getUser();
                           if (userError && userError.message.includes('Refresh Token')) {
-                            await supabase.auth.signOut().catch(console.error);
+                            await supabase.auth.signOut().catch(() => {});
                           }
                           if (!user) return alert("Vennligst logg inn på nytt.");
 

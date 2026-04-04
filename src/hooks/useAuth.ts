@@ -51,9 +51,10 @@ export const useAuth = () => {
           }
         }
       } catch (err: any) {
-        console.error('Auth error:', err);
         if (err?.message?.includes('Refresh Token')) {
-          await supabase.auth.signOut().catch(console.error);
+          await supabase.auth.signOut().catch(() => {});
+        } else {
+          console.error('Auth error:', err);
         }
         if (mounted) {
           setUser(null);

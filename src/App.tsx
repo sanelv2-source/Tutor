@@ -21,6 +21,7 @@ import Unauthorized from './components/Unauthorized';
 import CompleteProfile from './components/CompleteProfile';
 import { InvoicePage } from './components/InvoicePage';
 import AcceptInvite from './components/AcceptInvite';
+import TermsOfSale from './components/TermsOfSale';
 import { linkStudentProfileByEmail, linkStudentProfileByEmailFallback } from './utils/studentLinking';
 
 export default function App() {
@@ -93,9 +94,10 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        console.error("Session error:", error);
         if (error.message.includes('Refresh Token')) {
-          supabase.auth.signOut().catch(console.error);
+          supabase.auth.signOut().catch(() => {});
+        } else {
+          console.error("Session error:", error);
         }
       }
       checkRoleAndSetUser(session, 'INITIAL_SESSION');
@@ -113,7 +115,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const showNavbar = ['/', '/how-it-works', '/pricing', '/privacy', '/terms', '/contact', '/about'].includes(location.pathname);
+  const showNavbar = ['/', '/how-it-works', '/pricing', '/privacy', '/terms', '/salgsvilkar', '/contact', '/about'].includes(location.pathname);
 
   // Helper function to pass to legacy components that still use onNavigate
   const handleNavigate = (page: string) => {
@@ -129,6 +131,7 @@ export default function App() {
       'pricing': '/pricing',
       'privacy': '/privacy',
       'terms': '/terms',
+      'salgsvilkar': '/salgsvilkar',
       'contact': '/contact',
       'about': '/about',
       'emails': '/emails',
@@ -177,6 +180,7 @@ export default function App() {
         <Route path="/pricing" element={<Pricing onNavigate={handleNavigate} />} />
         <Route path="/privacy" element={<Privacy onNavigate={handleNavigate} />} />
         <Route path="/terms" element={<Terms onNavigate={handleNavigate} />} />
+        <Route path="/salgsvilkar" element={<TermsOfSale onNavigate={handleNavigate} />} />
         <Route path="/contact" element={<Contact onNavigate={handleNavigate} />} />
         <Route path="/about" element={<About onNavigate={handleNavigate} />} />
         <Route path="/emails" element={<EmailPreview onNavigate={handleNavigate} />} />

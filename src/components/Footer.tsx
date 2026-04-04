@@ -37,6 +37,7 @@ export default function Footer({ onNavigate }: { onNavigate: (page: string) => v
             <ul className="space-y-3 text-sm text-slate-500">
               <li><button onClick={() => onNavigate('privacy')} className="hover:text-indigo-600 transition-colors">Personvern</button></li>
               <li><button onClick={() => onNavigate('terms')} className="hover:text-indigo-600 transition-colors">Bruksvilkår</button></li>
+              <li><button onClick={() => onNavigate('salgsvilkar')} className="hover:text-indigo-600 transition-colors">Salgsvilkår</button></li>
             </ul>
           </div>
         </div>
