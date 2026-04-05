@@ -185,32 +185,32 @@ const MyCalendar = ({ events }: { events: any[] }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center justify-between">
-        {viewMode === 'list' ? 'Dagens oppgaver (I dag)' : viewMode === 'week' ? 'Ukeskalender' : 'Månedskalender'}
-        <div className="flex gap-4 items-center">
-          <div className="flex bg-slate-100 rounded-lg p-1">
-            <button 
-              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setViewMode('list')}
-            >
-              Liste
-            </button>
-            <button 
-              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setViewMode('week')}
-            >
-              Uke
-            </button>
-            <button 
-              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setViewMode('month')}
-            >
-              Måned
-            </button>
-          </div>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h2 className="text-lg font-bold text-slate-900">
+          {viewMode === 'list' ? 'Dagens oppgaver' : viewMode === 'week' ? 'Ukeskalender' : 'Månedskalender'}
+        </h2>
+        <div className="flex bg-slate-100 rounded-lg p-1 w-full sm:w-auto justify-between sm:justify-start">
+          <button 
+            className={`flex-1 sm:flex-none px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            onClick={() => setViewMode('list')}
+          >
+            Liste
+          </button>
+          <button 
+            className={`flex-1 sm:flex-none px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            onClick={() => setViewMode('week')}
+          >
+            Uke
+          </button>
+          <button 
+            className={`flex-1 sm:flex-none px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            onClick={() => setViewMode('month')}
+          >
+            Måned
+          </button>
         </div>
-      </h2>
+      </div>
 
       <div className="space-y-4">
         {viewMode === 'list' ? (

@@ -129,12 +129,15 @@ const StudentDashboard = () => {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Ikke logget inn');
+      console.log('Auth user id:', user.id);
 
       const { data: student, error: studentError } = await supabase
         .from('students')
         .select('id, full_name, email, tutor_id')
         .eq('profile_id', user.id)
         .single();
+
+      console.log('Loaded student row:', student);
 
       if (studentError || !student) {
         throw new Error('Fant ikke elevkobling.');
@@ -163,6 +166,9 @@ const StudentDashboard = () => {
         `)
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
+
+      console.log('Assignments query result:', assignmentsData);
+      console.log('Assignments query error:', assignmentsError);
 
       if (assignmentsData) {
         setAssignments(assignmentsData as any[]);
@@ -283,13 +289,13 @@ const StudentDashboard = () => {
   const renderContent = () => {
     if (activeTab === 'tasks') {
       return (
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-8">
+        <div className="p-4 sm:p-8">
+          <div className="flex justify-between items-center mb-6 sm:mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Dine oppgaver</h1>
           </div>
           
           {meetLink && (
-            <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl mb-8 flex items-center justify-between">
+            <div className="bg-blue-50 border border-blue-100 p-4 sm:p-6 rounded-2xl mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-blue-900 font-bold text-lg">Videoundervisning</h3>
                 <p className="text-blue-700 text-sm">Bli med i timen din her.</p>
@@ -298,7 +304,7 @@ const StudentDashboard = () => {
                 href={meetLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
               >
                 <Video className="w-5 h-5" />
                 Bli med
@@ -314,10 +320,10 @@ const StudentDashboard = () => {
             )}
 
             {assignments.map(assignment => (
-              <div key={assignment.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <h4 className="text-lg font-bold text-gray-900">{assignment.title}</h4>
+              <div key={assignment.id} className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <h4 className="text-lg font-bold text-gray-900 w-full sm:w-auto">{assignment.title}</h4>
                     <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
                       {assignment.status || 'Ny oppgave'}
                     </span>
@@ -329,10 +335,11 @@ const StudentDashboard = () => {
                   </div>
                   <button 
                     onClick={() => setAssignmentToDelete(assignment.id)}
-                    className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+                    className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium self-end sm:self-auto"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Fjern
+                    <span className="sm:hidden">Fjern</span>
+                    <span className="hidden sm:inline">Fjern</span>
                   </button>
                 </div>
                 <p className="text-gray-600 mb-4 whitespace-pre-wrap">{assignment.description}</p>
@@ -385,15 +392,15 @@ const StudentDashboard = () => {
       });
       const calendarEvents = [...assignmentEvents, ...lessonEvents];
       return (
-        <div className="p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-8">Timeplan</h1>
+        <div className="p-4 sm:p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Timeplan</h1>
           <MyCalendar events={calendarEvents} />
         </div>
       );
     } else if (activeTab === 'settings') {
       return (
-        <div className="p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-8">Innstillinger</h1>
+        <div className="p-4 sm:p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Innstillinger</h1>
           <div className="bg-white p-8 rounded-2xl border border-gray-100 max-w-xl">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Endre passord</h3>
             <div className="space-y-4">
@@ -437,12 +444,12 @@ const StudentDashboard = () => {
       );
     } else {
       return (
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {activeTab === 'messages' ? (
             <ChatList />
           ) : activeTab === 'resources' ? (
             <>
-              <h1 className="text-2xl font-bold text-gray-900 mb-8">Ressurser</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Ressurser</h1>
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 <ul className="divide-y divide-gray-100">
                   {resources.length === 0 ? (
@@ -487,10 +494,10 @@ const StudentDashboard = () => {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-gray-900 mb-8">
+              <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
                 {activeTab === 'uploads' && 'Mine Innleveringer'}
               </h1>
-              <div className="bg-white p-12 rounded-2xl border border-gray-100 text-center">
+              <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-100 text-center">
                 <p className="text-gray-500">Dette området er under utvikling.</p>
               </div>
             </>
@@ -501,9 +508,9 @@ const StudentDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row">
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
-      <div className="flex-grow pb-10 overflow-y-auto">
+      <div className="flex-grow pb-20 md:pb-10 overflow-y-auto w-full">
         <main className="max-w-4xl mx-auto">
           {renderContent()}
         </main>
