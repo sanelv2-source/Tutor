@@ -1,317 +1,327 @@
-import React, { useState, useMemo } from 'react';
-import Holidays from 'date-holidays';
-import { Download, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon } from 'lucide-react';
+import React, { useState } from 'react';
 
-const hd = new Holidays('NO');
+const weekdays = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 
-export interface CalendarEvent {
-  date: string;
-  type: 'deadline' | 'booking';
-  title: string;
-}
+const getEasterSunday = (year: number) => {
+  const f = Math.floor,
+    G = year % 19,
+    C = f(year / 100),
+    H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30,
+    I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11)),
+    J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7,
+    L = I - J,
+    month = 3 + f((L + 40) / 44),
+    day = L + 28 - 31 * f(month / 4);
+  return new Date(year, month - 1, day);
+};
 
-interface MyCalendarProps {
-  events: CalendarEvent[];
-}
+const getNorwegianHolidays = (year: number) => {
+  const easter = getEasterSunday(year);
+  const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 
-const daysOfWeek = ["MAN", "TIR", "ONS", "TOR", "FRE", "LØR", "SØN"];
+  const holidays = [
+    { date: new Date(year, 0, 1), name: "1. nyttårsdag" },
+    { date: new Date(year, 4, 1), name: "1. mai" },
+    { date: new Date(year, 4, 17), name: "17. mai" },
+    { date: new Date(year, 11, 25), name: "1. juledag" },
+    { date: new Date(year, 11, 26), name: "2. juledag" },
+    { date: addDays(easter, -3), name: "Skjærtorsdag" },
+    { date: addDays(easter, -2), name: "Langfredag" },
+    { date: easter, name: "1. påskedag" },
+    { date: addDays(easter, 1), name: "2. påskedag" },
+    { date: addDays(easter, 39), name: "Kristi Himmelfartsdag" },
+    { date: addDays(easter, 49), name: "1. pinsedag" },
+    { date: addDays(easter, 50), name: "2. pinsedag" },
+  ];
 
-const MyCalendar: React.FC<MyCalendarProps> = ({ events }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<any>(null);
-
-  const monthYear = currentDate.toLocaleDateString('no-NO', {
-    month: 'long',
-    year: 'numeric'
+  return holidays.map(h => {
+    const offset = h.date.getTimezoneOffset() * 60000;
+    return {
+      dateString: new Date(h.date.getTime() - offset).toISOString().split('T')[0],
+      name: h.name
+    };
   });
+};
 
-  const daysInMonth = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+const getNorwegianHolidayName = (date: Date) => {
+  const offset = date.getTimezoneOffset() * 60000;
+  const dateString = new Date(date.getTime() - offset).toISOString().split('T')[0];
+  const holidays = getNorwegianHolidays(date.getFullYear());
+  const holiday = holidays.find(h => h.dateString === dateString);
+  if (holiday) return holiday.name;
+  if (date.getDay() === 0) return "Søndag";
+  return null;
+};
 
+const formatTime = (timeStr: string) => {
+  if (!timeStr) return '';
+  return timeStr.substring(0, 5);
+};
+
+const calculateEndTime = (startTime: string, durationMinutes: number) => {
+  if (!startTime || !durationMinutes) return '';
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes + durationMinutes, 0, 0);
+  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+};
+
+const getStudentColor = (name: string) => {
+  const colors = [
+    { bgClass: 'bg-blue-50', borderClass: 'border-blue-200', textClass: 'text-blue-700', bgHex: '#eff6ff', borderHex: '#3b82f6' },
+    { bgClass: 'bg-emerald-50', borderClass: 'border-emerald-200', textClass: 'text-emerald-700', bgHex: '#ecfdf5', borderHex: '#10b981' },
+    { bgClass: 'bg-purple-50', borderClass: 'border-purple-200', textClass: 'text-purple-700', bgHex: '#faf5ff', borderHex: '#a855f7' },
+    { bgClass: 'bg-orange-50', borderClass: 'border-orange-200', textClass: 'text-orange-700', bgHex: '#fff7ed', borderHex: '#f97316' },
+    { bgClass: 'bg-pink-50', borderClass: 'border-pink-200', textClass: 'text-pink-700', bgHex: '#fdf2f8', borderHex: '#ec4899' },
+    { bgClass: 'bg-teal-50', borderClass: 'border-teal-200', textClass: 'text-teal-700', bgHex: '#f0fdfa', borderHex: '#14b8a6' },
+    { bgClass: 'bg-rose-50', borderClass: 'border-rose-200', textClass: 'text-rose-700', bgHex: '#fff1f2', borderHex: '#f43f5e' },
+    { bgClass: 'bg-indigo-50', borderClass: 'border-indigo-200', textClass: 'text-indigo-700', bgHex: '#eef2ff', borderHex: '#6366f1' }
+  ];
+  if (!name) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
+const MyCalendar = ({ events }: { events: any[] }) => {
+  const [viewMode, setViewMode] = useState<'list' | 'week' | 'month'>('week');
+  const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
+  const [selectedDayDetails, setSelectedDayDetails] = useState<string | null>(null);
+
+  const getDaysInMonth = () => {
+    const year = currentMonthDate.getFullYear();
+    const month = currentMonthDate.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-
-    let startDay = firstDay.getDay();
-    startDay = startDay === 0 ? 6 : startDay - 1;
-
-    const days: any[] = [];
-
-    for (let i = 0; i < startDay; i++) {
+    const days = [];
+    
+    let startPadding = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    for (let i = 0; i < startPadding; i++) {
       days.push(null);
     }
-
+    
     for (let i = 1; i <= lastDay.getDate(); i++) {
-      const date = new Date(year, month, i);
-      const dateStr = date.toDateString();
-
-      const dayEvents = events.filter(
-        e => new Date(e.date).toDateString() === dateStr
-      );
-
-      const holidayInfo = hd.isHoliday(date);
-
-      const holidayArray = Array.isArray(holidayInfo)
-        ? holidayInfo
-        : holidayInfo
-        ? [holidayInfo]
-        : [];
-
-      const isHoliday =
-        holidayArray.some(h => h.type === 'public') || date.getDay() === 0;
-
-      days.push({
-        date: i,
-        fullDate: date,
-        isHoliday,
-        holidayName: holidayArray[0]?.name || null,
-        events: dayEvents,
-        hasLesson: dayEvents.some(e => e.type === 'booking'),
-        hasDeadline: dayEvents.some(e => e.type === 'deadline')
-      });
+      days.push(new Date(year, month, i));
     }
-
     return days;
-  }, [currentDate, events]);
+  };
 
-  const changeMonth = (offset: number) => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1)
+  const renderMonthView = () => {
+    const daysInMonth = getDaysInMonth();
+    const monthNames = ["Januar", "Februar", "Mars", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Desember"];
+    const monthName = monthNames[currentMonthDate.getMonth()];
+    const year = currentMonthDate.getFullYear();
+
+    const handlePrevMonth = () => setCurrentMonthDate(new Date(year, currentMonthDate.getMonth() - 1, 1));
+    const handleNextMonth = () => setCurrentMonthDate(new Date(year, currentMonthDate.getMonth() + 1, 1));
+
+    return (
+      <div className="month-view-container">
+        <div className="flex justify-between items-center mb-4 px-2">
+          <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 font-bold">
+            &lt; Forrige
+          </button>
+          <h3 className="text-xl font-bold text-slate-900 capitalize">{monthName} {year}</h3>
+          <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 font-bold">
+            Neste &gt;
+          </button>
+        </div>
+        <div className="month-grid">
+          {weekdays.map(day => (
+            <div key={`header-${day}`} className="month-grid-header text-center font-bold text-xs text-slate-500 uppercase mb-2">
+              {day}
+            </div>
+          ))}
+          
+          {daysInMonth.map((date, index) => {
+            if (!date) {
+              return <div key={`empty-${index}`} className="grid-cell empty-cell" />;
+            }
+            
+            const holidayName = getNorwegianHolidayName(date);
+            const isRedDay = holidayName !== null;
+            const offset = date.getTimezoneOffset() * 60000;
+            const dateString = new Date(date.getTime() - offset).toISOString().split('T')[0];
+            
+            const eventsThisDay = events.filter((e: any) => new Date(e.date).toISOString().split('T')[0] === dateString);
+            const isClickable = eventsThisDay.length > 0;
+
+            const uniqueTitles = Array.from(new Set(eventsThisDay.map((e: any) => e.title)));
+
+            return (
+              <div 
+                key={dateString} 
+                className={`grid-cell ${isRedDay ? 'red-day' : ''} ${isClickable ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                onClick={() => isClickable && setSelectedDayDetails(dateString)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="mobile-weekday text-sm text-slate-500 w-8 text-left">{weekdays[date.getDay() === 0 ? 6 : date.getDay() - 1].substring(0, 3)}</span>
+                  <span>{date.getDate()}</span>
+                </div>
+                {holidayName && holidayName !== "Søndag" && (
+                  <span className="text-[9px] leading-tight text-center mt-1 opacity-80 px-1">{holidayName}</span>
+                )}
+                <div className="indicators mt-auto mb-1">
+                  {uniqueTitles.map((title: any, i) => {
+                    const color = getStudentColor(title);
+                    return (
+                      <div 
+                        key={i} 
+                        className="dot-lesson" 
+                        style={{ backgroundColor: color.borderHex }}
+                        title={title} 
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     );
   };
 
-  const downloadICS = () => {
-    if (events.length === 0) return;
-    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    let icsContent = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//TutorFlyt//NONSGML v1.0//EN',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'X-WR-CALNAME:TutorFlyt Timeplan',
-      'X-WR-TIMEZONE:Europe/Oslo'
-    ];
-    
-    events.forEach(event => {
-      const date = new Date(event.date);
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      const start = `${y}${m}${d}`;
-      
-      const nextDay = new Date(date);
-      nextDay.setDate(date.getDate() + 1);
-      const ey = nextDay.getFullYear();
-      const em = String(nextDay.getMonth() + 1).padStart(2, '0');
-      const ed = String(nextDay.getDate()).padStart(2, '0');
-      const end = `${ey}${em}${ed}`;
-
-      icsContent.push('BEGIN:VEVENT');
-      icsContent.push(`UID:${event.title.replace(/[^\w]/g, '')}-${start}-${Math.random().toString(36).substr(2, 5)}@tutorflyt.no`);
-      icsContent.push(`DTSTAMP:${timestamp}`);
-      icsContent.push(`DTSTART;VALUE=DATE:${start}`);
-      icsContent.push(`DTEND;VALUE=DATE:${end}`);
-      icsContent.push(`SUMMARY:${event.title}`);
-      icsContent.push(`DESCRIPTION:${event.type === 'deadline' ? 'Frist for innlevering' : 'Planlagt undervisning'} i TutorFlyt`);
-      icsContent.push('STATUS:CONFIRMED');
-      icsContent.push('TRANSP:TRANSPARENT');
-      icsContent.push('END:VEVENT');
-    });
-    
-    icsContent.push('END:VCALENDAR');
-    const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.setAttribute('download', 'tutorflyt_timeplan.ics');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const today = new Date();
-
   return (
-    <div className="calendar-view">
-
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <span>📅</span> Timeplan og frister
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">Oversikt over dine bookede timer og viktige frister.</p>
-        </div>
-
-        <button 
-          onClick={downloadICS}
-          disabled={events.length === 0}
-          className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Last ned (.ics)
-        </button>
-      </div>
-
-      {/* CALENDAR */}
-      <div className="bg-white p-4 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
-
-        <div className="flex items-center justify-between mb-8">
-          <button 
-            onClick={() => changeMonth(-1)} 
-            className="p-2.5 hover:bg-slate-50 rounded-xl border border-slate-100 text-slate-600 transition-all active:scale-95"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
-          <h3 className="text-xl font-bold text-slate-900 capitalize tracking-tight">{monthYear}</h3>
-
-          <button 
-            onClick={() => changeMonth(1)} 
-            className="p-2.5 hover:bg-slate-50 rounded-xl border border-slate-100 text-slate-600 transition-all active:scale-95"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* WEEKDAYS */}
-        <div className="grid grid-cols-7 text-[10px] sm:text-xs font-black text-slate-400 mb-4 uppercase tracking-[0.2em]">
-          {daysOfWeek.map(d => (
-            <div key={d} className="text-center">
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* GRID */}
-        <div className="month-view-container">
-          <div className="month-grid">
-            {daysInMonth.map((day, i) => {
-              if (!day)
-                return <div key={i} className="grid-cell bg-slate-50/30" />;
-
-              const isToday =
-                day.fullDate.toDateString() === today.toDateString();
-
-              return (
-                <div
-                  key={i}
-                  onClick={() => setSelectedDay(day)}
-                  className={`grid-cell cursor-pointer group transition-all duration-200 ${day.isHoliday ? 'red-day' : ''} ${isToday ? 'bg-indigo-50/30' : ''}`}
-                >
-                  <div className="flex justify-between items-start w-full">
-                    <span className={`text-sm font-bold transition-all ${isToday ? 'bg-indigo-600 text-white px-2 py-0.5 rounded-lg shadow-sm shadow-indigo-200' : 'text-slate-700 group-hover:text-indigo-600'}`}>
-                      {day.date}
-                    </span>
-                    {day.holidayName && (
-                      <span className="hidden lg:block text-[8px] text-red-400 font-bold uppercase truncate max-w-[50px]">
-                        {day.holidayName}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="indicators mt-auto">
-                    {day.hasLesson && <span className="dot-lesson shadow-sm shadow-indigo-200" />}
-                    {day.hasDeadline && <span className="dot-deadline shadow-sm shadow-yellow-100" />}
-                    {day.isHoliday && <span className="dot-vacation shadow-sm shadow-red-100" />}
-                  </div>
-                </div>
-              );
-            })}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center justify-between">
+        {viewMode === 'list' ? 'Dagens oppgaver (I dag)' : viewMode === 'week' ? 'Ukeskalender' : 'Månedskalender'}
+        <div className="flex gap-4 items-center">
+          <div className="flex bg-slate-100 rounded-lg p-1">
+            <button 
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setViewMode('list')}
+            >
+              Liste
+            </button>
+            <button 
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setViewMode('week')}
+            >
+              Uke
+            </button>
+            <button 
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setViewMode('month')}
+            >
+              Måned
+            </button>
           </div>
         </div>
+      </h2>
 
-        {/* LEGEND */}
-        <div className="calendar-legend mt-8 pt-8 border-t border-slate-50 flex flex-wrap gap-x-8 gap-y-4">
-          <div className="legend-item flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-indigo-600 shadow-sm shadow-indigo-100"></span>
-            <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Booket time</span>
-          </div>
-
-          <div className="legend-item flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-yellow-400 shadow-sm shadow-yellow-100"></span>
-            <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Deadline</span>
-          </div>
-
-          <div className="legend-item flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-red-500 shadow-sm shadow-red-100"></span>
-            <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Helligdag</span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* MODAL */}
-      {selectedDay && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in duration-300">
+      <div className="space-y-4">
+        {viewMode === 'list' ? (
+          <div className="calendar-view">
+            <h3>📅 Dagens og kommende</h3>
             
-            <div className="bg-indigo-600 p-8 text-white relative">
-              <button 
-                onClick={() => setSelectedDay(null)} 
-                className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              
-              <p className="text-indigo-100 text-xs font-black uppercase tracking-[0.2em] mb-2">
-                {selectedDay.fullDate.getFullYear()}
-              </p>
-              <h3 className="text-2xl font-black capitalize">
-                {selectedDay.fullDate.toLocaleDateString('no-NO', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long'
-                })}
-              </h3>
-            </div>
-
-            <div className="p-8 space-y-6">
-              {selectedDay.holidayName && (
-                <div className="flex items-center gap-3 p-4 bg-red-50 rounded-2xl border border-red-100">
-                  <span className="text-xl">🇳🇴</span>
-                  <div>
-                    <p className="text-red-800 font-bold text-sm">{selectedDay.holidayName}</p>
-                    <p className="text-red-600/60 text-[10px] font-bold uppercase tracking-wider">Offentlig helligdag</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                {selectedDay.events.length > 0 ? (
-                  selectedDay.events.map((e: CalendarEvent, i: number) => (
-                    <div key={i} className={`group p-5 rounded-2xl border transition-all hover:shadow-md ${e.type === 'deadline' ? 'bg-yellow-50/50 border-yellow-100 hover:border-yellow-200' : 'bg-indigo-50/50 border-indigo-100 hover:border-indigo-200'}`}>
-                      <div className="flex justify-between items-start gap-4">
-                        <div>
-                          <p className="font-black text-slate-900 text-lg leading-tight">
-                            {e.title}
-                          </p>
-                          <p className="text-xs font-bold text-slate-500 mt-2 uppercase tracking-wider">
-                            {e.type === 'deadline' ? '⚠️ Frist for innlevering' : '📘 Planlagt undervisning'}
-                          </p>
-                        </div>
-                        <div className={`p-2.5 rounded-xl ${e.type === 'deadline' ? 'bg-yellow-100 text-yellow-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                          <CalendarIcon className="w-5 h-5" />
-                        </div>
-                      </div>
+            {events.length > 0 ? (
+              events.map((event, idx) => {
+                const color = getStudentColor(event.title);
+                return (
+                  <div 
+                    key={idx} 
+                    className="lesson-card"
+                    style={{ '--card-bg': color.bgHex, '--card-border': color.borderHex } as React.CSSProperties}
+                  >
+                    <div className="lesson-info">
+                      <span className="lesson-student">{event.title}</span>
+                      <span className="lesson-time">
+                        🗓️ {new Date(event.date).toLocaleDateString('no-NO')}
+                        {event.type === 'lesson' && event.start_time && ` kl. ${formatTime(event.start_time)}`}
+                        {event.type === 'deadline' && ' ⚠️ Frist'}
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 px-6 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                      <CalendarIcon className="w-8 h-8 text-slate-300" />
-                    </div>
-                    <p className="text-slate-400 font-bold text-sm italic tracking-wide">Ingen planer denne dagen.</p>
                   </div>
-                )}
+                );
+              })
+            ) : (
+              <div className="empty-state">
+                <p>Ingen oppgaver eller timer planlagt ennå.</p>
               </div>
+            )}
+          </div>
+        ) : viewMode === 'week' ? (
+          <div className="weekly-calendar overflow-x-auto">
+            {(() => {
+              const today = new Date();
+              const dayOfWeek = today.getDay();
+              const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+              
+              return Array.from({ length: 7 }).map((_, index) => {
+                const date = new Date(today);
+                date.setDate(today.getDate() - adjustedDay + index);
+                const offset = date.getTimezoneOffset() * 60000;
+                const dateString = new Date(date.getTime() - offset).toISOString().split('T')[0];
+                const holidayName = getNorwegianHolidayName(date);
+                const isRedDay = holidayName !== null;
+                
+                const dayEvents = events.filter((e: any) => new Date(e.date).toISOString().split('T')[0] === dateString);
+                
+                return (
+                  <div key={index} className={`calendar-day min-w-[120px] ${isRedDay ? 'bg-red-50/30' : ''}`}>
+                    <span className={`day-name ${isRedDay ? 'text-red-600' : ''}`}>
+                      {weekdays[index]} {date.getDate()}/{date.getMonth() + 1}
+                    </span>
+                    {holidayName && holidayName !== "Søndag" && (
+                      <div className="text-[10px] text-red-500 text-center font-medium mb-2">{holidayName}</div>
+                    )}
+                    <div className="day-content space-y-2 mt-2">
+                      {dayEvents.map((event: any, idx: number) => {
+                        const color = getStudentColor(event.title);
+                        return (
+                          <div key={idx} className={`${color.bgClass} p-2 rounded-lg border ${color.borderClass} text-left relative group`}>
+                            <p className="text-sm text-slate-800 truncate" title={event.title}>{event.title}</p>
+                            {event.type === 'deadline' && <small className="text-red-600 font-bold block mt-1">⚠️ Frist</small>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        ) : (
+          renderMonthView()
+        )}
+      </div>
 
-              <button 
-                onClick={() => setSelectedDay(null)} 
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-[0.15em] hover:bg-slate-800 transition-all active:scale-[0.98] shadow-lg shadow-slate-200"
-              >
-                Lukk vindu
+      {selectedDayDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedDayDetails(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-900">
+                {new Date(selectedDayDetails).toLocaleDateString('no-NO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </h3>
+              <button onClick={() => setSelectedDayDetails(null)} className="text-slate-400 hover:text-slate-600">
+                &times;
               </button>
+            </div>
+            <div className="space-y-3">
+              {events.filter((e: any) => new Date(e.date).toISOString().split('T')[0] === selectedDayDetails).map((event: any, idx: number) => {
+                const color = getStudentColor(event.title);
+                return (
+                  <div key={idx} className={`p-4 rounded-xl border ${color.borderClass} ${color.bgClass}`}>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className={`font-bold ${color.textClass}`}>{event.title}</p>
+                        {event.type === 'deadline' && <p className="text-sm text-red-600 font-medium mt-1">⚠️ Innleveringsfrist</p>}
+                        {event.type === 'lesson' && event.duration_minutes && (
+                          <p className={`text-sm opacity-80 ${color.textClass}`}>{event.duration_minutes} min</p>
+                        )}
+                      </div>
+                      {event.type === 'lesson' && event.start_time && (
+                        <div className={`font-bold text-lg ${color.textClass}`}>
+                          {formatTime(event.start_time)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

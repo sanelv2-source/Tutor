@@ -524,14 +524,14 @@ const saveMeetLink = async (link: string) => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFixedModal, setShowFixedModal] = useState(false);
-  const [fixedLessonData, setFixedLessonData] = useState({ name: '', day: '2026-03-23', time: '14:00' });
+  const [fixedLessonData, setFixedLessonData] = useState({ name: '', day: '2026-03-23', time: '14:00', studentId: '', duration: '60' });
   const [viewMode, setViewMode] = useState<'list' | 'week' | 'month'>('month');
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<string | null>(null);
   const [vacationDays, setVacationDays] = useState<string[]>([]);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ isOpen: boolean, studentId: string, studentName: string } | null>(null);
   const [deleteLessonConfirmModal, setDeleteLessonConfirmModal] = useState<{ isOpen: boolean, lessonId: string } | null>(null);
-  const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '', date: '', method: 'Faktura' });
+  const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
   const [isSaving, setIsSaving] = useState(false);
   
   const [taskModal, setTaskModal] = useState<{ isOpen: boolean, studentId: string, studentName: string } | null>(null);
@@ -919,16 +919,32 @@ const saveMeetLink = async (link: string) => {
     } else if (activeTab === 'timeplan') {
       setIsSaving(true);
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Ikke logget inn');
+
+        let selectedStudentName = newItemData.name;
+        if (newItemData.studentId) {
+          const student = students.find(s => s.id === newItemData.studentId);
+          if (student) {
+            selectedStudentName = student.full_name;
+          }
+        }
+
+        const lesson_date = newItemData.date || new Date().toISOString().split('T')[0];
+        const start_time = newItemData.detail ? (newItemData.detail.length === 5 ? `${newItemData.detail}:00` : newItemData.detail) : '12:00:00';
+        const duration_minutes = parseInt(newItemData.duration) || 60;
+
         const { error } = await supabase
           .from('lessons')
-          .insert([
-            { 
-              tutor_id: authUserId, 
-              student_name: newItemData.name, 
-              lesson_date: newItemData.date || new Date().toISOString().split('T')[0], 
-              start_time: newItemData.detail ? (newItemData.detail.length === 5 ? `${newItemData.detail}:00` : newItemData.detail) : '12:00:00'
-            }
-          ]);
+          .insert({
+            tutor_id: user.id,
+            student_id: newItemData.studentId || null,
+            student_name: selectedStudentName,
+            lesson_date,
+            start_time,
+            duration_minutes,
+            is_recurring: false,
+          });
 
         if (error) throw error;
         
@@ -940,7 +956,7 @@ const saveMeetLink = async (link: string) => {
       } finally {
         setIsSaving(false);
         setShowAddModal(false);
-        setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura' });
+        setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
       }
     } else if (activeTab === 'betaling') {
       setIsSaving(true);
@@ -1312,7 +1328,7 @@ const saveMeetLink = async (link: string) => {
                       <div 
                         key={i} 
                         className="dot-lesson" 
-                        style={{ backgroundColor: color.bgHex }}
+                        style={{ backgroundColor: color.borderHex }}
                         title={`Time med ${studentName}`} 
                       />
                     );
@@ -1362,16 +1378,30 @@ const saveMeetLink = async (link: string) => {
 
     setIsSaving(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Ikke logget inn');
+
+      let selectedStudentName = fixedLessonData.name;
+      if (fixedLessonData.studentId) {
+        const student = students.find(s => s.id === fixedLessonData.studentId);
+        if (student) {
+          selectedStudentName = student.full_name;
+        }
+      }
+
       const newLessons = [];
       let currentDate = new Date(fixedLessonData.day);
+      const duration_minutes = parseInt(fixedLessonData.duration) || 60;
       
       for (let i = 0; i < 4; i++) {
         newLessons.push({
-          tutor_id: authUserId,
-          student_name: fixedLessonData.name,
+          tutor_id: user.id,
+          student_id: fixedLessonData.studentId || null,
+          student_name: selectedStudentName,
           lesson_date: currentDate.toISOString().split('T')[0],
           start_time: fixedLessonData.time.length === 5 ? `${fixedLessonData.time}:00` : fixedLessonData.time,
-          duration_minutes: 60
+          duration_minutes: duration_minutes,
+          is_recurring: false
         });
         currentDate.setDate(currentDate.getDate() + 7);
       }
@@ -1385,7 +1415,7 @@ const saveMeetLink = async (link: string) => {
       showToast('Faste timer lagret for 4 uker!');
       fetchLessons();
       setShowFixedModal(false);
-      setFixedLessonData({ name: '', day: '2026-03-23', time: '14:00' });
+      setFixedLessonData({ name: '', day: '2026-03-23', time: '14:00', studentId: '', duration: '60' });
     } catch (err: any) {
       console.error('Feil ved lagring av faste timer:', err);
       showToast(`Kunne ikke lagre faste timer: ${err.message}`);
@@ -2872,13 +2902,26 @@ const saveMeetLink = async (link: string) => {
             <h3 className="text-xl font-bold text-slate-900">Sett opp fast avtale</h3>
             <p className="text-slate-500 text-sm">Dette vil legge inn timen for de neste 4 ukene.</p>
             
-            <input 
-              type="text" 
-              placeholder="Navn på elev" 
-              id="fNavn" 
-              value={fixedLessonData.name}
-              onChange={(e) => setFixedLessonData({...fixedLessonData, name: e.target.value})}
-            />
+            <select
+              id="fNavn"
+              value={fixedLessonData.studentId || ''}
+              onChange={(e) => {
+                const studentId = e.target.value;
+                const student = students.find(s => s.id === studentId);
+                setFixedLessonData({
+                  ...fixedLessonData,
+                  studentId,
+                  name: student ? student.full_name : ''
+                });
+              }}
+            >
+              <option value="">Velg elev...</option>
+              {students.map(student => (
+                <option key={student.id} value={student.id}>
+                  {student.full_name}
+                </option>
+              ))}
+            </select>
             <select 
               id="fDag"
               value={fixedLessonData.day}
@@ -2892,12 +2935,24 @@ const saveMeetLink = async (link: string) => {
               <option value="2026-03-28">Lørdag (28. mars)</option>
               <option value="2026-03-29">Søndag (29. mars)</option>
             </select>
-            <input 
-              type="time" 
-              id="fTid" 
-              value={fixedLessonData.time}
-              onChange={(e) => setFixedLessonData({...fixedLessonData, time: e.target.value})}
-            />
+            <div className="flex gap-2">
+              <input 
+                type="time" 
+                id="fTid" 
+                value={fixedLessonData.time}
+                onChange={(e) => setFixedLessonData({...fixedLessonData, time: e.target.value})}
+                className="flex-1"
+              />
+              <input 
+                type="number"
+                min="15"
+                step="15"
+                placeholder="Minutter"
+                value={fixedLessonData.duration || '60'}
+                onChange={(e) => setFixedLessonData({...fixedLessonData, duration: e.target.value})}
+                className="w-24"
+              />
+            </div>
             
             <div className="flex gap-3 mt-2">
               <button 
@@ -3219,34 +3274,74 @@ const saveMeetLink = async (link: string) => {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   {activeTab === 'oversikt' && 'Elevens navn'}
-                  {activeTab === 'timeplan' && 'Elevens navn'}
+                  {activeTab === 'timeplan' && 'Velg elev'}
                   {activeTab === 'betaling' && 'Elevens navn'}
                 </label>
-                <input 
-                  type="text" 
-                  value={newItemData.name || ''}
-                  onChange={(e) => setNewItemData({...newItemData, name: e.target.value})}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="F.eks. Ola Nordmann"
-                />
+                {activeTab === 'timeplan' ? (
+                  <select
+                    value={newItemData.studentId || ''}
+                    onChange={(e) => {
+                      const studentId = e.target.value;
+                      const student = students.find(s => s.id === studentId);
+                      setNewItemData({
+                        ...newItemData, 
+                        studentId, 
+                        name: student ? student.full_name : ''
+                      });
+                    }}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Velg elev...</option>
+                    {students.map(student => (
+                      <option key={student.id} value={student.id}>
+                        {student.full_name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input 
+                    type="text" 
+                    value={newItemData.name || ''}
+                    onChange={(e) => setNewItemData({...newItemData, name: e.target.value})}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="F.eks. Ola Nordmann"
+                  />
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  {activeTab === 'oversikt' && 'Fag / Emne'}
-                  {activeTab === 'timeplan' && 'Tidspunkt'}
-                  {activeTab === 'betaling' && 'Beløp (kr)'}
-                </label>
-                <input 
-                  type="text" 
-                  value={newItemData.detail || ''}
-                  onChange={(e) => setNewItemData({...newItemData, detail: e.target.value})}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder={
-                    activeTab === 'oversikt' ? 'F.eks. Matte R1' : 
-                    activeTab === 'timeplan' ? 'F.eks. 14:00 - 15:00' : 
-                    'F.eks. 500'
-                  }
-                />
+              <div className={activeTab === 'timeplan' ? "grid grid-cols-2 gap-4" : ""}>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    {activeTab === 'oversikt' && 'Fag / Emne'}
+                    {activeTab === 'timeplan' && 'Tidspunkt'}
+                    {activeTab === 'betaling' && 'Beløp (kr)'}
+                  </label>
+                  <input 
+                    type={activeTab === 'timeplan' ? 'time' : 'text'}
+                    value={newItemData.detail || ''}
+                    onChange={(e) => setNewItemData({...newItemData, detail: e.target.value})}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder={
+                      activeTab === 'oversikt' ? 'F.eks. Matte R1' : 
+                      activeTab === 'timeplan' ? 'F.eks. 14:00' : 
+                      'F.eks. 500'
+                    }
+                  />
+                </div>
+                {activeTab === 'timeplan' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Varighet (minutter)
+                    </label>
+                    <input 
+                      type="number"
+                      min="15"
+                      step="15"
+                      value={newItemData.duration || '60'}
+                      onChange={(e) => setNewItemData({...newItemData, duration: e.target.value})}
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                )}
               </div>
               {(activeTab === 'timeplan' || activeTab === 'betaling') && (
                 <div>
