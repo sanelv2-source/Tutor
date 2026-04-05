@@ -178,7 +178,7 @@
   text-transform: uppercase;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .weekly-calendar {
     grid-template-columns: 1fr;
     padding: 15px;
@@ -294,7 +294,7 @@
   display: none;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .mobile-weekday {
     display: inline;
   }

@@ -86,7 +86,9 @@ const getStudentColor = (name: string) => {
 };
 
 const MyCalendar = ({ events }: { events: any[] }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'week' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'list' | 'week' | 'month'>(
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'list' : 'week'
+  );
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<string | null>(null);
 
@@ -261,7 +263,7 @@ const MyCalendar = ({ events }: { events: any[] }) => {
                 const dayEvents = events.filter((e: any) => new Date(e.date).toISOString().split('T')[0] === dateString);
                 
                 return (
-                  <div key={index} className={`calendar-day min-w-[120px] ${isRedDay ? 'bg-red-50/30' : ''}`}>
+                  <div key={index} className={`calendar-day md:min-w-[120px] ${isRedDay ? 'bg-red-50/30' : ''}`}>
                     <span className={`day-name ${isRedDay ? 'text-red-600' : ''}`}>
                       {weekdays[index]} {date.getDate()}/{date.getMonth() + 1}
                     </span>

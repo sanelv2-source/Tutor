@@ -510,7 +510,7 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row">
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
-      <div className="flex-grow pb-20 md:pb-10 overflow-y-auto w-full">
+      <div className="flex-grow pb-10 overflow-y-auto w-full">
         <main className="max-w-4xl mx-auto">
           {renderContent()}
         </main>
