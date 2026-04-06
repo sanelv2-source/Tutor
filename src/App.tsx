@@ -26,6 +26,7 @@ export default function App() {
   const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string} | null>(null);
   const [pendingUser, setPendingUser] = useState<{name: string, email: string, password: string} | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(localStorage.getItem('tutorflyt_session_id'));
 
   // Save user to localStorage whenever it changes
   useEffect(() => {
@@ -51,16 +52,54 @@ export default function App() {
         .eq('email', session.user.email)
         .maybeSingle();
 
-      // Hent betalingsstatus fra profiles-tabellen
+      // Hent betalingsstatus og sesjons-ID fra profiles-tabellen
       const { data: profile } = await supabase
         .from('profiles')
-        .select('subscription_status')
+        .select('subscription_status, last_session_id')
         .eq('id', session.user.id)
         .maybeSingle();
 
       const isStudent = !!studentData || session.user.user_metadata?.role === 'student';
       const role = isStudent ? 'student' : 'tutor';
       const hasPaid = role === 'student' || profile?.subscription_status === 'active';
+
+      // Single session logic: If this is a new login, update the session ID
+      if (event === 'SIGNED_IN') {
+        const newSessionId = crypto.randomUUID();
+        localStorage.setItem('tutorflyt_session_id', newSessionId);
+        setCurrentSessionId(newSessionId);
+        
+        // Update profile with new session ID
+        await supabase
+          .from('profiles')
+          .update({ last_session_id: newSessionId })
+          .eq('id', session.user.id);
+      } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_UP') {
+        // On initial load, if we don't have a session ID in localStorage, create one
+        let sid = localStorage.getItem('tutorflyt_session_id');
+        if (!sid) {
+          sid = crypto.randomUUID();
+          localStorage.setItem('tutorflyt_session_id', sid);
+          setCurrentSessionId(sid);
+          
+          // Update profile
+          await supabase
+            .from('profiles')
+            .update({ last_session_id: sid })
+            .eq('id', session.user.id);
+        } else {
+          setCurrentSessionId(sid);
+          
+          // Check if the session ID matches the one in the database
+          if (profile && profile.last_session_id && profile.last_session_id !== sid) {
+            console.warn("Session invalidated by another login");
+            await supabase.auth.signOut();
+            setUser(null);
+            navigate('/login');
+            return;
+          }
+        }
+      }
 
       setUser({
         name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
@@ -104,7 +143,43 @@ export default function App() {
       checkRoleAndSetUser(session, _event);
     });
 
-    return () => subscription.unsubscribe();
+    // Realtime listener for session invalidation
+    let profileSubscription: any = null;
+    
+    const setupRealtime = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        profileSubscription = supabase
+          .channel(`public:profiles:id=eq.${session.user.id}`)
+          .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles',
+            filter: `id=eq.${session.user.id}`
+          }, (payload) => {
+            const newSessionId = payload.new.last_session_id;
+            const localSessionId = localStorage.getItem('tutorflyt_session_id');
+            
+            if (newSessionId && localSessionId && newSessionId !== localSessionId) {
+              console.warn("Logged out due to login on another device");
+              supabase.auth.signOut().then(() => {
+                setUser(null);
+                navigate('/login');
+              });
+            }
+          })
+          .subscribe();
+      }
+    };
+
+    setupRealtime();
+
+    return () => {
+      subscription.unsubscribe();
+      if (profileSubscription) {
+        supabase.removeChannel(profileSubscription);
+      }
+    };
   }, [navigate]);
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
