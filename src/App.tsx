@@ -20,20 +20,55 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
 
+// Memory fallback for session ID (persists during tab session even if localStorage is blocked)
+let memorySessionId: string | null = null;
+let lastLocalUpdate = 0;
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string} | null>(null);
   const [pendingUser, setPendingUser] = useState<{name: string, email: string, password: string} | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(localStorage.getItem('tutorflyt_session_id'));
+  
+  // Robust session ID access
+  const getSessionId = () => {
+    if (memorySessionId) return memorySessionId;
+    try {
+      const sid = localStorage.getItem('tutorflyt_session_id');
+      if (sid) memorySessionId = sid;
+      return sid;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const saveSessionId = (id: string | null) => {
+    memorySessionId = id;
+    lastLocalUpdate = Date.now();
+    try {
+      if (id) {
+        localStorage.setItem('tutorflyt_session_id', id);
+      } else {
+        localStorage.removeItem('tutorflyt_session_id');
+      }
+    } catch (e) {
+      // Storage blocked
+    }
+  };
+
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(getSessionId());
 
   // Save user to localStorage whenever it changes
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('tutorflyt_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('tutorflyt_user');
+    try {
+      if (user) {
+        localStorage.setItem('tutorflyt_user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('tutorflyt_user');
+      }
+    } catch (e) {
+      // Ignore storage errors
     }
   }, [user]);
 
@@ -45,6 +80,15 @@ export default function App() {
         return;
       }
 
+      // Hent profil og sesjons-ID
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('subscription_status, last_session_id, role')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (profileError) console.error("Feil ved henting av profil:", profileError);
+
       // Sjekk om brukeren ligger i students-tabellen
       const { data: studentData } = await supabase
         .from('students')
@@ -52,54 +96,57 @@ export default function App() {
         .eq('email', session.user.email)
         .maybeSingle();
 
-      // Hent betalingsstatus og sesjons-ID fra profiles-tabellen
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('subscription_status, last_session_id')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      const isStudent = !!studentData || session.user.user_metadata?.role === 'student';
+      const isStudent = !!studentData || session.user.user_metadata?.role === 'student' || profile?.role === 'student';
       const role = isStudent ? 'student' : 'tutor';
       const hasPaid = role === 'student' || profile?.subscription_status === 'active';
 
-      // Single session logic: If this is a new login, update the session ID
+      // --- Single Session Logic ---
+      const generateId = () => {
+        try {
+          return crypto.randomUUID();
+        } catch (e) {
+          return Math.random().toString(36).substring(2) + Date.now().toString(36);
+        }
+      };
+
+      let localSid = getSessionId();
+      const dbSid = profile?.last_session_id;
+
       if (event === 'SIGNED_IN') {
-        const newSessionId = crypto.randomUUID();
-        localStorage.setItem('tutorflyt_session_id', newSessionId);
+        const newSessionId = generateId();
+        saveSessionId(newSessionId);
         setCurrentSessionId(newSessionId);
         
-        // Update profile with new session ID
         await supabase
           .from('profiles')
           .update({ last_session_id: newSessionId })
           .eq('id', session.user.id);
+          
       } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_UP') {
-        // On initial load, if we don't have a session ID in localStorage, create one
-        let sid = localStorage.getItem('tutorflyt_session_id');
-        if (!sid) {
-          sid = crypto.randomUUID();
-          localStorage.setItem('tutorflyt_session_id', sid);
-          setCurrentSessionId(sid);
-          
-          // Update profile
-          await supabase
-            .from('profiles')
-            .update({ last_session_id: sid })
-            .eq('id', session.user.id);
-        } else {
-          setCurrentSessionId(sid);
-          
-          // Check if the session ID matches the one in the database
-          if (profile && profile.last_session_id && profile.last_session_id !== sid) {
-            console.warn("Session invalidated by another login");
-            await supabase.auth.signOut();
-            setUser(null);
-            navigate('/login');
-            return;
+        if (!localSid) {
+          if (dbSid) {
+            // Hvis vi mangler lokal ID (f.eks. første gang i en ny fane), adopterer vi DB-sesjonen
+            saveSessionId(dbSid);
+            setCurrentSessionId(dbSid);
+          } else {
+            // Ingen ID noen steder: opprett en ny
+            const newSid = generateId();
+            saveSessionId(newSid);
+            setCurrentSessionId(newSid);
+            await supabase.from('profiles').update({ last_session_id: newSid }).eq('id', session.user.id);
           }
+        } else if (dbSid && dbSid !== localSid) {
+          // STRENG SJEKK: Hvis vi har en lokal ID, men den er annerledes enn i DB, 
+          // betyr det at noen andre har logget inn etter oss.
+          console.warn("Sesjon ugyldig: Innlogging oppdaget på en annen enhet");
+          await supabase.auth.signOut();
+          setUser(null);
+          saveSessionId(null);
+          navigate('/login');
+          return;
         }
       }
+      // --- End Single Session Logic ---
 
       setUser({
         name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
@@ -133,17 +180,36 @@ export default function App() {
       }
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      checkRoleAndSetUser(session, 'INITIAL_SESSION');
-    });
+    // Consolidated auth initialization
+    let isInitialCheckDone = false;
+
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await checkRoleAndSetUser(session, 'INITIAL_SESSION');
+      } else {
+        setIsAuthReady(true);
+      }
+      isInitialCheckDone = true;
+    };
+
+    initAuth();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Skip the first event if we already handled it in initAuth to avoid race conditions
+      if (_event === 'INITIAL_SESSION' && isInitialCheckDone) return;
       checkRoleAndSetUser(session, _event);
     });
 
-    // Realtime listener for session invalidation
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  // Realtime listener for session invalidation
+  useEffect(() => {
     let profileSubscription: any = null;
     
     const setupRealtime = async () => {
@@ -158,12 +224,17 @@ export default function App() {
             filter: `id=eq.${session.user.id}`
           }, (payload) => {
             const newSessionId = payload.new.last_session_id;
-            const localSessionId = localStorage.getItem('tutorflyt_session_id');
+            const localSessionId = getSessionId();
             
+            // Ignore updates that happen very close to our own local update (to prevent self-logout)
+            const timeSinceLastUpdate = Date.now() - lastLocalUpdate;
+            if (timeSinceLastUpdate < 2000) return;
+
             if (newSessionId && localSessionId && newSessionId !== localSessionId) {
               console.warn("Logged out due to login on another device");
               supabase.auth.signOut().then(() => {
                 setUser(null);
+                saveSessionId(null);
                 navigate('/login');
               });
             }
@@ -172,15 +243,16 @@ export default function App() {
       }
     };
 
-    setupRealtime();
+    if (user) {
+      setupRealtime();
+    }
 
     return () => {
-      subscription.unsubscribe();
       if (profileSubscription) {
         supabase.removeChannel(profileSubscription);
       }
     };
-  }, [navigate]);
+  }, [user, navigate]);
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
