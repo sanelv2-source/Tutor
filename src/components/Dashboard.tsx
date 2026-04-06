@@ -265,7 +265,7 @@ const saveMeetLink = async (link: string) => {
         assignments ( title )
       `)
       .eq('tutor_id', authUserId)
-      .eq('status', 'sent')
+      .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     if (error) {

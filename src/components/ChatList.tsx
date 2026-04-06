@@ -246,7 +246,13 @@ export const ChatList = () => {
             filter: `conversation_id=eq.${activeConversation.id}`,
           },
           (payload) => {
-            setMessages((prev) => [...prev, payload.new]);
+            setMessages((prev) => {
+              // Prevent duplicates if the message was already added via optimistic update
+              if (prev.some(m => m.id === payload.new.id)) {
+                return prev;
+              }
+              return [...prev, payload.new];
+            });
           }
         )
         .subscribe();
@@ -359,6 +365,19 @@ export const ChatList = () => {
     // Optimistic clear
     setNewMessage('');
     
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      conversation_id: activeConversation.id,
+      sender_id: currentUserId,
+      recipient_id: null, // Will be set in DB
+      body: trimmed,
+      created_at: new Date().toISOString(),
+      read_at: null
+    };
+
+    setMessages(prev => [...prev, optimisticMessage]);
+    
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError || !authData.user) {
@@ -393,25 +412,40 @@ export const ChatList = () => {
       if (isTutor && !recipientId) {
         alert("Eleven har ikke aktivert kontoen sin ennå.");
         setNewMessage(trimmed); // Revert optimistic clear
+        setMessages(prev => prev.filter(m => m.id !== tempId)); // Remove optimistic message
         return;
       }
 
-      const { error: insertError } = await supabase
+      const { data: insertedMsg, error: insertError } = await supabase
         .from('messages')
         .insert({
           conversation_id: activeConversation.id,
           sender_id: senderId,
           recipient_id: recipientId,
           body: trimmed,
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) {
         throw insertError;
       }
+
+      // Replace optimistic message with real message
+      setMessages(prev => {
+        // If the real message was already added by realtime subscription
+        if (prev.some(m => m.id === insertedMsg.id && m.id !== tempId)) {
+          return prev.filter(m => m.id !== tempId);
+        }
+        // Otherwise, replace the temp message with the real one
+        return prev.map(m => m.id === tempId ? insertedMsg : m);
+      });
+
     } catch (error) {
       console.error('Error sending message:', error);
       // Revert optimistic clear if failed
       setNewMessage(trimmed);
+      setMessages(prev => prev.filter(m => m.id !== tempId)); // Remove optimistic message
     }
   };
 

@@ -1,26 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
 export default function Login({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
+  const [usePassword, setUsePassword] = useState(false);
+
+  const getRedirectUrl = () => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get('redirect');
+  };
 
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       setIsLoading(true);
       setError('');
       
+      const redirectUrl = getRedirectUrl();
+      const redirectTo = redirectUrl 
+        ? `${window.location.origin}${redirectUrl}` 
+        : `${window.location.origin}/`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectTo,
           skipBrowserRedirect: true,
+          scopes: provider === 'google' ? 'https://www.googleapis.com/auth/calendar.readonly' : undefined,
         }
       });
 
@@ -46,14 +60,53 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     }
   };
 
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const redirectUrl = getRedirectUrl();
+      const redirectTo = redirectUrl 
+        ? `${window.location.origin}${redirectUrl}` 
+        : `${window.location.origin}/`;
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: {
+          emailRedirectTo: redirectTo,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setIsMagicLinkSent(true);
+    } catch (err: any) {
+      console.error('Magic link error:', err);
+      let errorMessage = err instanceof Error ? err.message : 'Kunne ikke sende magisk lenke';
+      
+      if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
+        errorMessage = 'Kunne ikke sende magisk lenke. Sjekk at magiske lenker er aktivert i Supabase-prosjektet ditt, og at SMTP er konfigurert.';
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
@@ -62,8 +115,25 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
 
       if (data.user) {
-        // Vi navigerer til roten og lar App.tsx håndtere ruting basert på rolle og betalingsstatus
-        navigate('/');
+        const redirectUrl = getRedirectUrl();
+        if (redirectUrl) {
+          navigate(redirectUrl);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile?.role === 'tutor') {
+          navigate('/tutor/dashboard');
+        } else if (profile?.role === 'student') {
+          navigate('/student/dashboard');
+        } else {
+          navigate('/complete-profile');
+        }
       }
     } catch (err: any) {
       console.error('Login error:', err);
@@ -78,7 +148,6 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       setIsLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative">
@@ -115,11 +184,28 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
             </div>
           )}
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-                E-postadresse
-              </label>
+          {isMagicLinkSent ? (
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-emerald-100 mb-4">
+                <Mail className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Sjekk e-posten din</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Vi har sendt en magisk innloggingslenke til <strong>{email}</strong>. Klikk på lenken i e-posten for å logge inn.
+              </p>
+              <button
+                onClick={() => setIsMagicLinkSent(false)}
+                className="text-sm font-medium text-teal-600 hover:text-teal-500"
+              >
+                Prøv en annen e-postadresse
+              </button>
+            </div>
+          ) : (
+            <form className="space-y-6" onSubmit={usePassword ? handleSubmit : handleMagicLink}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                  E-postadresse
+                </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-slate-400" />
@@ -138,59 +224,73 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                 </div>
               </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                Passord
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
+              {usePassword && (
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                    Passord
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
                 </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
-                  placeholder="••••••••"
-                  required
-                />
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
+                    Husk meg
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <button 
+                    type="button" 
+                    onClick={() => setUsePassword(!usePassword)}
+                    className="font-medium text-teal-600 hover:text-teal-500 transition-colors"
+                  >
+                    {usePassword ? 'Bruk magisk lenke' : 'Logg inn med passord'}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-300 rounded cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
-                  Husk meg
-                </label>
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Sender...' : (
+                    <>
+                      {usePassword ? 'Logg inn' : 'Send magisk lenke'}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </button>
               </div>
-            </div>
+            </form>
+          )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Logger inn...' : (
-                  <>
-                    Logg inn
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6">
+          {!isMagicLinkSent && (
+            <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
@@ -234,8 +334,8 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                 </button>
               </div>
             </div>
-
           </div>
+          )}
         </div>
         
         <p className="mt-8 text-center text-sm text-slate-500">

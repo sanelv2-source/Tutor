@@ -11,14 +11,10 @@ interface Assignment {
   id: string;
   title: string;
   description: string;
-  due_date: string;
+  due_date: string | null;
   status: string;
-  created_at: string;
+  student_id: string;
   tutor_id: string;
-  is_task?: boolean;
-  video_url?: string;
-  is_completed?: boolean;
-  submission_url?: string;
   profiles?: {
     full_name: string;
   };
@@ -45,23 +41,43 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
         await supabase.auth.signOut().catch(() => {});
       }
       const authUserId = user?.id;
+      if (!authUserId) throw new Error('Ikke logget inn');
+
+      // Load the student row to ensure we have the correct student.id
+      const { data: studentRow, error: studentError } = await supabase
+        .from('students')
+        .select('id')
+        .eq('profile_id', authUserId)
+        .single();
+        
+      if (studentError || !studentRow) {
+        throw new Error('Fant ikke elevprofilen din.');
+      }
+      
+      const actualStudentId = studentRow.id;
       
       const fileExt = file.name.split('.').pop();
       const fileName = `${taskId}-${Date.now()}.${fileExt}`;
-      const filePath = authUserId ? `${authUserId}/submissions/${fileName}` : `submissions/${fileName}`;
+      const filePath = `${authUserId}/submissions/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage.from('homework-uploads').upload(filePath, file);
+      console.log('AUTH USER:', user);
+      console.log('BUCKET NAME:', 'submissions');
+      console.log('FILE PATH:', filePath);
+
+      const { error: uploadError } = await supabase.storage
+        .from('submissions')
+        .upload(filePath, file, { upsert: false });
+        
+      console.error('UPLOAD ERROR:', uploadError);
+
       if (uploadError) {
-        console.error("Upload error:", uploadError);
         throw new Error(`Upload feilet: ${uploadError.message}`);
       }
 
-      const { data } = supabase.storage.from('homework-uploads').getPublicUrl(filePath);
+      const { data } = supabase.storage.from('submissions').getPublicUrl(filePath);
 
       const { error: dbError } = await supabase.from('assignments').update({ 
-        submission_url: data.publicUrl,
-        is_completed: true,
-        completed_at: new Date().toISOString()
+        status: 'submitted'
       }).eq('id', taskId);
 
       if (dbError) {
@@ -69,22 +85,21 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
         // Don't throw here, we might still be able to insert into submissions
       }
 
-      if (studentId && tutorId) {
+      if (actualStudentId && tutorId) {
         const { error: subError } = await supabase.from('submissions').insert({
-          student_id: studentId,
+          student_id: actualStudentId,
           tutor_id: tutorId,
-          answer_text: data.publicUrl,
+          file_url: data.publicUrl,
+          answer_text: '',
           status: 'pending',
           assignment_id: taskId
         });
         if (subError) {
-          console.error("DB error inserting submission:", subError);
-          if (dbError) {
-            throw new Error(`Database feilet: ${dbError.message || subError.message}`);
-          }
+          console.error("Submission insert error:", subError);
+          throw new Error(`Klarte ikke lagre innleveringen: ${subError.message}`);
         }
-      } else if (dbError) {
-        throw new Error(`Database feilet: ${dbError.message}`);
+      } else {
+        throw new Error('Mangler elev- eller lærer-ID for å levere.');
       }
 
       onComplete(data.publicUrl);
@@ -153,25 +168,28 @@ const StudentDashboard = () => {
           description,
           due_date,
           status,
-          created_at,
-          is_completed,
-          submission_url,
-          video_url,
-          tutor_id,
-          tutor:profiles!assignments_tutor_id_fkey (
-            id,
-            full_name,
-            email
-          )
+          student_id,
+          tutor_id
         `)
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
+        .eq('student_id', student.id);
 
       console.log('Assignments query result:', assignmentsData);
       console.log('Assignments query error:', assignmentsError);
 
       if (assignmentsData) {
-        setAssignments(assignmentsData as any[]);
+        const sortedAssignments = (assignmentsData as any[]).sort((a, b) => {
+          // Completed assignments at the bottom
+          const aCompleted = a.status === 'submitted' || a.status === 'approved';
+          const bCompleted = b.status === 'submitted' || b.status === 'approved';
+          if (aCompleted && !bCompleted) return 1;
+          if (!aCompleted && bCompleted) return -1;
+          
+          // Sort by due_date ascending (closest first)
+          const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+          const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+          return dateA - dateB;
+        });
+        setAssignments(sortedAssignments);
       } else {
         setAssignments([]);
       }
@@ -283,7 +301,7 @@ const StudentDashboard = () => {
   };
 
   const handleAssignmentComplete = (taskId: string, url: string) => {
-    setAssignments(prev => prev.map(a => a.id === taskId ? { ...a, is_completed: true, submission_url: url } : a));
+    setAssignments(prev => prev.map(a => a.id === taskId ? { ...a, status: 'submitted' } : a));
   };
 
   const renderContent = () => {
@@ -312,74 +330,104 @@ const StudentDashboard = () => {
             </div>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-8">
             {assignments.length === 0 && (
               <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
                 <p className="text-gray-500">Du har ingen oppgaver ennå. Ta det med ro!</p>
               </div>
             )}
 
-            {assignments.map(assignment => (
-              <div key={assignment.id} className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <h4 className="text-lg font-bold text-gray-900 w-full sm:w-auto">{assignment.title}</h4>
-                    <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
-                      {assignment.status || 'Ny oppgave'}
-                    </span>
-                    {assignment.is_completed && (
-                      <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> Fullført
-                      </span>
-                    )}
-                  </div>
-                  <button 
-                    onClick={() => setAssignmentToDelete(assignment.id)}
-                    className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium self-end sm:self-auto"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span className="sm:hidden">Fjern</span>
-                    <span className="hidden sm:inline">Fjern</span>
-                  </button>
-                </div>
-                <p className="text-gray-600 mb-4 whitespace-pre-wrap">{assignment.description}</p>
-                <div className="flex flex-col gap-2 text-sm text-gray-500">
-                  <span className="font-medium text-gray-700">Sendt av: {assignment.profiles?.full_name || 'Lærer'}</span>
-                  <div className="flex gap-6">
-                    <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Frist: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString('no-NO') : 'Ingen frist'}</span>
-                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> Lagt til: {new Date(assignment.created_at).toLocaleDateString('no-NO')}</span>
-                  </div>
-                </div>
+            {assignments.filter(a => a.status !== 'submitted' && a.status !== 'approved').length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  Kommende oppgaver
+                </h3>
+                {assignments.filter(a => a.status !== 'submitted' && a.status !== 'approved').map(assignment => (
+                  <div key={assignment.id} className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <h4 className="text-lg font-bold text-gray-900 w-full sm:w-auto">{assignment.title}</h4>
+                        <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
+                          {assignment.status || 'Ny oppgave'}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setAssignmentToDelete(assignment.id)}
+                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium self-end sm:self-auto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="sm:hidden">Fjern</span>
+                        <span className="hidden sm:inline">Fjern</span>
+                      </button>
+                    </div>
+                    <p className="text-gray-600 mb-4 whitespace-pre-wrap">{assignment.description}</p>
+                    <div className="flex flex-col gap-2 text-sm text-gray-500">
+                      <span className="font-medium text-gray-700">Sendt av: {assignment.profiles?.full_name || 'Lærer'}</span>
+                      <div className="flex gap-6">
+                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Frist: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString('no-NO') : 'Ingen frist'}</span>
+                      </div>
+                    </div>
 
-                {!assignment.is_completed && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <SubmitAssignment 
-                      taskId={assignment.id} 
-                      tutorId={assignment.tutor_id}
-                      studentId={studentId || undefined}
-                      onComplete={(url) => handleAssignmentComplete(assignment.id, url)} 
-                    />
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <SubmitAssignment 
+                        taskId={assignment.id} 
+                        tutorId={assignment.tutor_id}
+                        studentId={studentId || undefined}
+                        onComplete={(url) => handleAssignmentComplete(assignment.id, url)} 
+                      />
+                    </div>
                   </div>
-                )}
-                
-                {assignment.is_completed && assignment.submission_url && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <a href={assignment.submission_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1">
-                      <ExternalLink className="w-4 h-4" /> Se innlevering
-                    </a>
-                  </div>
-                )}
+                ))}
               </div>
-            ))}
+            )}
+
+            {assignments.filter(a => a.status === 'submitted' || a.status === 'approved').length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  Fullførte oppgaver
+                </h3>
+                {assignments.filter(a => a.status === 'submitted' || a.status === 'approved').map(assignment => (
+                  <div key={assignment.id} className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow opacity-80">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <h4 className="text-lg font-bold text-gray-900 w-full sm:w-auto">{assignment.title}</h4>
+                        <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Fullført
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setAssignmentToDelete(assignment.id)}
+                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium self-end sm:self-auto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="sm:hidden">Fjern</span>
+                        <span className="hidden sm:inline">Fjern</span>
+                      </button>
+                    </div>
+                    <p className="text-gray-600 mb-4 whitespace-pre-wrap">{assignment.description}</p>
+                    <div className="flex flex-col gap-2 text-sm text-gray-500">
+                      <span className="font-medium text-gray-700">Sendt av: {assignment.profiles?.full_name || 'Lærer'}</span>
+                      <div className="flex gap-6">
+                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Frist: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString('no-NO') : 'Ingen frist'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       );
     } else if (activeTab === 'calendar') {
-      const assignmentEvents = assignments.map(a => ({
-        title: a.title,
-        date: a.due_date || a.created_at,
-        type: a.due_date ? 'deadline' : 'task'
-      }));
+      const assignmentEvents = assignments
+        .filter(a => a.due_date)
+        .map(a => ({
+          title: a.title,
+          date: a.due_date as string,
+          type: 'deadline'
+        }));
       const lessonEvents = lessons.map(l => {
         const tutorName = Array.isArray(l.tutor) ? l.tutor[0]?.full_name : l.tutor?.full_name;
         return {
