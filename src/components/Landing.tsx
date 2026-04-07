@@ -14,7 +14,7 @@ import Logo from './Logo';
 import Footer from './Footer';
 
 // FAQ Accordion Component
-const AccordionItem = ({ question, answer }: { question: string, answer: string }) => {
+const AccordionItem = ({ question, answer }: { question: string, answer: React.ReactNode }) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <div className="border-b border-slate-200">
@@ -40,13 +40,6 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     onNavigate('signup');
-  };
-
-  const handleDemoLogin = () => {
-    if (setUser) {
-      setUser({ name: 'Demo Lærer', email: 'demo@tutorflyt.no', hasPaid: true });
-      onNavigate('dashboard');
-    }
   };
 
   return (
@@ -336,16 +329,24 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             <h2 className="text-3xl font-bold text-slate-900 mb-10 text-center">Ofte stilte spørsmål</h2>
             <div className="border-t border-slate-200">
               <AccordionItem 
-                question="Er det vanskelig å flytte over fra Excel?" 
-                answer="Nei, vi hjelper deg med å importere elevene dine på 5 minutter." 
-              />
-              <AccordionItem 
                 question="Hva koster det?" 
-                answer="Beta-testere får tilgang for 99,-/mnd. Ingen skjulte gebyrer." 
+                answer={
+                  <div className="space-y-3">
+                    <p>Vi har ulike faser for våre tidlige brukere:</p>
+                    <ul className="list-disc pl-5 space-y-2">
+                      <li><span className="font-bold text-slate-900">Closed Beta:</span> Helt gratis tilgang for inviterte beta-testere.</li>
+                      <li><span className="font-bold text-slate-900">Open Beta:</span> Redusert pris på <span className="text-indigo-600 font-bold">99,-/mnd</span>.</li>
+                      <li><span className="font-bold text-slate-900">Verv-en-venn:</span> Få en gratis måned dersom du inviterer 10 nye brukere som registrerer seg via din referal-link.</li>
+                    </ul>
+                    <p className="pt-2 border-t border-slate-100 text-sm text-slate-500 italic">
+                      Ordinær pris uten rabatter eller tilbud er 148,-/mnd.
+                    </p>
+                  </div>
+                } 
               />
               <AccordionItem 
                 question="Fungerer det på iPhone og Android?" 
-                answer="Ja, TutorFlyt er bygget for å fungere perfekt i nettleseren på alle mobiler." 
+                answer="Ja, TutorFlyt er bygget for å fungere perfekt i nettleseren på alle mobiler. En egen app er også under utvikling og vil bli presentert på et senere tidspunkt." 
               />
             </div>
           </div>
@@ -363,7 +364,8 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 Klar for en ryddigere hverdag?
               </h2>
               <p className="text-xl text-indigo-100 mb-10">
-                Bli en av våre 10 første "Founding Tutors" og sikre deg laveste pris for alltid.
+                Bli en av våre Beta-testere/Founding Tutors og få gratis tilgang under Closed-beta. <br className="hidden sm:block" />
+                Registrer deg under for påmelding av Closed-beta.
               </p>
               
               <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
