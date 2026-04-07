@@ -234,10 +234,12 @@ export const ChatList = () => {
 
   useEffect(() => {
     let channel: any;
-    if (activeConversation) {
+    
+    if (activeConversation?.id) {
       console.log('Subscribing to realtime for conversation:', activeConversation.id);
+      
       channel = supabase
-        .channel(`messages:${activeConversation.id}`)
+        .channel(`messages_${activeConversation.id}`)
         .on(
           'postgres_changes',
           {
@@ -267,7 +269,7 @@ export const ChatList = () => {
         supabase.removeChannel(channel);
       }
     };
-  }, [activeConversation]);
+  }, [activeConversation?.id]);
 
   const fetchConversations = async () => {
     try {
