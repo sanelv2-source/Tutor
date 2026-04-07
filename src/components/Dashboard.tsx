@@ -538,6 +538,7 @@ const saveMeetLink = async (link: string) => {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskContent, setTaskContent] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskAttachment, setTaskAttachment] = useState<File | null>(null);
   const [isSendingTask, setIsSendingTask] = useState(false);
 
   const sendTaskToStudent = async (studentId: string) => {
@@ -545,6 +546,20 @@ const saveMeetLink = async (link: string) => {
     setIsSendingTask(true);
     
     try {
+      let attachmentPath = null;
+      if (taskAttachment) {
+        const fileExt = taskAttachment.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${authUserId}/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('resources')
+          .upload(filePath, taskAttachment);
+          
+        if (uploadError) throw uploadError;
+        attachmentPath = filePath;
+      }
+
       const { error } = await supabase
         .from('assignments')
         .insert([
@@ -553,7 +568,8 @@ const saveMeetLink = async (link: string) => {
             student_id: studentId, 
             title: taskTitle,
             description: taskContent,
-            due_date: taskDueDate || null
+            due_date: taskDueDate || null,
+            attachment_path: attachmentPath
           }
         ]);
         
@@ -564,6 +580,7 @@ const saveMeetLink = async (link: string) => {
       setTaskTitle('');
       setTaskContent('');
       setTaskDueDate('');
+      setTaskAttachment(null);
     } catch (err: any) {
       console.error("Feil ved sending av oppgave:", err);
       showToast("Kunne ikke sende oppgave: " + err.message);
@@ -2751,6 +2768,14 @@ const saveMeetLink = async (link: string) => {
                   onChange={(e) => setTaskDueDate(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vedlegg (valgfritt)</label>
+                <input 
+                  type="file"
+                  onChange={(e) => setTaskAttachment(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                 />
               </div>
               <div className="flex gap-3 pt-4">
