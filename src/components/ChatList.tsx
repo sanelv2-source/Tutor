@@ -413,8 +413,14 @@ export const ChatList = () => {
       const isTutor = senderId === conversation.tutor_id;
       const recipientId = isTutor ? (student.profile_id || null) : conversation.tutor_id;
 
-      if (isTutor && !recipientId) {
-        alert("Eleven har ikke aktivert kontoen sin ennå.");
+      console.log('--- Send Message Debug ---');
+      console.log('activeConversation:', activeConversation);
+      console.log('senderId:', senderId);
+      console.log('resolved recipientId:', recipientId);
+      console.log('--------------------------');
+
+      if (!recipientId) {
+        alert(isTutor ? "Eleven har ikke aktivert kontoen sin ennå." : "Fant ikke mottaker for samtalen.");
         setNewMessage(trimmed); // Revert optimistic clear
         setMessages(prev => prev.filter(m => m.id !== tempId)); // Remove optimistic message
         return;
@@ -425,6 +431,7 @@ export const ChatList = () => {
         .insert({
           conversation_id: activeConversation.id,
           sender_id: senderId,
+          recipient_id: recipientId,
           body: trimmed,
         })
         .select()
