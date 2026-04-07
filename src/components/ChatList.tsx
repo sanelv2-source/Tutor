@@ -235,6 +235,7 @@ export const ChatList = () => {
   useEffect(() => {
     let channel: any;
     if (activeConversation) {
+      console.log('Subscribing to realtime for conversation:', activeConversation.id);
       channel = supabase
         .channel(`messages:${activeConversation.id}`)
         .on(
@@ -246,6 +247,7 @@ export const ChatList = () => {
             filter: `conversation_id=eq.${activeConversation.id}`,
           },
           (payload) => {
+            console.log('Realtime message received:', payload);
             setMessages((prev) => {
               // Prevent duplicates if the message was already added via optimistic update
               if (prev.some(m => m.id === payload.new.id)) {
@@ -255,7 +257,9 @@ export const ChatList = () => {
             });
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('Realtime subscription status:', status);
+        });
     }
 
     return () => {
@@ -421,7 +425,6 @@ export const ChatList = () => {
         .insert({
           conversation_id: activeConversation.id,
           sender_id: senderId,
-          recipient_id: recipientId,
           body: trimmed,
         })
         .select()
