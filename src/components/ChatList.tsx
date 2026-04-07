@@ -234,9 +234,12 @@ export const ChatList = () => {
 
   useEffect(() => {
     let channel: any;
-    if (activeConversation) {
+    
+    if (activeConversation?.id) {
+      console.log('Subscribing to realtime for conversation:', activeConversation.id);
+      
       channel = supabase
-        .channel(`messages:${activeConversation.id}`)
+        .channel(`messages_${activeConversation.id}`)
         .on(
           'postgres_changes',
           {
@@ -246,6 +249,7 @@ export const ChatList = () => {
             filter: `conversation_id=eq.${activeConversation.id}`,
           },
           (payload) => {
+            console.log('Realtime message received:', payload);
             setMessages((prev) => {
               // Prevent duplicates if the message was already added via optimistic update
               if (prev.some(m => m.id === payload.new.id)) {
@@ -255,7 +259,9 @@ export const ChatList = () => {
             });
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('Realtime subscription status:', status);
+        });
     }
 
     return () => {
@@ -263,7 +269,7 @@ export const ChatList = () => {
         supabase.removeChannel(channel);
       }
     };
-  }, [activeConversation]);
+  }, [activeConversation?.id]);
 
   const fetchConversations = async () => {
     try {
@@ -409,8 +415,14 @@ export const ChatList = () => {
       const isTutor = senderId === conversation.tutor_id;
       const recipientId = isTutor ? (student.profile_id || null) : conversation.tutor_id;
 
-      if (isTutor && !recipientId) {
-        alert("Eleven har ikke aktivert kontoen sin ennå.");
+      console.log('--- Send Message Debug ---');
+      console.log('activeConversation:', activeConversation);
+      console.log('senderId:', senderId);
+      console.log('resolved recipientId:', recipientId);
+      console.log('--------------------------');
+
+      if (!recipientId) {
+        alert(isTutor ? "Eleven har ikke aktivert kontoen sin ennå." : "Fant ikke mottaker for samtalen.");
         setNewMessage(trimmed); // Revert optimistic clear
         setMessages(prev => prev.filter(m => m.id !== tempId)); // Remove optimistic message
         return;
