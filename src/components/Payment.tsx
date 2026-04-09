@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, ShieldCheck, ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
+import { CreditCard, ShieldCheck, ArrowLeft, CheckCircle2, Lock, LogOut } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
+import { supabase } from '../supabaseClient';
 import {
   Elements,
   CardElement,
@@ -9,14 +10,21 @@ import {
 } from '@stripe/react-stripe-js';
 
 // Replace with your actual publishable key
-const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
+const publishableKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY;
+if (!publishableKey) {
+  console.warn('VITE_STRIPE_PUBLISHABLE_KEY is missing. Please add it in the "Settings" menu to enable frontend payments.');
+}
+const stripePromise = loadStripe(publishableKey || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
 
-function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void }) {
+function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void, pendingUser: any, setPendingUser: (user: any) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+
+  const activeEmail = user?.email || pendingUser?.email;
+  const activeName = user?.name || pendingUser?.name;
 
   useEffect(() => {
     // Create SetupIntent as soon as the page loads
@@ -32,7 +40,10 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
           setError(data.error);
         }
       })
-      .catch((err) => setError('Kunne ikke koble til betalingsleverandør. Sjekk at STRIPE_SECRET_KEY er satt.'));
+      .catch((err) => {
+        console.error("Payment intent error:", err);
+        setError('Kunne ikke koble til betalingsleverandør. Sjekk at STRIPE_SECRET_KEY er lagt inn i "Settings"-menyen.');
+      });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,8 +67,8 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
           payment_method: {
             card: cardElement as any,
             billing_details: {
-              email: user?.email,
-              name: user?.name,
+              email: activeEmail,
+              name: activeName,
             },
           },
         }
@@ -67,14 +78,55 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
         throw new Error(stripeError.message || 'Kortet ble avvist');
       }
 
-      // If successful, tell our backend to mark the user as paid
+      // If successful, handle registration if needed, then tell our backend to mark the user as paid
       if (setupIntent && setupIntent.status === 'succeeded') {
+        let currentUser = user;
+
+        // 1. If we have a pending user, register them now
+        if (!currentUser && pendingUser) {
+          const { data, error: signUpError } = await supabase.auth.signUp({
+            email: pendingUser.email,
+            password: pendingUser.password,
+            options: {
+              data: {
+                full_name: pendingUser.name,
+                email: pendingUser.email,
+                role: 'tutor'
+              },
+              emailRedirectTo: `${window.location.origin}/`,
+            }
+          });
+
+          if (signUpError) throw signUpError;
+          
+          if (data.user) {
+            // Opprett profil
+            await supabase.from('profiles').upsert({ 
+              id: data.user.id, 
+              email: pendingUser.email, 
+              full_name: pendingUser.name,
+              role: 'tutor',
+              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+              subscription_status: 'inactive'
+            });
+
+            currentUser = {
+              name: pendingUser.name,
+              email: pendingUser.email,
+              hasPaid: false,
+              role: 'tutor'
+            };
+          }
+        }
+
+        if (!activeEmail) throw new Error("Ingen e-postadresse funnet");
+
         const response = await fetch('/api/payment/process', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email: user?.email }),
+          body: JSON.stringify({ email: activeEmail }),
         });
 
         const data = await response.json();
@@ -83,7 +135,8 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
           throw new Error(data.error || 'Kunne ikke oppdatere brukerstatus');
         }
 
-        setUser({ ...user, hasPaid: true });
+        setPendingUser(null);
+        setUser({ ...currentUser, hasPaid: true });
         onNavigate('dashboard');
       }
     } catch (err) {
@@ -94,7 +147,8 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
   };
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <div className="space-y-6">
+      <form className="space-y-6" onSubmit={handleSubmit}>
       {/* Payment Methods */}
       <div className="flex gap-4 mb-6">
         <label className="flex-1 relative border-2 border-indigo-600 bg-indigo-50 rounded-xl p-4 cursor-pointer flex items-center justify-center">
@@ -172,14 +226,29 @@ function CheckoutForm({ onNavigate, user, setUser }: { onNavigate: (page: string
         </div>
       )}
     </form>
+    </div>
   );
 }
 
-export default function Payment({ onNavigate, user, setUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void }) {
+export default function Payment({ onNavigate, user, setUser, pendingUser, setPendingUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void, pendingUser: any, setPendingUser: (user: any) => void }) {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setPendingUser(null);
+    onNavigate('landing');
+  };
+
+  const handleBack = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setPendingUser(null);
+    onNavigate('signup');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col py-12 sm:px-6 lg:px-8 font-sans relative">
       <button 
-        onClick={() => onNavigate('signup')}
+        onClick={handleBack}
         className="absolute top-6 left-6 sm:top-8 sm:left-8 flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -192,7 +261,7 @@ export default function Payment({ onNavigate, user, setUser }: { onNavigate: (pa
             Fullfør din registrering
           </h2>
           <p className="mt-2 text-slate-600">
-            Du betaler ingenting i dag. Start din 14-dagers gratis prøveperiode.
+            {pendingUser ? `Velkommen, ${pendingUser.name}! Start din 14-dagers gratis prøveperiode.` : 'Du betaler ingenting i dag. Start din 14-dagers gratis prøveperiode.'}
           </p>
         </div>
 
@@ -206,7 +275,7 @@ export default function Payment({ onNavigate, user, setUser }: { onNavigate: (pa
             </h3>
 
             <Elements stripe={stripePromise}>
-              <CheckoutForm onNavigate={onNavigate} user={user} setUser={setUser} />
+              <CheckoutForm onNavigate={onNavigate} user={user} setUser={setUser} pendingUser={pendingUser} setPendingUser={setPendingUser} />
             </Elements>
           </div>
 

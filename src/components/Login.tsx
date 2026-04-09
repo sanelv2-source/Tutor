@@ -1,38 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
 export default function Login({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const getRedirectUrl = () => {
-    const searchParams = new URLSearchParams(location.search);
-    return searchParams.get('redirect');
-  };
 
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       setIsLoading(true);
       setError('');
       
-      const redirectUrl = getRedirectUrl();
-      const redirectTo = redirectUrl 
-        ? `${window.location.origin}${redirectUrl}` 
-        : `${window.location.origin}/`;
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: redirectTo,
+          redirectTo: `${window.location.origin}/`,
           skipBrowserRedirect: true,
-          scopes: provider === 'google' ? 'https://www.googleapis.com/auth/calendar.readonly' : undefined,
         }
       });
 
@@ -64,9 +52,8 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setError('');
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
+        email,
         password,
       });
 
@@ -75,25 +62,8 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       }
 
       if (data.user) {
-        const redirectUrl = getRedirectUrl();
-        if (redirectUrl) {
-          navigate(redirectUrl);
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profile?.role === 'tutor') {
-          navigate('/tutor/dashboard');
-        } else if (profile?.role === 'student') {
-          navigate('/student/dashboard');
-        } else {
-          navigate('/complete-profile');
-        }
+        // Vi navigerer til roten og lar App.tsx håndtere ruting basert på rolle og betalingsstatus
+        navigate('/');
       }
     } catch (err: any) {
       console.error('Login error:', err);
@@ -108,6 +78,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative">
@@ -149,23 +120,23 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
               <label htmlFor="email" className="block text-sm font-medium text-slate-700">
                 E-postadresse
               </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                    placeholder="din@epost.no"
+                    required
+                  />
                 </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
-                  placeholder="din@epost.no"
-                  required
-                />
               </div>
-            </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-slate-700">
@@ -263,6 +234,7 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                 </button>
               </div>
             </div>
+
           </div>
         </div>
         
