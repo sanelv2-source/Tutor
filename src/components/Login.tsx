@@ -52,16 +52,42 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setError('');
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (supabase.auth.getSession === undefined || (import.meta as any).env.VITE_SUPABASE_URL?.includes('placeholder')) {
+        throw new Error('Supabase-konfigurasjon mangler. Vennligst legg til VITE_SUPABASE_URL og VITE_SUPABASE_ANON_KEY i "Settings"-menyen.');
+      }
+
+      let retryCount = 0;
+      const maxRetries = 3;
+      let signInError = null;
+      let data = null;
+
+      while (retryCount < maxRetries) {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        data = result.data;
+        signInError = result.error;
+
+        if (!signInError) break;
+
+        // If it's a network error, retry
+        if (signInError.message?.includes('fetch') || signInError.message?.includes('Network')) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            continue;
+          }
+        }
+        break;
+      }
 
       if (signInError) {
         throw signInError;
       }
 
-      if (data.user) {
+      if (data?.user) {
         // Vi navigerer til roten og lar App.tsx håndtere ruting basert på rolle og betalingsstatus
         navigate('/');
       }
@@ -69,7 +95,9 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       console.error('Login error:', err);
       let errorMessage = err instanceof Error ? err.message : 'Innlogging feilet';
       
-      if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+        errorMessage = 'Kunne ikke koble til serveren (Failed to fetch). Vennligst sjekk internettforbindelsen din eller om Supabase-prosjektet er aktivt.';
+      } else if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
         errorMessage = 'Kunne ikke logge inn. Sjekk at e-post/passord-innlogging er aktivert i Supabase-prosjektet ditt.';
       }
       
