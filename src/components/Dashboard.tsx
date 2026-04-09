@@ -427,7 +427,10 @@ const saveMeetLink = async (link: string) => {
         name: lesson.student_name,
         detail: '500', // Standardpris
         date: new Date().toISOString().split('T')[0], // Dagens dato som forfall
-        email: studentEmail
+        email: studentEmail,
+        method: 'Faktura',
+        studentId: student?.id || '',
+        duration: '60'
       });
       setActiveTab('betaling');
       setShowAddModal(true);
@@ -815,7 +818,7 @@ const saveMeetLink = async (link: string) => {
       return;
     }
     setShowAddModal(true);
-    setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura' });
+    setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
   };
 
   const handleSendReport = async () => {
@@ -931,7 +934,7 @@ const saveMeetLink = async (link: string) => {
       } finally {
         setIsSaving(false);
         setShowAddModal(false);
-        setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura' });
+        setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
       }
     } else if (activeTab === 'timeplan') {
       setIsSaving(true);
@@ -1028,7 +1031,7 @@ const saveMeetLink = async (link: string) => {
           });
           setShowAddModal(false);
           setIsSaving(false);
-          setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura' });
+          setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
           return;
         }
 
@@ -1088,7 +1091,7 @@ const saveMeetLink = async (link: string) => {
         showToast(`Kunne ikke opprette faktura: ${err.message}`);
       } finally {
         setIsSaving(false);
-        setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura' });
+        setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
       }
     }
   };
