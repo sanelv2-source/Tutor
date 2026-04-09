@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
@@ -5,11 +6,8 @@ import crypto from "crypto";
 import Stripe from "stripe";
 import fs from "fs";
 import path from "path";
-import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://jshciiidthsxjhwlxmbh.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_publishable_iaTt8xzIHCGGoy_m2HrV2A_o2rMES6D'; // Fallback to anon key if service key is missing
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 const PORT = 3000;
@@ -17,13 +15,192 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Required for Apple OAuth POST callback
 
+// Initialize Supabase Admin client
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
+
+// Initialize Resend
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// Automated Invoice Reminders
+async function checkOverdueInvoices() {
+  if (!supabaseAdmin) {
+    console.warn("Supabase Admin client not initialized. Skipping overdue check.");
+    return;
+  }
+
+  console.log("Checking for overdue invoices...");
+  const now = new Date();
+  
+  try {
+    // Fetch overdue invoices first
+    const { data: overdueInvoices, error: invoiceError } = await supabaseAdmin
+      .from('invoices')
+      .select('*')
+      .eq('status', 'pending')
+      .lt('due_date', now.toISOString());
+
+    if (invoiceError) {
+      console.error("Supabase error fetching invoices in checkOverdueInvoices:", invoiceError);
+      throw invoiceError;
+    }
+
+    if (!overdueInvoices || overdueInvoices.length === 0) {
+      console.log("No overdue invoices found.");
+      return;
+    }
+
+    console.log(`Found ${overdueInvoices.length} overdue invoices. Fetching student data...`);
+
+    // Fetch all students for these invoices
+    const studentIds = [...new Set(overdueInvoices.map(inv => inv.student_id).filter(Boolean))];
+    const { data: students, error: studentError } = await supabaseAdmin
+      .from('students')
+      .select('id, full_name, email, parent_email')
+      .in('id', studentIds);
+
+    if (studentError) {
+      console.error("Supabase error fetching students in checkOverdueInvoices:", studentError);
+      throw studentError;
+    }
+
+    const studentMap = new Map(students?.map(s => [s.id, s]));
+
+    for (const invoice of overdueInvoices) {
+      const student = studentMap.get(invoice.student_id);
+      const recipientEmail = student?.parent_email || student?.email;
+      
+      if (!recipientEmail) {
+        console.warn(`No email found for student ${student?.full_name || invoice.student_id}. Skipping reminder.`);
+        continue;
+      }
+
+      console.log(`Sending reminder for invoice ${invoice.id} to ${recipientEmail}...`);
+      
+      if (!resend) {
+        console.warn("Resend not initialized. Skipping email.");
+        continue;
+      }
+
+      const { data: emailData, error: emailError } = await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL || "TutorFlyt <noreply@tutorflyt.no>",
+        to: [recipientEmail],
+        subject: `Betalingspåminnelse: Faktura for ${student?.full_name}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #ef4444;">Betalingspåminnelse</h2>
+            <p>Hei,</p>
+            <p>Dette er en vennlig påminnelse om at fakturaen for <strong>${student?.full_name}</strong> har forfalt.</p>
+            <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 5px 0;"><strong>Beløp:</strong> ${invoice.amount} kr</p>
+              <p style="margin: 5px 0;"><strong>Forfallsdato:</strong> ${new Date(invoice.due_date).toLocaleDateString('no-NO')}</p>
+              <p style="margin: 5px 0;"><strong>Status:</strong> Forfalt</p>
+            </div>
+            <p>Vennligst gjennomfør betalingen så snart som mulig. Hvis du allerede har betalt, kan du se bort fra denne e-posten.</p>
+            <p>Logg inn på din konto for å se detaljer og betale:</p>
+            <a href="${process.env.APP_URL || 'https://tutorflyt.no'}" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Gå til TutorFlyt</a>
+            <p style="margin-top: 30px; font-size: 0.9em; color: #6b7280;">Vennlig hilsen,<br>TutorFlyt-teamet</p>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        console.error(`Failed to send email for invoice ${invoice.id}:`, emailError);
+      } else {
+        console.log(`Reminder sent for invoice ${invoice.id}. Email ID: ${emailData?.id}`);
+      }
+    }
+  } catch (err: any) {
+    console.error("Error in checkOverdueInvoices:", err?.message || err);
+    if (err?.details) console.error("Error details:", err.details);
+  }
+}
+
+// Run overdue check every hour
+setInterval(checkOverdueInvoices, 60 * 60 * 1000);
+
+// Also run it on server start after a short delay
+setTimeout(checkOverdueInvoices, 10000);
+
+// API Endpoints for Invoices
+app.post("/api/invoices/check", async (req, res) => {
+  await checkOverdueInvoices();
+  res.json({ message: "Overdue check triggered manually." });
+});
+
+app.post("/api/invoices/:id/remind", async (req, res) => {
+  const { id } = req.params;
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase Admin not initialized" });
+
+  try {
+    const { data: invoice, error } = await supabaseAdmin
+      .from('invoices')
+      .select(`
+        *,
+        students (
+          full_name,
+          parent_email,
+          parent_name
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error || !invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const student = invoice.students;
+    const recipientEmail = student?.parent_email;
+
+    if (!recipientEmail) return res.status(400).json({ error: "No parent email found" });
+
+    if (!resend) return res.status(500).json({ error: "Resend not initialized" });
+
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || "TutorFlyt <noreply@tutorflyt.no>",
+      to: [recipientEmail],
+      subject: `Betalingspåminnelse: Faktura for ${student?.full_name}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #ef4444;">Betalingspåminnelse</h2>
+          <p>Hei ${student?.parent_name || 'foresatt'},</p>
+          <p>Dette er en vennlig påminnelse om at fakturaen for <strong>${student?.full_name}</strong> har forfalt.</p>
+          <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Beløp:</strong> ${invoice.amount} kr</p>
+            <p style="margin: 5px 0;"><strong>Forfallsdato:</strong> ${new Date(invoice.due_date).toLocaleDateString('no-NO')}</p>
+            <p style="margin: 5px 0;"><strong>Status:</strong> Forfalt</p>
+          </div>
+          <p>Vennligst gjennomfør betalingen så snart som mulig. Hvis du allerede har betalt, kan du se bort fra denne e-posten.</p>
+          <p>Logg inn på din konto for å se detaljer og betale:</p>
+          <a href="${process.env.APP_URL || 'https://tutorflyt.no'}" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Gå til TutorFlyt</a>
+          <p style="margin-top: 30px; font-size: 0.9em; color: #6b7280;">Vennlig hilsen,<br>TutorFlyt-teamet</p>
+        </div>
+      `,
+    });
+
+    if (emailError) throw emailError;
+
+    await supabaseAdmin
+      .from('invoices')
+      .update({ last_reminder_sent_at: new Date().toISOString() })
+      .eq('id', id);
+
+    res.json({ message: "Reminder sent successfully", emailId: emailData?.id });
+  } catch (err) {
+    console.error("Error sending manual reminder:", err);
+    res.status(500).json({ error: "Failed to send reminder" });
+  }
+});
+
 // Initialize Stripe lazily
 let stripeClient: Stripe | null = null;
 function getStripe(): Stripe {
   if (!stripeClient) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) {
-      throw new Error('STRIPE_SECRET_KEY environment variable is required');
+      throw new Error('STRIPE_SECRET_KEY is missing. Please add it in the "Settings" menu (bottom left) to enable payments.');
     }
     stripeClient = new Stripe(key, { apiVersion: '2025-02-24.acacia' as any });
   }
@@ -58,12 +235,6 @@ function saveUsers(usersMap: Map<string, any>) {
 const users = loadUsers(); // email -> { name, email, password, verified, hasPaid, token }
 
 async function startServer() {
-  // Initialize Resend with API key if available
-  let resend: Resend | null = null;
-  if (process.env.RESEND_API_KEY) {
-    resend = new Resend(process.env.RESEND_API_KEY);
-  }
-
   // API routes
   app.post("/api/auth/magic-link", async (req, res) => {
     const { email } = req.body;
@@ -86,7 +257,7 @@ async function startServer() {
 
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const magicLink = `${appUrl}/?verify=${token}`;
-    const fromEmail = "TutorFlyt <post@tutorflyt.no>";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
 
     if (resend) {
       try {
@@ -124,11 +295,7 @@ async function startServer() {
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          let errorMessage = data.error.message || "Kunne ikke sende e-post.";
-          if (data.error.name === 'validation_error') {
-            errorMessage = "Valideringsfeil fra Resend. Sjekk at e-postadressen er gyldig. Hvis du bruker gratisversjonen av Resend, kan du kun sende til din egen bekreftede e-postadresse.";
-          }
-          return res.status(400).json({ error: errorMessage });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend." });
         }
       } catch (error) {
         console.error("Failed to send email:", error);
@@ -154,7 +321,7 @@ async function startServer() {
 
     // In a real app, we would look up the tutor's email based on the portalId/lessonId
     const tutorEmail = "tutor@example.com"; 
-    const fromEmail = "TutorFlyt <post@tutorflyt.no>";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
 
     if (resend) {
       try {
@@ -171,11 +338,7 @@ async function startServer() {
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          let errorMessage = data.error.message || "Kunne ikke sende e-post.";
-          if (data.error.name === 'validation_error') {
-            errorMessage = "Valideringsfeil fra Resend. Sjekk at e-postadressen er gyldig. Hvis du bruker gratisversjonen av Resend, kan du kun sende til din egen bekreftede e-postadresse.";
-          }
-          return res.status(400).json({ error: errorMessage });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
         }
       } catch (error) {
         console.error("Failed to send reschedule email:", error);
@@ -193,161 +356,6 @@ async function startServer() {
     res.json({ message: "Forespørsel sendt" });
   });
 
-  app.post("/api/invitations/send-email", async (req, res) => {
-    const { email, tutorName, token } = req.body;
-    const authHeader = req.headers.authorization;
-
-    if (!email || !token) {
-      return res.status(400).json({ error: "Mangler påkrevde felt" });
-    }
-
-    if (!authHeader) {
-      return res.status(401).json({ error: "Uautorisert" });
-    }
-
-    try {
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const inviteUrl = `${appUrl}/student/accept-invite?token=${token}`;
-      const fromEmail = "TutorFlyt <post@tutorflyt.no>";
-
-      if (resend) {
-        const data = await resend.emails.send({
-          from: fromEmail,
-          to: email,
-          subject: "Invitasjon til TutorFlyt",
-          html: `
-            <div style="background-color: #f8fafc; font-family: sans-serif; padding: 40px 20px;">
-              <div style="margin: 0 auto; padding: 40px 32px; background-color: #ffffff; border-radius: 12px; max-width: 600px; border: 1px solid #e2e8f0; text-align: center;">
-                <h1 style="color: #0f172a; font-size: 24px; font-weight: bold; margin: 0 0 24px;">Velkommen til TutorFlyt!</h1>
-                <p style="color: #475569; font-size: 16px; line-height: 26px; margin: 0 0 20px; text-align: center;">
-                  <strong>${tutorName || "Læreren din"}</strong> har invitert deg til å opprette en elevkonto på TutorFlyt.
-                </p>
-                <div style="margin: 32px 0; text-align: center;">
-                  <a href="${inviteUrl}" style="background-color: #4f46e5; border-radius: 8px; color: #ffffff; display: inline-block; font-size: 16px; font-weight: bold; text-decoration: none; padding: 16px 32px;">
-                    Aksepter invitasjon og opprett konto
-                  </a>
-                </div>
-                <p style="color: #94a3b8; font-size: 14px; line-height: 22px; text-align: center;">
-                  Denne lenken utløper om 7 dager.
-                </p>
-              </div>
-            </div>
-          `,
-        });
-        
-        if (data.error) {
-          console.error("Resend API returned an error:", data.error);
-        }
-      } else {
-        console.log("=========================================");
-        console.log("RESEND_API_KEY not set. Simulating invite email:");
-        console.log(`To: ${email}`);
-        console.log(`Invite Link: ${inviteUrl}`);
-        console.log("=========================================");
-      }
-
-      res.json({ success: true, message: "E-post sendt" });
-    } catch (error: any) {
-      console.error("Failed to send email:", error);
-      res.status(500).json({ error: "En feil oppstod ved sending av e-post" });
-    }
-  });
-
-  app.post("/api/invitations/cancel", async (req, res) => {
-    const { studentId, tutorId } = req.body;
-    const authHeader = req.headers.authorization;
-
-    if (!studentId || !tutorId) {
-      return res.status(400).json({ error: "Mangler påkrevde felt" });
-    }
-
-    if (!authHeader) {
-      return res.status(401).json({ error: "Uautorisert" });
-    }
-
-    try {
-      const tokenStr = authHeader.replace('Bearer ', '');
-      
-      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-        global: {
-          headers: {
-            Authorization: `Bearer ${tokenStr}`
-          }
-        }
-      });
-
-      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
-      if (authError || !user || user.id !== tutorId) {
-        return res.status(401).json({ error: "Uautorisert" });
-      }
-
-      await supabaseClient
-        .from('student_invitations')
-        .update({ status: 'cancelled' })
-        .eq('student_id', studentId)
-        .eq('tutor_id', tutorId)
-        .eq('status', 'pending');
-
-      res.json({ success: true, message: "Invitasjon kansellert" });
-    } catch (error: any) {
-      console.error("Failed to cancel invitation:", error);
-      res.status(500).json({ error: "En feil oppstod" });
-    }
-  });
-
-  app.post("/api/invitations/validate", async (req, res) => {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: "Mangler token" });
-
-    try {
-      const { data: invitation, error } = await supabaseAdmin
-        .from('student_invitations')
-        .select('*, tutor:profiles!tutor_id(full_name)')
-        .eq('token', token)
-        .single();
-
-      if (error || !invitation) {
-        return res.status(404).json({ error: "Ugyldig invitasjon" });
-      }
-
-      if (invitation.status !== 'pending') {
-        return res.status(400).json({ error: `Invitasjonen er ${invitation.status === 'accepted' ? 'allerede akseptert' : 'utløpt eller kansellert'}` });
-      }
-
-      if (new Date(invitation.expires_at) < new Date()) {
-        return res.status(400).json({ error: "Invitasjonen har utløpt" });
-      }
-
-      res.json({ valid: true, invitation });
-    } catch (error) {
-      console.error("Validation error:", error);
-      res.status(500).json({ error: "En feil oppstod ved validering" });
-    }
-  });
-
-  app.post("/api/invitations/accept", async (req, res) => {
-    const { token, userId } = req.body;
-    if (!token || !userId) return res.status(400).json({ error: "Mangler token eller userId" });
-
-    try {
-      const { error } = await supabaseAdmin.rpc('accept_student_invitation', {
-        invitation_token: token,
-        new_user_id: userId
-      });
-
-      if (error) {
-        console.error("RPC error:", error);
-        return res.status(400).json({ error: "Ugyldig eller utløpt invitasjon" });
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Accept error:", error);
-      res.status(500).json({ error: "En feil oppstod ved akseptering" });
-    }
-  });
-
   app.post("/api/send-invite", async (req, res) => {
     const { email, tutorId } = req.body;
 
@@ -357,7 +365,7 @@ async function startServer() {
 
     // In a real app, we would look up the tutor's name based on the tutorId
     const tutorName = "Læreren din"; 
-    const fromEmail = "TutorFlyt <post@tutorflyt.no>";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const loginUrl = `${appUrl}/login`;
 
@@ -396,11 +404,7 @@ async function startServer() {
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          let errorMessage = data.error.message || "Kunne ikke sende e-post.";
-          if (data.error.name === 'validation_error') {
-            errorMessage = "Valideringsfeil fra Resend. Sjekk at e-postadressen er gyldig. Hvis du bruker gratisversjonen av Resend, kan du kun sende til din egen bekreftede e-postadresse.";
-          }
-          return res.status(400).json({ error: errorMessage });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
         }
       } catch (error) {
         console.error("Failed to send invite email:", error);
@@ -439,7 +443,7 @@ async function startServer() {
     // Construct the verification URL
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const verificationUrl = `${appUrl}/?verify=${token}`;
-    const fromEmail = "TutorFlyt <post@tutorflyt.no>";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
 
     if (resend) {
       try {
@@ -476,11 +480,7 @@ async function startServer() {
         
         if (data.error) {
           console.error("Resend API returned an error:", data.error);
-          let errorMessage = data.error.message || "Kunne ikke sende e-post.";
-          if (data.error.name === 'validation_error') {
-            errorMessage = "Valideringsfeil fra Resend. Sjekk at e-postadressen er gyldig. Hvis du bruker gratisversjonen av Resend, kan du kun sende til din egen bekreftede e-postadresse.";
-          }
-          return res.status(400).json({ error: errorMessage });
+          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post. Sjekk at e-postadressen er tillatt i Resend (gratisplan krever at du sender til din egen e-post)." });
         }
         
         console.log("Verification email sent to:", email);
@@ -525,7 +525,7 @@ async function startServer() {
       user: { 
         name: foundUser.name, 
         email: foundUser.email,
-        hasPaid: foundUser.hasPaid || true,
+        hasPaid: foundUser.hasPaid || false,
         role: foundUser.role || 'tutor'
       } 
     });
@@ -544,7 +544,7 @@ async function startServer() {
       return res.status(403).json({ error: "Vennligst bekreft e-postadressen din først" });
     }
 
-    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid || true, role: user.role || 'tutor' } });
+    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid || false, role: user.role || 'tutor' } });
   });
 
   // Endpoint for completing OAuth login (called by frontend after popup closes)
@@ -556,7 +556,7 @@ async function startServer() {
       return res.status(404).json({ error: "Bruker ikke funnet" });
     }
 
-    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid || true, role: user.role || 'tutor' } });
+    res.json({ user: { name: user.name, email: user.email, hasPaid: user.hasPaid || false, role: user.role || 'tutor' } });
   });
 
   // --- GOOGLE OAUTH ---
@@ -718,65 +718,123 @@ async function startServer() {
     }
   });
 
-  app.post("/api/payment/process", (req, res) => {
-    const { email } = req.body;
-    const user = users.get(email);
-    
-    if (!user) {
-      return res.status(404).json({ error: "Bruker ikke funnet" });
+  app.post("/api/payment/create-checkout-session", async (req, res) => {
+    try {
+      const stripe = getStripe();
+      const { email } = req.body;
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        payment_method_types: ["card"],
+        customer_email: email,
+        line_items: [
+          {
+            price: "price_1TIpSSCyYLDNgabqNIs1oIbJ", // DIN PRICE ID
+            quantity: 1,
+          },
+        ],
+        success_url: `${appUrl}/success`,
+        cancel_url: `${appUrl}/cancel`,
+        subscription_data: {
+          trial_period_days: 14,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Stripe checkout error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Kunne ikke opprette betalingsøkt" });
     }
-    
-    user.hasPaid = true;
-    users.set(email, user);
-    saveUsers(users);
-    
-    res.json({ success: true });
   });
 
-  app.post("/api/payment/vipps-request", async (req, res) => {
-    const { invoiceId } = req.body;
+  // Alias for shorter path as requested by user
+  app.post("/create-checkout-session", async (req, res) => {
+    try {
+      const stripe = getStripe();
+      const { email } = req.body;
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
 
-    if (!invoiceId) {
-      return res.status(400).json({ error: "Mangler invoiceId" });
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        payment_method_types: ["card"],
+        customer_email: email,
+        line_items: [
+          {
+            price: "price_1TIpSSCyYLDNgabqNIs1oIbJ", // DIN PRICE ID
+            quantity: 1,
+          },
+        ],
+        success_url: `${appUrl}/success`,
+        cancel_url: `${appUrl}/cancel`,
+        subscription_data: {
+          trial_period_days: 14,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Stripe checkout error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Kunne ikke opprette betalingsøkt" });
+    }
+  });
+
+  app.post("/api/payment/process", async (req, res) => {
+    const { email } = req.body;
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
     }
 
     try {
-      // Fetch invoice from Supabase using admin client to ensure we get the public_token
-      const { data: invoice, error: invoiceError } = await supabaseAdmin
-        .from('invoices')
-        .select('*, profiles!tutor_id(full_name)')
-        .eq('id', invoiceId)
-        .single();
+      const { data: profile, error: fetchError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
 
-      if (invoiceError || !invoice) {
-        return res.status(404).json({ error: "Faktura ikke funnet" });
+      if (fetchError || !profile) {
+        return res.status(404).json({ error: "Profil ikke funnet" });
       }
 
-      if (!invoice.email) {
-        return res.status(400).json({ error: "Faktura mangler e-postadresse" });
-      }
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ subscription_status: 'active' })
+        .eq('id', profile.id);
 
-      const fromEmail = "TutorFlyt <post@tutorflyt.no>";
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const invoiceUrl = `${appUrl}/invoice/${invoice.public_token}`;
-      const teacherName = invoice.profiles?.full_name || 'TutorFlyt';
+      if (updateError) throw updateError;
 
-      if (resend) {
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      res.status(500).json({ error: "Kunne ikke oppdatere betalingsstatus" });
+    }
+  });
+
+  app.post("/api/payment/vipps-request", async (req, res) => {
+    const { teacherName, amount, phone, parentEmail } = req.body;
+
+    if (!teacherName || !amount || !phone || !parentEmail) {
+      return res.status(400).json({ error: "Mangler nødvendig informasjon" });
+    }
+
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
+    if (resend) {
+      try {
         const data = await resend.emails.send({
           from: fromEmail,
-          to: invoice.email,
+          to: parentEmail,
           subject: `Vipps-krav fra ${teacherName} - TutorFlyt`,
           html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+            <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
               <h2 style="color: #111827;">Betaling for undervisning</h2>
               <p style="color: #4b5563; font-size: 16px; line-height: 1.5;">
                 Lærer <strong>${teacherName}</strong> har fullført timen.
               </p>
               <div style="background-color: #f9fafb; padding: 16px; border-radius: 6px; margin: 20px 0;">
-                <p style="margin: 0; font-size: 18px; color: #111827;">Vennligst betal <strong>${invoice.amount} kr</strong></p>
-              </div>
-              <div style="text-align: center; margin-top: 30px; margin-bottom: 30px;">
-                <a href="${invoiceUrl}" style="background-color: #ff5b24; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Gå til betaling</a>
+                <p style="margin: 0; font-size: 18px; color: #111827;">Vennligst Vipps <strong>${amount} kr</strong> til:</p>
+                <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #ff5b24;">${phone}</p>
               </div>
               <p style="color: #6b7280; font-size: 14px;">Takk for at du bruker TutorFlyt!</p>
             </div>
@@ -787,312 +845,15 @@ async function startServer() {
           console.error("Resend API returned an error:", data.error);
           return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
         }
-      } else {
-        console.log("=========================================");
-        console.log("RESEND_API_KEY not set. Simulating Vipps request email:");
-        console.log(`To: ${invoice.email}`);
-        console.log(`Message: Lærer ${teacherName} har fullført timen. Vennligst betal ${invoice.amount} kr.`);
-        console.log(`Link: ${invoiceUrl}`);
-        console.log("=========================================");
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Failed to send email:", error);
-      res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
-    }
-  });
-
-  app.post("/api/payment/send-invoice", async (req, res) => {
-    const { invoiceId } = req.body;
-
-    if (!invoiceId) {
-      return res.status(400).json({ error: "Mangler invoiceId" });
-    }
-
-    try {
-      // Fetch invoice from Supabase using admin client
-      const { data: invoice, error: invoiceError } = await supabaseAdmin
-        .from('invoices')
-        .select('*, profiles!tutor_id(full_name)')
-        .eq('id', invoiceId)
-        .single();
-
-      if (invoiceError || !invoice) {
-        return res.status(404).json({ error: "Faktura ikke funnet" });
-      }
-
-      if (!invoice.email) {
-        return res.status(400).json({ error: "Faktura mangler e-postadresse" });
-      }
-
-      const fromEmail = "TutorFlyt <post@tutorflyt.no>";
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const invoiceUrl = `${appUrl}/invoice/${invoice.public_token}`;
-      const teacherName = invoice.profiles?.full_name || 'TutorFlyt';
-
-      if (resend) {
-        const data = await resend.emails.send({
-          from: fromEmail,
-          to: invoice.email,
-          subject: "Ny faktura fra din Tutor",
-          html: `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-              <div style="background-color: #2563eb; padding: 20px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Faktura fra TutorFlyt</h1>
-              </div>
-              
-              <div style="padding: 30px; color: #333; line-height: 1.6;">
-                <p style="font-size: 18px;">Hei!</p>
-                <p>Du har mottatt en ny faktura for undervisning med <strong>${invoice.student_name}</strong>.</p>
-                
-                <div style="background-color: #f8fafc; border-radius: 6px; padding: 20px; margin: 25px 0; border-left: 4px solid #2563eb;">
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                      <td style="padding: 5px 0; color: #64748b;">Beløp å betale:</td>
-                      <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px;">${invoice.amount} kr</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 5px 0; color: #64748b;">Elev:</td>
-                      <td style="padding: 5px 0; text-align: right;">${invoice.student_name}</td>
-                    </tr>
-                  </table>
-                </div>
-
-                <p style="margin-top: 25px;"><strong>Slik betaler du:</strong></p>
-                <p>Klikk på knappen under for å gå til betalingssiden.</p>
-                
-                <div style="text-align: center; margin-top: 30px;">
-                  <a href="${invoiceUrl}" style="background-color: #ff5b24; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Gå til betaling</a>
-                </div>
-              </div>
-              
-              <div style="background-color: #f1f5f9; padding: 15px; text-align: center; color: #94a3b8; font-size: 12px;">
-                <p>Dette er en automatisk utsendelse fra TutorFlyt.<br>Takk for at du benytter våre tjenester!</p>
-              </div>
-            </div>
-          `,
-        });
-        
-        if (data.error) {
-          console.error("Resend API returned an error:", data.error);
-          return res.status(400).json({ error: data.error.message || "Kunne ikke sende e-post." });
-        }
-      } else {
-        console.log("=========================================");
-        console.log("RESEND_API_KEY not set. Simulating invoice email:");
-        console.log(`To: ${invoice.email}`);
-        console.log(`Subject: Ny faktura fra din Tutor`);
-        console.log(`Amount: ${invoice.amount} kr`);
-        console.log(`Link: ${invoiceUrl}`);
-        console.log("=========================================");
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Failed to send email:", error);
-      res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
-    }
-  });
-
-  app.get("/api/invoices/:publicToken", async (req, res) => {
-    const { publicToken } = req.params;
-
-    try {
-      const { data: invoice, error } = await supabaseAdmin
-        .from('invoices')
-        .select('*, profiles!tutor_id(full_name, phone)')
-        .eq('public_token', publicToken)
-        .single();
-
-      if (error || !invoice) {
-        return res.status(404).json({ error: "Faktura ikke funnet" });
-      }
-
-      res.json(invoice);
-    } catch (error) {
-      console.error("Error fetching invoice:", error);
-      res.status(500).json({ error: "En feil oppstod ved henting av faktura" });
-    }
-  });
-
-  app.post("/api/payments/:publicToken/create-vipps-payment", async (req, res) => {
-    const { publicToken } = req.params;
-
-    try {
-      // 1. Fetch invoice using admin client
-      const { data: invoice, error: invoiceError } = await supabaseAdmin
-        .from('invoices')
-        .select('*, profiles!tutor_id(full_name, phone)')
-        .eq('public_token', publicToken)
-        .single();
-
-      if (invoiceError || !invoice) {
-        return res.status(404).json({ error: "Faktura ikke funnet" });
-      }
-
-      // 2. Simulate Vipps payment creation
-      const simulatedVippsUrl = `https://qr.vipps.no/28/2/01/010/${(invoice.tutor_phone || invoice.profiles?.phone || '').replace(/\D/g, '')}?amount=${invoice.amount}00`;
-      
-      // 3. Save the payment attempt in our database using admin client
-      const { error: paymentError } = await supabaseAdmin
-        .from('invoice_payments')
-        .insert([
-          {
-            invoice_id: invoice.id,
-            payment_provider: 'vipps',
-            provider_order_id: `vipps_${Date.now()}_${invoice.id}`,
-            status: 'initiated',
-            provider_redirect_url: simulatedVippsUrl
-          }
-        ]);
-
-      if (paymentError) {
-        console.error("Error saving payment:", paymentError);
-        return res.status(500).json({ error: "Kunne ikke lagre betalingsforsøk" });
-      }
-
-      // 4. Return the URL to redirect the user to
-      res.json({ redirectUrl: simulatedVippsUrl });
-    } catch (error) {
-      console.error("Payment creation error:", error);
-      res.status(500).json({ error: "En feil oppstod ved opprettelse av betaling" });
-    }
-  });
-
-  app.post("/api/payments/vipps-webhook", async (req, res) => {
-    // In a real scenario, this would be called by Vipps when a payment is completed.
-    // We would verify the signature and update the database.
-    const { orderId, status } = req.body;
-
-    if (!orderId || !status) {
-      return res.status(400).json({ error: "Missing orderId or status" });
-    }
-
-    try {
-      // 1. Update invoice_payments status
-      const { data: payment, error: paymentError } = await supabaseAdmin
-        .from('invoice_payments')
-        .update({ status: status, updated_at: new Date().toISOString() })
-        .eq('provider_order_id', orderId)
-        .select()
-        .single();
-
-      if (paymentError || !payment) {
-        return res.status(404).json({ error: "Payment not found" });
-      }
-
-      // 2. If payment is successful, update invoice status
-      if (status === 'captured' || status === 'RESERVE' || status === 'SALE') {
-        await supabaseAdmin
-          .from('invoices')
-          .update({ 
-            status: 'Betalt', 
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', payment.invoice_id);
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Webhook error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  app.get("/api/payments/:publicToken/status", async (req, res) => {
-    const { publicToken } = req.params;
-
-    try {
-      // First get the invoice ID
-      const { data: invoice, error: invoiceError } = await supabaseAdmin
-        .from('invoices')
-        .select('id')
-        .eq('public_token', publicToken)
-        .single();
-
-      if (invoiceError || !invoice) {
-        return res.status(404).json({ error: "Faktura ikke funnet" });
-      }
-
-      // Then get the latest payment status
-      const { data: payment, error } = await supabaseAdmin
-        .from('invoice_payments')
-        .select('status')
-        .eq('invoice_id', invoice.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error || !payment) {
-        return res.status(404).json({ error: "Betaling ikke funnet" });
-      }
-
-      res.json({ status: payment.status });
-    } catch (error) {
-      console.error("Payment status error:", error);
-      res.status(500).json({ error: "En feil oppstod ved henting av betalingsstatus" });
-    }
-  });
-
-  app.post("/api/send-report", async (req, res) => {
-    const { studentEmail, studentName, topic, reportStatus, masteryLevel, reportComment, homework } = req.body;
-
-    if (!studentEmail) {
-      return res.status(400).json({ error: "Mangler mottakerens e-postadresse" });
-    }
-
-    const emoji = reportStatus === 'great' ? '😄' : reportStatus === 'good' ? '🙂' : '😐';
-    const fromEmail = "TutorFlyt <post@tutorflyt.no>";
-
-    if (resend) {
-      try {
-        const payload = {
-          from: fromEmail,
-          to: studentEmail,
-          subject: `Ny rapport fra din lærer ${emoji}`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #4f46e5;">Rapport fra TutorFlyt ${emoji}</h2>
-              
-              <p>Hei ${studentName || ''}!</p>
-              <p>Her er en oppsummering fra dagens time:</p>
-              
-              <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <p><strong>Emne:</strong> ${topic || 'Ikke spesifisert'}</p>
-                <p><strong>Mestring:</strong> ${masteryLevel}%</p>
-                <p><strong>Lærerens kommentar:</strong><br/> ${reportComment || 'Ingen kommentar.'}</p>
-                <p><strong>Lekser:</strong><br/> ${homework || 'Ingen lekser denne gangen.'}</p>
-              </div>
-              
-              <p>Logg inn på portalen for å se mer detaljer.</p>
-            </div>
-          `
-        };
-        const data = await resend.emails.send(payload);
-        
-        if (data.error) {
-          console.error("Resend API returned an error:", JSON.stringify(data.error, null, 2));
-          console.error("Payload was:", JSON.stringify({ ...payload, html: '[HTML CONTENT]' }, null, 2));
-          
-          let errorMessage = data.error.message || "Kunne ikke sende e-post.";
-          if (data.error.name === 'validation_error') {
-            errorMessage = "Valideringsfeil fra Resend. Sjekk at e-postadressen er gyldig. Hvis du bruker gratisversjonen av Resend, kan du kun sende til din egen bekreftede e-postadresse.";
-          }
-          
-          return res.status(400).json({ error: errorMessage });
-        }
       } catch (error) {
         console.error("Failed to send email:", error);
         return res.status(500).json({ error: "En feil oppstod ved sending av e-post." });
       }
     } else {
       console.log("=========================================");
-      console.log("RESEND_API_KEY not set. Simulating report email:");
-      console.log(`To: ${studentEmail}`);
-      console.log(`Subject: Ny rapport fra din lærer ${emoji}`);
-      console.log(`Topic: ${topic}, Mastery: ${masteryLevel}%`);
+      console.log("RESEND_API_KEY not set. Simulating Vipps request email:");
+      console.log(`To: ${parentEmail}`);
+      console.log(`Message: Lærer ${teacherName} har fullført timen. Vennligst Vipps ${amount} til ${phone}.`);
       console.log("=========================================");
     }
 
