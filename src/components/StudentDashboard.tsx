@@ -211,19 +211,37 @@ const StudentDashboard = () => {
         setAssignments([]);
       }
       
-      const { data: resourcesData, error: resourcesError } = await supabase
-        .from('resources')
-        .select(`
-          *,
-          resource_assignments!inner(student_id)
-        `)
-        .eq('resource_assignments.student_id', student.id)
-        .order('created_at', { ascending: false });
-        
-      if (resourcesData) {
-        setResources(resourcesData);
-      } else {
+      // Fetch resource assignments for this student first
+      const { data: resourceAssignments, error: resourceAssignmentsError } = await supabase
+        .from('resource_assignments')
+        .select('resource_id')
+        .eq('student_id', student.id);
+
+      if (resourceAssignmentsError) {
+        console.error('Error fetching resource assignments:', resourceAssignmentsError);
         setResources([]);
+      } else {
+        const resourceIds = resourceAssignments?.map((ra: any) => ra.resource_id) || [];
+        
+        if (resourceIds.length > 0) {
+          // Now fetch the actual resources by their IDs
+          const { data: fetchedResources, error: resourcesError } = await supabase
+            .from('resources')
+            .select('*')
+            .in('id', resourceIds)
+            .order('created_at', { ascending: false });
+          
+          if (resourcesError) {
+            console.error('Error fetching resources:', resourcesError);
+            setResources([]);
+          } else {
+            console.log('Fetched resources:', fetchedResources);
+            setResources(fetchedResources || []);
+          }
+        } else {
+          console.log('No resource assignments found for student');
+          setResources([]);
+        }
       }
 
       const { data: lessonsData, error: lessonsError } = await supabase
