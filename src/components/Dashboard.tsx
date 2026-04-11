@@ -24,7 +24,8 @@ import {
   X,
   User,
   Smartphone,
-  Copy
+  Copy,
+  Upload
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -33,6 +34,7 @@ import { ChatList } from './ChatList';
 import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
+import BulkImportModal from './BulkImportModal';
 import { supabase } from '../supabaseClient';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
@@ -54,6 +56,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [fasteTider, setFasteTider] = useState<any[]>([]);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
+  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
 
 const saveMeetLink = async (link: string) => {
     if (!authUserId) return;
@@ -1650,6 +1653,18 @@ const saveMeetLink = async (link: string) => {
               }}
             />
 
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Masseimport av elever</h3>
+              <p className="text-sm text-slate-500 mb-4">Last opp en CSV-fil for å invitere flere elever samtidig.</p>
+              <button
+                onClick={() => setBulkImportModalOpen(true)}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Last opp CSV-fil
+              </button>
+            </div>
+
             <div className="max-w-4xl mx-auto mt-12 mb-20">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -2604,14 +2619,18 @@ const saveMeetLink = async (link: string) => {
                           student_id: studentId
                         }));
                         
-                        const { error: assignError } = await supabase
+                        console.log('Inserting resource assignments:', assignments);
+                        
+                        const { data: assignmentData, error: assignError } = await supabase
                           .from('resource_assignments')
-                          .insert(assignments);
+                          .insert(assignments)
+                          .select();
                           
+                        console.log('ASSIGNMENT INSERT SUCCESS:', assignmentData);
                         console.error('ASSIGNMENT INSERT ERROR:', assignError);
                           
                         if (assignError) {
-                          throw assignError;
+                          throw new Error(`Kunne ikke tildele ressurs til elever: ${assignError.message}`);
                         }
                       }
                       
@@ -3630,6 +3649,17 @@ const saveMeetLink = async (link: string) => {
           <span className="font-medium">{toastMessage}</span>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        isOpen={bulkImportModalOpen}
+        onClose={() => setBulkImportModalOpen(false)}
+        tutorId={authUserId || ''}
+        onSuccess={() => {
+          fetchStudents();
+          showToast('Elever importert og invitasjoner sendt!');
+        }}
+      />
     </div>
   );
 }
