@@ -24,8 +24,7 @@ import {
   X,
   User,
   Smartphone,
-  Copy,
-  Upload
+  Copy
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -34,7 +33,6 @@ import { ChatList } from './ChatList';
 import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
-import BulkImportModal from './BulkImportModal';
 import { supabase } from '../supabaseClient';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
@@ -56,7 +54,6 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [fasteTider, setFasteTider] = useState<any[]>([]);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
-  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
 
 const saveMeetLink = async (link: string) => {
     if (!authUserId) return;
@@ -122,7 +119,6 @@ const saveMeetLink = async (link: string) => {
   // Mock data fjernet, starter med tomme lister
   const [students, setStudents] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
-  const [teacherComments, setTeacherComments] = useState<{[key: string]: string}>({});
   const [schedule, setSchedule] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -279,14 +275,11 @@ const saveMeetLink = async (link: string) => {
     }
   }, [authUserId]);
 
-  const oppdaterStatus = async (submissionId: string, assignmentId: string, nyStatus: string, teacherComment?: string) => {
+  const oppdaterStatus = async (submissionId: string, assignmentId: string, nyStatus: string) => {
     // 1. Oppdater selve innsendingen
     const { error: subError } = await supabase
       .from('submissions')
-      .update({ 
-        status: nyStatus,
-        teacher_comment: teacherComment || null
-      })
+      .update({ status: nyStatus })
       .eq('id', submissionId);
 
     // 2. Oppdater oppgaven slik at elevens dashboard endrer farge
@@ -305,7 +298,7 @@ const saveMeetLink = async (link: string) => {
     } else {
       // Oppdaterer lista lokalt så svaret forsvinner med en gang
       setSubmissions(submissions.filter(sub => sub.id !== submissionId));
-      showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave krever revisjon! 📝");
+      showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave avvist! ❌");
     }
   };
 
@@ -1653,18 +1646,6 @@ const saveMeetLink = async (link: string) => {
               }}
             />
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Masseimport av elever</h3>
-              <p className="text-sm text-slate-500 mb-4">Last opp en CSV-fil for å invitere flere elever samtidig.</p>
-              <button
-                onClick={() => setBulkImportModalOpen(true)}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Last opp CSV-fil
-              </button>
-            </div>
-
             <div className="max-w-4xl mx-auto mt-12 mb-20">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -1694,40 +1675,29 @@ const saveMeetLink = async (link: string) => {
                               "{sub.answer_text}"
                             </div>
                           )}
-                          <div className="flex gap-2 mt-3 flex-col">
+                          <div className="flex gap-2 mt-3">
                             {sub.file_url && (
                               <a 
                                 href={sub.file_url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2 self-start"
+                                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
                               >
                                 Se bilde
                               </a>
                             )}
-                            <div className="w-full">
-                              <textarea
-                                value={teacherComments[sub.id] || ''}
-                                onChange={(e) => setTeacherComments(prev => ({ ...prev, [sub.id]: e.target.value }))}
-                                placeholder="Skriv en kommentar til eleven..."
-                                className="w-full p-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                rows={3}
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved', teacherComments[sub.id])}
-                                className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-sm"
-                              >
-                                ✅ Godkjenn
-                              </button>
-                              <button 
-                                onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'needs_revision', teacherComments[sub.id])}
-                                className="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-sm"
-                              >
-                                📝 Krever revisjon
-                              </button>
-                            </div>
+                            <button 
+                              onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved')}
+                              className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-sm"
+                            >
+                              Godkjenn (Grønn)
+                            </button>
+                            <button 
+                              onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'rejected')}
+                              className="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all flex items-center gap-2 shadow-sm"
+                            >
+                              Ikke godkjent (Rød)
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -2619,18 +2589,14 @@ const saveMeetLink = async (link: string) => {
                           student_id: studentId
                         }));
                         
-                        console.log('Inserting resource assignments:', assignments);
-                        
-                        const { data: assignmentData, error: assignError } = await supabase
+                        const { error: assignError } = await supabase
                           .from('resource_assignments')
-                          .insert(assignments)
-                          .select();
+                          .insert(assignments);
                           
-                        console.log('ASSIGNMENT INSERT SUCCESS:', assignmentData);
                         console.error('ASSIGNMENT INSERT ERROR:', assignError);
                           
                         if (assignError) {
-                          throw new Error(`Kunne ikke tildele ressurs til elever: ${assignError.message}`);
+                          throw assignError;
                         }
                       }
                       
@@ -3524,26 +3490,17 @@ const saveMeetLink = async (link: string) => {
                     Se bilde
                   </a>
                 )}
-                <div className="w-full md:w-64">
-                  <textarea
-                    value={teacherComments[sub.id] || ''}
-                    onChange={(e) => setTeacherComments(prev => ({ ...prev, [sub.id]: e.target.value }))}
-                    placeholder="Skriv en kommentar..."
-                    className="w-full p-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={2}
-                  />
-                </div>
                 <button 
-                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved', teacherComments[sub.id])}
+                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved')}
                   className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
                 >
-                  ✅ Godkjenn
+                  Godkjenn <CheckCircle2 className="h-4 w-4" />
                 </button>
                 <button 
-                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'needs_revision', teacherComments[sub.id])}
-                  className="bg-amber-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
+                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'rejected')}
+                  className="bg-rose-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
                 >
-                  📝 Krever revisjon
+                  Avvis <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -3649,17 +3606,6 @@ const saveMeetLink = async (link: string) => {
           <span className="font-medium">{toastMessage}</span>
         </div>
       )}
-
-      {/* Bulk Import Modal */}
-      <BulkImportModal
-        isOpen={bulkImportModalOpen}
-        onClose={() => setBulkImportModalOpen(false)}
-        tutorId={authUserId || ''}
-        onSuccess={() => {
-          fetchStudents();
-          showToast('Elever importert og invitasjoner sendt!');
-        }}
-      />
     </div>
   );
 }
