@@ -19,6 +19,12 @@ interface Assignment {
   profiles?: {
     full_name: string;
   };
+  submissions?: {
+    id: string;
+    status: string;
+    teacher_comment: string | null;
+    created_at: string;
+  }[];
 }
 
 const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: string, tutorId?: string, studentId?: string, onComplete: (url: string) => void }) => {
@@ -174,6 +180,12 @@ const StudentDashboard = () => {
           attachment_path,
           profiles!assignments_tutor_id_fkey (
             full_name
+          ),
+          submissions (
+            id,
+            status,
+            teacher_comment,
+            created_at
           )
         `)
         .eq('student_id', student.id);
@@ -408,48 +420,68 @@ const StudentDashboard = () => {
                   <CheckCircle className="w-5 h-5 text-green-600" />
                   Fullførte oppgaver
                 </h3>
-                {assignments.filter(a => a.status === 'submitted' || a.status === 'approved').map(assignment => (
-                  <div key={assignment.id} className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow opacity-80">
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
-                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <h4 className="text-lg font-bold text-gray-900 w-full sm:w-auto">{assignment.title}</h4>
-                        <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" /> Fullført
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => setAssignmentToDelete(assignment.id)}
-                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium self-end sm:self-auto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="sm:hidden">Fjern</span>
-                        <span className="hidden sm:inline">Fjern</span>
-                      </button>
-                    </div>
-                    <p className="text-gray-600 mb-4 whitespace-pre-wrap">{assignment.description}</p>
-                    
-                    {assignment.attachment_path && (
-                      <div className="mb-4">
-                        <a 
-                          href={supabase.storage.from('resources').getPublicUrl(assignment.attachment_path).data.publicUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
+                {assignments.filter(a => a.status === 'submitted' || a.status === 'approved' || a.status === 'needs_revision').map(assignment => {
+                  const latestSubmission = assignment.submissions?.[0]; // Assuming submissions are ordered by created_at desc
+                  return (
+                    <div key={assignment.id} className={`bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow ${assignment.status === 'needs_revision' ? 'border-amber-200 bg-amber-50/30' : 'opacity-80'}`}>
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                          <h4 className="text-lg font-bold text-gray-900 w-full sm:w-auto">{assignment.title}</h4>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
+                            assignment.status === 'approved' 
+                              ? 'bg-green-50 text-green-700' 
+                              : assignment.status === 'needs_revision'
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-blue-50 text-blue-700'
+                          }`}>
+                            <CheckCircle className="w-3 h-3" /> {
+                              assignment.status === 'approved' ? 'Godkjent' :
+                              assignment.status === 'needs_revision' ? 'Krever revisjon' :
+                              'Fullført'
+                            }
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => setAssignmentToDelete(assignment.id)}
+                          className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium self-end sm:self-auto"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                          Åpne vedlegg
-                        </a>
+                          <Trash2 className="w-4 h-4" />
+                          <span className="sm:hidden">Fjern</span>
+                          <span className="hidden sm:inline">Fjern</span>
+                        </button>
                       </div>
-                    )}
+                      <p className="text-gray-600 mb-4 whitespace-pre-wrap">{assignment.description}</p>
+                      
+                      {latestSubmission?.teacher_comment && (
+                        <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl mb-4">
+                          <p className="text-sm font-medium text-blue-900 mb-1">Tilbakemelding fra lærer:</p>
+                          <p className="text-sm text-blue-800">{latestSubmission.teacher_comment}</p>
+                        </div>
+                      )}
+                      
+                      {assignment.attachment_path && (
+                        <div className="mb-4">
+                          <a 
+                            href={supabase.storage.from('resources').getPublicUrl(assignment.attachment_path).data.publicUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                            Åpne vedlegg
+                          </a>
+                        </div>
+                      )}
 
-                    <div className="flex flex-col gap-2 text-sm text-gray-500">
-                      <span className="font-medium text-gray-700">Sendt av: {assignment.profiles?.full_name || 'Lærer'}</span>
-                      <div className="flex gap-6">
-                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Frist: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString('no-NO') : 'Ingen frist'}</span>
+                      <div className="flex flex-col gap-2 text-sm text-gray-500">
+                        <span className="font-medium text-gray-700">Sendt av: {assignment.profiles?.full_name || 'Lærer'}</span>
+                        <div className="flex gap-6">
+                          <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Frist: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString('no-NO') : 'Ingen frist'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

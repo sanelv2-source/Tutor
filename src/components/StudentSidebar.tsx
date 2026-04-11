@@ -14,7 +14,6 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
   const menuItems = [
     { id: 'tasks', label: 'Oppgaver', icon: '📝' },
     { id: 'calendar', label: 'Timeplan', icon: '📅' },
-    { id: 'uploads', label: 'Innleveringer', icon: '📤' },
     { id: 'messages', label: 'Meldinger', icon: '💬' },
     { id: 'resources', label: 'Ressurser', icon: '📚' },
     { id: 'settings', label: 'Innstillinger', icon: '⚙️' },

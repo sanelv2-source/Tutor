@@ -234,10 +234,10 @@ export const ChatList = () => {
 
   useEffect(() => {
     let channel: any;
-    
+
     if (activeConversation?.id) {
       console.log('Subscribing to realtime for conversation:', activeConversation.id);
-      
+
       channel = supabase
         .channel(`messages_${activeConversation.id}`)
         .on(
@@ -255,17 +255,40 @@ export const ChatList = () => {
               if (prev.some(m => m.id === payload.new.id)) {
                 return prev;
               }
-              return [...prev, payload.new];
+              // Add the new message and sort by created_at to ensure proper order
+              const newMessages = [...prev, payload.new];
+              return newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             });
           }
         )
-        .subscribe((status) => {
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${activeConversation.id}`,
+          },
+          (payload) => {
+            console.log('Realtime message update received:', payload);
+            setMessages((prev) => {
+              const updated = prev.map(m => m.id === payload.new.id ? payload.new : m);
+              // Re-sort in case the update affects ordering
+              return updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            });
+          }
+        )
+        .subscribe((status, err) => {
           console.log('Realtime subscription status:', status);
+          if (err) {
+            console.error('Realtime subscription error:', err);
+          }
         });
     }
 
     return () => {
       if (channel) {
+        console.log('Unsubscribing from realtime for conversation:', activeConversation?.id);
         supabase.removeChannel(channel);
       }
     };
@@ -452,6 +475,12 @@ export const ChatList = () => {
         // Otherwise, replace the temp message with the real one
         return prev.map(m => m.id === tempId ? insertedMsg : m);
       });
+
+      // Update conversation's last_message_at
+      await supabase
+        .from('conversations')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', activeConversation.id);
 
     } catch (error) {
       console.error('Error sending message:', error);
