@@ -119,6 +119,7 @@ const saveMeetLink = async (link: string) => {
   // Mock data fjernet, starter med tomme lister
   const [students, setStudents] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [teacherComments, setTeacherComments] = useState<{[key: string]: string}>({});
   const [schedule, setSchedule] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -275,11 +276,14 @@ const saveMeetLink = async (link: string) => {
     }
   }, [authUserId]);
 
-  const oppdaterStatus = async (submissionId: string, assignmentId: string, nyStatus: string) => {
+  const oppdaterStatus = async (submissionId: string, assignmentId: string, nyStatus: string, teacherComment?: string) => {
     // 1. Oppdater selve innsendingen
     const { error: subError } = await supabase
       .from('submissions')
-      .update({ status: nyStatus })
+      .update({ 
+        status: nyStatus,
+        teacher_comment: teacherComment || null
+      })
       .eq('id', submissionId);
 
     // 2. Oppdater oppgaven slik at elevens dashboard endrer farge
@@ -298,7 +302,7 @@ const saveMeetLink = async (link: string) => {
     } else {
       // Oppdaterer lista lokalt så svaret forsvinner med en gang
       setSubmissions(submissions.filter(sub => sub.id !== submissionId));
-      showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave avvist! ❌");
+      showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave krever revisjon! 📝");
     }
   };
 
@@ -1675,29 +1679,40 @@ const saveMeetLink = async (link: string) => {
                               "{sub.answer_text}"
                             </div>
                           )}
-                          <div className="flex gap-2 mt-3">
+                          <div className="flex gap-2 mt-3 flex-col">
                             {sub.file_url && (
                               <a 
                                 href={sub.file_url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
+                                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2 self-start"
                               >
                                 Se bilde
                               </a>
                             )}
-                            <button 
-                              onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved')}
-                              className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-sm"
-                            >
-                              Godkjenn (Grønn)
-                            </button>
-                            <button 
-                              onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'rejected')}
-                              className="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all flex items-center gap-2 shadow-sm"
-                            >
-                              Ikke godkjent (Rød)
-                            </button>
+                            <div className="w-full">
+                              <textarea
+                                value={teacherComments[sub.id] || ''}
+                                onChange={(e) => setTeacherComments(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                                placeholder="Skriv en kommentar til eleven..."
+                                className="w-full p-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                rows={3}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved', teacherComments[sub.id])}
+                                className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-sm"
+                              >
+                                ✅ Godkjenn
+                              </button>
+                              <button 
+                                onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'needs_revision', teacherComments[sub.id])}
+                                className="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-sm"
+                              >
+                                📝 Krever revisjon
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3490,17 +3505,26 @@ const saveMeetLink = async (link: string) => {
                     Se bilde
                   </a>
                 )}
+                <div className="w-full md:w-64">
+                  <textarea
+                    value={teacherComments[sub.id] || ''}
+                    onChange={(e) => setTeacherComments(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                    placeholder="Skriv en kommentar..."
+                    className="w-full p-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={2}
+                  />
+                </div>
                 <button 
-                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved')}
+                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved', teacherComments[sub.id])}
                   className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
                 >
-                  Godkjenn <CheckCircle2 className="h-4 w-4" />
+                  ✅ Godkjenn
                 </button>
                 <button 
-                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'rejected')}
-                  className="bg-rose-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
+                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'needs_revision', teacherComments[sub.id])}
+                  className="bg-amber-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
                 >
-                  Avvis <X className="h-4 w-4" />
+                  📝 Krever revisjon
                 </button>
               </div>
             </div>
