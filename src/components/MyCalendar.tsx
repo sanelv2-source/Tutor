@@ -167,15 +167,29 @@ const MyCalendar = ({ events }: { events: any[] }) => {
                 )}
                 <div className="indicators mt-auto mb-1">
                   {uniqueTitles.map((title: any, i) => {
-                    const color = getStudentColor(title);
-                    return (
-                      <div 
-                        key={i} 
-                        className="dot-lesson" 
-                        style={{ backgroundColor: color.borderHex }}
-                        title={title} 
-                      />
-                    );
+                    // Check if this is a vacation event
+                    const eventsWithTitle = eventsThisDay.filter((e: any) => e.title === title);
+                    const isVacation = eventsWithTitle.some((e: any) => e.type === 'vacation');
+                    
+                    if (isVacation) {
+                      return (
+                        <div 
+                          key={i} 
+                          className="dot-vacation" 
+                          title={title} 
+                        />
+                      );
+                    } else {
+                      const color = getStudentColor(title);
+                      return (
+                        <div 
+                          key={i} 
+                          className="dot-lesson" 
+                          style={{ backgroundColor: color.borderHex }}
+                          title={title} 
+                        />
+                      );
+                    }
                   })}
                 </div>
               </div>

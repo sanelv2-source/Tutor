@@ -6,6 +6,7 @@ import MyCalendar from './MyCalendar';
 import StudentSidebar from './StudentSidebar';
 import { ChatList } from './ChatList';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
+import Notifications from './Notifications';
 
 interface Assignment {
   id: string;
@@ -144,6 +145,9 @@ const StudentDashboard = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMessage, setPasswordMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [vacationDays, setVacationDays] = useState<string[]>([]);
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
+  const [student, setStudent] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -155,7 +159,7 @@ const StudentDashboard = () => {
 
       const { data: student, error: studentError } = await supabase
         .from('students')
-        .select('id, full_name, email, tutor_id')
+        .select('id, full_name, email, tutor_id, last_seen_at')
         .eq('profile_id', user.id)
         .single();
 
@@ -166,7 +170,14 @@ const StudentDashboard = () => {
       }
 
       setStudentId(student.id);
+      setStudent(student);
+      setLastSeenAt(student.last_seen_at);
 
+      // Update last_seen_at to now
+      await supabase
+        .from('students')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', student.id);
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -278,6 +289,22 @@ const StudentDashboard = () => {
 
       if (tutorProfile?.meet_link) {
         setMeetLink(tutorProfile.meet_link);
+      }
+
+      // Fetch teacher's vacation days
+      const { data: vacationData, error: vacationError } = await supabase
+        .from('vacations')
+        .select('date')
+        .eq('tutor_id', student.tutor_id);
+
+      if (vacationError) {
+        // Ignore error if table doesn't exist yet
+        if (!vacationError.message.includes('does not exist')) {
+          console.error('Error fetching vacation days:', vacationError);
+        }
+        setVacationDays([]);
+      } else {
+        setVacationDays(vacationData?.map(v => v.date) || []);
       }
     };
     fetchData();
@@ -523,7 +550,12 @@ const StudentDashboard = () => {
           duration_minutes: l.duration_minutes
         };
       });
-      const calendarEvents = [...assignmentEvents, ...lessonEvents];
+      const vacationEvents = vacationDays.map(date => ({
+        title: 'Ferie / Fri',
+        date: date,
+        type: 'vacation'
+      }));
+      const calendarEvents = [...assignmentEvents, ...lessonEvents, ...vacationEvents];
       return (
         <div className="p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Timeplan</h1>
@@ -643,6 +675,19 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row">
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+
+      {/* Notifications Bell - Fixed Position */}
+      {studentId && student && (
+        <div className="fixed top-4 right-4 z-40">
+          <Notifications
+            studentId={studentId}
+            tutorId={student.tutor_id}
+            lastSeenAt={lastSeenAt}
+            onMarkAsRead={() => setLastSeenAt(new Date().toISOString())}
+          />
+        </div>
+      )}
+
       <div className="flex-grow pb-10 overflow-y-auto w-full">
         <main className="max-w-4xl mx-auto">
           {renderContent()}
