@@ -131,6 +131,7 @@ const StudentDashboard = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [resources, setResources] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
+  const [vacations, setVacations] = useState<any[]>([]);
   const [meetLink, setMeetLink] = useState<string | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -238,6 +239,17 @@ const StudentDashboard = () => {
         setLessons(lessonsData);
       } else {
         setLessons([]);
+      }
+
+      const { data: vacationsData, error: vacationsError } = await supabase
+        .from('vacations')
+        .select('start_date, end_date')
+        .eq('tutor_id', student.tutor_id);
+
+      if (vacationsData) {
+        setVacations(vacationsData);
+      } else {
+        setVacations([]);
       }
       
       const { data: tutorProfile } = await supabase
@@ -473,7 +485,19 @@ const StudentDashboard = () => {
           duration_minutes: l.duration_minutes
         };
       });
-      const calendarEvents = [...assignmentEvents, ...lessonEvents];
+      const vacationEvents: any[] = [];
+      vacations.forEach(v => {
+        const start = new Date(v.start_date);
+        const end = new Date(v.end_date);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          vacationEvents.push({
+            title: 'Ferie / Fri',
+            date: d.toISOString().split('T')[0],
+            type: 'vacation'
+          });
+        }
+      });
+      const calendarEvents = [...assignmentEvents, ...lessonEvents, ...vacationEvents];
       return (
         <div className="p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Timeplan</h1>
