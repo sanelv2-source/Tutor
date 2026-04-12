@@ -141,6 +141,7 @@ const saveMeetLink = async (link: string) => {
   const [subject, setSubject] = useState('');
 
   const [isBulkImporting, setIsBulkImporting] = useState(false);
+  const [showBulkImportHelp, setShowBulkImportHelp] = useState(false);
 
   const handleGoToVippsPreparation = () => {
     // 1. Sjekk at elev og beløp er fylt ut
@@ -1673,13 +1674,75 @@ const saveMeetLink = async (link: string) => {
 
             <div className="mb-4">
               <button
-                onClick={() => document.getElementById('bulk-import-input')?.click()}
+                onClick={() => setShowBulkImportHelp(true)}
                 className="inline-flex items-center justify-center px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm"
                 disabled={isBulkImporting}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {isBulkImporting ? 'Importing...' : 'Bulk Import'}
               </button>
+              {showBulkImportHelp && (
+                <div className="mt-4 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-blue-900">Bulk Import av Elever</h3>
+                    <button
+                      onClick={() => setShowBulkImportHelp(false)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4 text-sm text-blue-800">
+                    <p>
+                      <strong>Oversikt:</strong> Bulk import lar deg legge til flere elever samtidig ved å laste opp en CSV-fil. Dette sparer tid sammenlignet med å legge til elever en etter en.
+                    </p>
+                    <div>
+                      <strong>Steg 1: Forbered CSV-filen</strong>
+                      <p>CSV-filen skal ha følgende format:</p>
+                      <pre className="bg-white p-2 rounded border text-xs mt-2">
+{`Navn,E-post,Fag
+Ole Nordmann,ole@example.com,Matematikk
+Maria Jensen,maria@example.com,Engelsk
+Per Andersen,per@example.com,Norsk`}
+                      </pre>
+                      <ul className="list-disc list-inside mt-2">
+                        <li><strong>Navn</strong> - Elevens fulle navn - PÅKREVET</li>
+                        <li><strong>E-post</strong> - Elevens e-postadresse - PÅKREVET</li>
+                        <li><strong>Fag</strong> - Fag/emne - VALGFRITT</li>
+                      </ul>
+                      <p className="mt-2">Regler:</p>
+                      <ul className="list-disc list-inside">
+                        <li>Overskriftsraden (første rad) er valgfri og hoppes over automatisk hvis den inneholder "Navn" eller "E-post"</li>
+                        <li>E-postadresser må være gyldige (inneholde @) og unike for kontoen din</li>
+                        <li>Navn kan inneholde mellomrom og spesialtegn</li>
+                        <li>Fag-feltet kan være tomt</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <strong>Steg 2: Last ned mal-fil</strong>
+                      <p>Last ned en ferdig CSV-mal du kan kopiere og redigere:</p>
+                      <a
+                        href="/BULK_IMPORT_TEMPLATE.csv"
+                        download="bulk_import_template.csv"
+                        className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 mt-2"
+                      >
+                        Last ned mal-fil
+                      </a>
+                    </div>
+                    <div>
+                      <strong>Steg 3: Last opp filen</strong>
+                      <p>Velg din CSV-fil fra datamaskinen:</p>
+                      <button
+                        onClick={() => document.getElementById('bulk-import-input')?.click()}
+                        className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mt-2"
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        Velg CSV-fil
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <input
                 id="bulk-import-input"
                 type="file"
