@@ -215,8 +215,8 @@ const saveMeetLink = async (link: string) => {
     if (!authUserId) return;
     try {
       const { data, error } = await supabase
-        .from('vacations')
-        .select('start_date, end_date')
+        .from('tutor_vacation')
+        .select('id, tutor_id, vacation_date, description')
         .eq('tutor_id', authUserId);
       
       if (error) {
@@ -225,15 +225,7 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke hente feriedager fra Supabase:", error);
         }
       } else if (data) {
-        const vacationDates: string[] = [];
-        data.forEach(v => {
-          const start = new Date(v.start_date);
-          const end = new Date(v.end_date);
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            vacationDates.push(d.toISOString().split('T')[0]);
-          }
-        });
-        setVacationDays(vacationDates);
+        setVacationDays(data.map(v => v.vacation_date));
       }
     } catch (error) {
       console.error("Feil ved henting av feriedager:", error);
