@@ -242,8 +242,8 @@ const StudentDashboard = () => {
       }
 
       const { data: vacationsData, error: vacationsError } = await supabase
-        .from('vacations')
-        .select('start_date, end_date')
+        .from('tutor_vacation')
+        .select('id, tutor_id, vacation_date, description')
         .eq('tutor_id', student.tutor_id);
 
       if (vacationsData) {
@@ -485,18 +485,12 @@ const StudentDashboard = () => {
           duration_minutes: l.duration_minutes
         };
       });
-      const vacationEvents: any[] = [];
-      vacations.forEach(v => {
-        const start = new Date(v.start_date);
-        const end = new Date(v.end_date);
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          vacationEvents.push({
-            title: 'Ferie / Fri',
-            date: d.toISOString().split('T')[0],
-            type: 'vacation'
-          });
-        }
-      });
+      const vacationEvents = vacations.map(v => ({
+        title: 'Ferie / Fri',
+        date: v.vacation_date,
+        type: 'vacation',
+        description: v.description
+      }));
       const calendarEvents = [...assignmentEvents, ...lessonEvents, ...vacationEvents];
       return (
         <div className="p-4 sm:p-8">
