@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Papa from 'papaparse';
 import { 
   Users, 
   Calendar as CalendarIcon, 
@@ -24,7 +25,8 @@ import {
   X,
   User,
   Smartphone,
-  Copy
+  Copy,
+  Upload
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -137,6 +139,8 @@ const saveMeetLink = async (link: string) => {
   const [vippsAmount, setVippsAmount] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [subject, setSubject] = useState('');
+
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
 
   const handleGoToVippsPreparation = () => {
     // 1. Sjekk at elev og beløp er fylt ut
@@ -395,6 +399,35 @@ const saveMeetLink = async (link: string) => {
       supabase.removeChannel(channel);
     };
   }, [fetchSubmissions]);
+
+  const handleBulkImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsBulkImporting(true);
+    Papa.parse(file, {
+      header: true,
+      complete: async (results) => {
+        const rows = results.data as { name: string; email: string }[];
+        for (const row of rows) {
+          if (row.name && row.email) {
+            await supabase.from('student_invitations').insert({
+              name: row.name,
+              email: row.email,
+              tutor_id: authUserId,
+            });
+          }
+        }
+        setIsBulkImporting(false);
+        showToast('Bulk import completed!');
+        fetchStudents();
+      },
+      error: (error) => {
+        console.error('CSV parse error:', error);
+        setIsBulkImporting(false);
+        showToast('Error parsing CSV');
+      }
+    });
+  };
 
   const handleDeleteLesson = (lessonId: string) => {
     setDeleteLessonConfirmModal({ isOpen: true, lessonId });
@@ -1636,6 +1669,24 @@ const saveMeetLink = async (link: string) => {
                   {isSavingLink ? 'Lagrer...' : 'Lagre lenke'}
                 </button>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <button
+                onClick={() => document.getElementById('bulk-import-input')?.click()}
+                className="inline-flex items-center justify-center px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                disabled={isBulkImporting}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isBulkImporting ? 'Importing...' : 'Bulk Import'}
+              </button>
+              <input
+                id="bulk-import-input"
+                type="file"
+                accept=".csv"
+                onChange={handleBulkImport}
+                style={{ display: 'none' }}
+              />
             </div>
 
             <InviteStudent 
