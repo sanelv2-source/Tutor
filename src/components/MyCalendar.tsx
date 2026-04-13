@@ -77,13 +77,7 @@ const getEventColor = (event: any) => {
     };
   }
   // Default to green for lessons and other events
-  return {
-    bgClass: 'bg-emerald-50',
-    borderClass: 'border-emerald-200',
-    textClass: 'text-emerald-700',
-    bgHex: '#ecfdf5',
-    borderHex: '#10b981'
-  };
+  return getStudentColor(event.title);
 };
 
 const MyCalendar = ({ events }: { events: any[] }) => {
