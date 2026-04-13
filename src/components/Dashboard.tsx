@@ -2032,6 +2032,9 @@ Per Andersen,per@example.com,Norsk`}
                       student_name: lesson.student_name
                     }));
                     
+                    console.log('Tutor lessons:', lessonEvents);
+                    console.log('Tutor vacations:', vacationEvents);
+                    
                     // Merge vacation and lesson events
                     const allEvents = [...lessonEvents, ...vacationEvents];
                     console.log('Tutor merged event array:', allEvents);

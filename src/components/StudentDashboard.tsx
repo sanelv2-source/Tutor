@@ -497,6 +497,9 @@ const StudentDashboard = () => {
           duration_minutes: l.duration_minutes
         };
       });
+      
+      console.log('Student lessons:', lessonEvents);
+      console.log('Student vacations:', vacationEvents);
       const vacationEvents = vacations.map(v => ({
         id: `vacation-${v.id}`,
         type: 'vacation',
