@@ -418,11 +418,13 @@ const saveMeetLink = async (link: string) => {
   }, [authUserId]);
 
   useEffect(() => {
-    fetchStudents();
-    fetchLessons();
-    fetchVacations();
-    fetchResources();
-  }, [fetchStudents, fetchLessons, fetchVacations, fetchResources]);
+    if (authUserId) {
+      fetchStudents();
+      fetchLessons();
+      fetchVacations();
+      fetchResources();
+    }
+  }, [authUserId, fetchStudents, fetchLessons, fetchVacations, fetchResources]);
 
   useEffect(() => {
     fetchCalendar();
@@ -2014,7 +2016,7 @@ Per Andersen,per@example.com,Norsk`}
                       id: `vacation-${v.id}`,
                       type: 'vacation',
                       date: v.vacation_date,
-                      title: 'Ferie / Fri',
+                      title: `${v.tutor_name || 'Lærer'} har fri`,
                       description: v.description,
                       tutor_name: v.tutor_name
                     }));
