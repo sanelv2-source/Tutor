@@ -252,6 +252,9 @@ const StudentDashboard = () => {
         `)
         .eq('tutor_id', student.tutor_id);
 
+      console.log('Student vacations fetch result:', vacationsData);
+      console.log('Student vacations fetch error:', vacationsError);
+
       if (vacationsData) {
         setVacations(vacationsData);
       } else {
