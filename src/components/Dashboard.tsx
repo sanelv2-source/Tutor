@@ -211,12 +211,41 @@ const saveMeetLink = async (link: string) => {
     }
   };
 
+  const saveVacation = async (dates: string[]) => {
+    console.log('Tutor user id:', authUserId);
+    const insertPayload = dates.map(date => ({
+      tutor_id: authUserId,
+      date: date
+    }));
+    console.log('Insert payload:', insertPayload);
+
+    if (authUserId) {
+      try {
+        const { data, error } = await supabase.from('vacations').insert(insertPayload);
+        console.log('Insert result:', data);
+        console.log('Insert error:', error);
+        
+        if (error) {
+          console.error("Kunne ikke lagre ferie til Supabase, bruker lokal state", error);
+          setVacationDays(prev => [...prev, ...dates]);
+        } else {
+          fetchVacations();
+        }
+      } catch (err) {
+        console.error("Feil ved lagring av ferie:", err);
+        setVacationDays(prev => [...prev, ...dates]);
+      }
+    } else {
+      setVacationDays(prev => [...prev, ...dates]);
+    }
+  };
+
   const fetchVacations = React.useCallback(async () => {
     if (!authUserId) return;
     try {
       const { data, error } = await supabase
-        .from('tutor_vacation')
-        .select('id, tutor_id, vacation_date, description')
+        .from('vacations')
+        .select('id, tutor_id, date')
         .eq('tutor_id', authUserId);
       
       if (error) {
@@ -225,7 +254,7 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke hente feriedager fra Supabase:", error);
         }
       } else if (data) {
-        setVacationDays(data.map(v => v.vacation_date));
+        setVacationDays(data.map(v => v.date));
       }
     } catch (error) {
       console.error("Feil ved henting av feriedager:", error);
@@ -3684,28 +3713,7 @@ Per Andersen,per@example.com,Norsk`}
                 showToast(`Feil ved lagring: ${error.message}`);
               }
             } else {
-              if (authUserId) {
-                try {
-                  const { error } = await supabase.from('vacations').insert(
-                    dates.map(date => ({
-                      tutor_id: authUserId,
-                      date: date
-                    }))
-                  );
-                  
-                  if (error) {
-                    console.error("Kunne ikke lagre ferie til Supabase, bruker lokal state", error);
-                    setVacationDays(prev => [...prev, ...dates]);
-                  } else {
-                    fetchVacations();
-                  }
-                } catch (err) {
-                  console.error("Feil ved lagring av ferie:", err);
-                  setVacationDays(prev => [...prev, ...dates]);
-                }
-              } else {
-                setVacationDays(prev => [...prev, ...dates]);
-              }
+              await saveVacation(dates);
               showToast(`Ferie/fravær registrert for ${dates.length} dager. Elevene får beskjed.`);
             }
             setCalendarModal(null);
