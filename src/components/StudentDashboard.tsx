@@ -243,7 +243,13 @@ const StudentDashboard = () => {
 
       const { data: vacationsData, error: vacationsError } = await supabase
         .from('tutor_vacation')
-        .select('id, tutor_id, vacation_date, description')
+        .select(`
+          id, 
+          tutor_id, 
+          vacation_date, 
+          description,
+          profiles!tutor_vacation_tutor_id_fkey(full_name)
+        `)
         .eq('tutor_id', student.tutor_id);
 
       if (vacationsData) {
@@ -486,10 +492,11 @@ const StudentDashboard = () => {
         };
       });
       const vacationEvents = vacations.map(v => ({
-        title: 'Ferie / Fri',
+        title: `${v.profiles?.full_name || 'Lærer'} har fri`,
         date: v.vacation_date,
         type: 'vacation',
-        description: v.description
+        description: v.description,
+        tutor_name: v.profiles?.full_name || 'Lærer'
       }));
       const calendarEvents = [...assignmentEvents, ...lessonEvents, ...vacationEvents];
       return (

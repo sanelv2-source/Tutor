@@ -66,23 +66,18 @@ const calculateEndTime = (startTime: string, durationMinutes: number) => {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 };
 
-const getStudentColor = (name: string) => {
-  const colors = [
-    { bgClass: 'bg-blue-50', borderClass: 'border-blue-200', textClass: 'text-blue-700', bgHex: '#eff6ff', borderHex: '#3b82f6' },
-    { bgClass: 'bg-emerald-50', borderClass: 'border-emerald-200', textClass: 'text-emerald-700', bgHex: '#ecfdf5', borderHex: '#10b981' },
-    { bgClass: 'bg-purple-50', borderClass: 'border-purple-200', textClass: 'text-purple-700', bgHex: '#faf5ff', borderHex: '#a855f7' },
-    { bgClass: 'bg-orange-50', borderClass: 'border-orange-200', textClass: 'text-orange-700', bgHex: '#fff7ed', borderHex: '#f97316' },
-    { bgClass: 'bg-pink-50', borderClass: 'border-pink-200', textClass: 'text-pink-700', bgHex: '#fdf2f8', borderHex: '#ec4899' },
-    { bgClass: 'bg-teal-50', borderClass: 'border-teal-200', textClass: 'text-teal-700', bgHex: '#f0fdfa', borderHex: '#14b8a6' },
-    { bgClass: 'bg-rose-50', borderClass: 'border-rose-200', textClass: 'text-rose-700', bgHex: '#fff1f2', borderHex: '#f43f5e' },
-    { bgClass: 'bg-indigo-50', borderClass: 'border-indigo-200', textClass: 'text-indigo-700', bgHex: '#eef2ff', borderHex: '#6366f1' }
-  ];
-  if (!name) return colors[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+const getEventColor = (event: any) => {
+  if (event.type === 'vacation') {
+    return {
+      bgClass: 'bg-yellow-50',
+      borderClass: 'border-yellow-200',
+      textClass: 'text-yellow-800',
+      bgHex: '#fefce8',
+      borderHex: '#eab308'
+    };
   }
-  return colors[Math.abs(hash) % colors.length];
+  // Default to green for lessons and other events
+  return getStudentColor(event.title);
 };
 
 const MyCalendar = ({ events }: { events: any[] }) => {
@@ -166,14 +161,14 @@ const MyCalendar = ({ events }: { events: any[] }) => {
                   <span className="text-[9px] leading-tight text-center mt-1 opacity-80 px-1">{holidayName}</span>
                 )}
                 <div className="indicators mt-auto mb-1">
-                  {uniqueTitles.map((title: any, i) => {
-                    const color = getStudentColor(title);
+                  {eventsThisDay.map((event: any, i) => {
+                    const color = getEventColor(event);
                     return (
                       <div 
                         key={i} 
                         className="dot-lesson" 
                         style={{ backgroundColor: color.borderHex }}
-                        title={title} 
+                        title={event.title} 
                       />
                     );
                   })}
@@ -221,7 +216,7 @@ const MyCalendar = ({ events }: { events: any[] }) => {
             
             {events.length > 0 ? (
               events.map((event, idx) => {
-                const color = getStudentColor(event.title);
+                const color = getEventColor(event);
                 return (
                   <div 
                     key={idx} 
@@ -234,6 +229,7 @@ const MyCalendar = ({ events }: { events: any[] }) => {
                         🗓️ {new Date(event.date).toLocaleDateString('no-NO')}
                         {event.type === 'lesson' && event.start_time && ` kl. ${formatTime(event.start_time)}`}
                         {event.type === 'deadline' && ' ⚠️ Frist'}
+                        {event.type === 'vacation' && ' 🌴 Ferie'}
                       </span>
                     </div>
                   </div>
@@ -272,11 +268,12 @@ const MyCalendar = ({ events }: { events: any[] }) => {
                     )}
                     <div className="day-content space-y-2 mt-2">
                       {dayEvents.map((event: any, idx: number) => {
-                        const color = getStudentColor(event.title);
+                        const color = getEventColor(event);
                         return (
                           <div key={idx} className={`${color.bgClass} p-2 rounded-lg border ${color.borderClass} text-left relative group`}>
                             <p className="text-sm text-slate-800 truncate" title={event.title}>{event.title}</p>
                             {event.type === 'deadline' && <small className="text-red-600 font-bold block mt-1">⚠️ Frist</small>}
+                            {event.type === 'vacation' && <small className="text-yellow-700 font-bold block mt-1">🌴 Ferie</small>}
                           </div>
                         );
                       })}
@@ -304,13 +301,14 @@ const MyCalendar = ({ events }: { events: any[] }) => {
             </div>
             <div className="space-y-3">
               {events.filter((e: any) => new Date(e.date).toISOString().split('T')[0] === selectedDayDetails).map((event: any, idx: number) => {
-                const color = getStudentColor(event.title);
+                const color = getEventColor(event);
                 return (
                   <div key={idx} className={`p-4 rounded-xl border ${color.borderClass} ${color.bgClass}`}>
                     <div className="flex justify-between items-center">
                       <div>
                         <p className={`font-bold ${color.textClass}`}>{event.title}</p>
                         {event.type === 'deadline' && <p className="text-sm text-red-600 font-medium mt-1">⚠️ Innleveringsfrist</p>}
+                        {event.type === 'vacation' && <p className="text-sm text-yellow-700 font-medium mt-1">🌴 Ferie</p>}
                         {event.type === 'lesson' && event.duration_minutes && (
                           <p className={`text-sm opacity-80 ${color.textClass}`}>{event.duration_minutes} min</p>
                         )}
