@@ -255,6 +255,9 @@ const saveMeetLink = async (link: string) => {
         `)
         .eq('tutor_id', authUserId);
       
+      console.log('Tutor vacations fetch result:', data);
+      console.log('Tutor vacations fetch error:', error);
+      
       if (error) {
         // Ignorer feil hvis tabellen ikke finnes ennå
         if (!error.message.includes('does not exist')) {
