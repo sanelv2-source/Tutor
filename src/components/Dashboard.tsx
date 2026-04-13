@@ -246,7 +246,13 @@ const saveMeetLink = async (link: string) => {
     try {
       const { data, error } = await supabase
         .from('tutor_vacation')
-        .select('id, tutor_id, vacation_date, description')
+        .select(`
+          id, 
+          tutor_id, 
+          vacation_date, 
+          description,
+          profiles!tutor_vacation_tutor_id_fkey(full_name)
+        `)
         .eq('tutor_id', authUserId);
       
       if (error) {
@@ -255,6 +261,14 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke hente feriedager fra Supabase:", error);
         }
       } else if (data) {
+        const vacationsWithNames = data.map(v => ({
+          id: v.id,
+          tutor_id: v.tutor_id,
+          vacation_date: v.vacation_date,
+          description: v.description,
+          tutor_name: v.profiles?.full_name || 'Lærer'
+        }));
+        setVacations(vacationsWithNames);
         setVacationDays(data.map(v => v.vacation_date));
       }
     } catch (error) {
@@ -559,6 +573,37 @@ const saveMeetLink = async (link: string) => {
     }
   };
 
+  const deleteVacation = async (vacationId: string) => {
+    console.log('vacationId:', vacationId);
+    
+    if (!confirm("Er du sikker på at du vil slette denne feriedagen?")) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('tutor_vacation')
+        .delete()
+        .eq('id', vacationId)
+        .eq('tutor_id', authUserId);
+        
+      console.log('delete result:', data);
+      console.log('delete error:', error);
+      
+      if (error) {
+        console.error("Klarte ikke slette ferie:", error);
+        showToast("Kunne ikke slette ferien. Prøv igjen.");
+      } else {
+        // Reload vacations from database instead of relying only on local state
+        await fetchVacations();
+        showToast('Ferie ble slettet');
+      }
+    } catch (error: any) {
+      console.error('Feil ved sletting av ferie:', error);
+      showToast('Kunne ikke slette ferien: ' + error.message);
+    }
+  };
+
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
     setDeleteConfirmModal({ isOpen: true, studentId, studentName });
   };
@@ -596,6 +641,7 @@ const saveMeetLink = async (link: string) => {
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<string | null>(null);
   const [vacationDays, setVacationDays] = useState<string[]>([]);
+  const [vacations, setVacations] = useState<Array<{id: string, tutor_id: string, vacation_date: string, description: string, tutor_name: string}>>([]);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ isOpen: boolean, studentId: string, studentName: string } | null>(null);
   const [deleteLessonConfirmModal, setDeleteLessonConfirmModal] = useState<{ isOpen: boolean, lessonId: string } | null>(null);
   const [newItemData, setNewItemData] = useState({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
@@ -690,6 +736,10 @@ const saveMeetLink = async (link: string) => {
       });
     }
   }, [authUserId]);
+
+  React.useEffect(() => {
+    fetchVacations();
+  }, [fetchVacations]);
 
   const fetchInvoices = React.useCallback(async () => {
     if (!authUserId) return;
@@ -1405,7 +1455,7 @@ const saveMeetLink = async (link: string) => {
                   <span className="text-[9px] leading-tight text-center mt-1 opacity-80 px-1">{holidayName}</span>
                 )}
                 <div className="indicators mt-auto mb-1">
-                  {hasVacation && <div className="dot-vacation" title="Ferie" />}
+                  {hasVacation && <div className="dot-vacation" title={`${vacations.find(v => v.vacation_date === dateString)?.tutor_name} har fri`} />}
                   {uniqueStudents.map((studentName: any, i) => {
                     const color = getStudentColor(studentName);
                     return (
@@ -3161,8 +3211,30 @@ Per Andersen,per@example.com,Norsk`}
             
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               {vacationDays.includes(selectedDayDetails) && (
-                <div className="bg-orange-50 text-orange-700 p-4 rounded-xl border border-orange-200 font-medium flex items-center gap-3">
-                  <span className="text-2xl">🌴</span> Ferie / Fri
+                <div className="bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 font-medium flex items-center justify-between group relative">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🌴</span> 
+                    <div>
+                      <div className="font-semibold">{vacations.find(v => v.vacation_date === selectedDayDetails)?.tutor_name} har fri</div>
+                      {vacations.find(v => v.vacation_date === selectedDayDetails)?.description && (
+                        <div className="text-sm text-yellow-700 mt-1">{vacations.find(v => v.vacation_date === selectedDayDetails)?.description}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => {
+                        const vacation = vacations.find(v => v.vacation_date === selectedDayDetails);
+                        if (vacation) {
+                          deleteVacation(vacation.id);
+                        }
+                      }}
+                      className="p-1 text-yellow-600 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Slett ferie"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
               
