@@ -139,139 +139,158 @@ const StudentDashboard = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMessage, setPasswordMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      await linkStudentProfileByEmail();
+      try {
+        setLoading(true);
+        await linkStudentProfileByEmail();
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Ikke logget inn');
-      console.log('Auth user id:', user.id);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Ikke logget inn');
+        console.log('Auth user id:', user.id);
 
-      const { data: student, error: studentError } = await supabase
-        .from('students')
-        .select('id, full_name, email, tutor_id')
-        .eq('profile_id', user.id)
-        .single();
+        const { data: student, error: studentError } = await supabase
+          .from('students')
+          .select('id, full_name, email, tutor_id')
+          .eq('profile_id', user.id)
+          .single();
 
-      console.log('Student row result:', student);
-      console.log('Student row error:', studentError);
+        console.log('Student row result:', student);
+        console.log('Student row error:', studentError);
 
-      console.log('Loaded student row:', student);
+        if (studentError || !student) {
+          throw new Error('Fant ikke elevkobling.');
+        }
 
-      if (studentError || !student) {
-        throw new Error('Fant ikke elevkobling.');
-      }
+        console.log('Loaded student row:', student);
+        setStudentId(student.id);
 
-      setStudentId(student.id);
-
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select(`
-          id,
-          title,
-          description,
-          due_date,
-          status,
-          student_id,
-          tutor_id,
-          attachment_path,
-          profiles!assignments_tutor_id_fkey (
-            full_name
-          )
-        `)
-        .eq('student_id', student.id);
-
-      console.log('Assignments query result:', assignmentsData);
-      console.log('Assignments query error:', assignmentsError);
-
-      if (assignmentsData) {
-        const sortedAssignments = (assignmentsData as any[]).sort((a, b) => {
-          // Completed assignments at the bottom
-          const aCompleted = a.status === 'submitted' || a.status === 'approved';
-          const bCompleted = b.status === 'submitted' || b.status === 'approved';
-          if (aCompleted && !bCompleted) return 1;
-          if (!aCompleted && bCompleted) return -1;
-          
-          // Sort by due_date ascending (closest first)
-          const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
-          const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
-          return dateA - dateB;
-        });
-        setAssignments(sortedAssignments);
-      } else {
-        setAssignments([]);
-      }
-      
-      const { data: resourcesData, error: resourcesError } = await supabase
-        .from('resources')
-        .select(`
-          *,
-          resource_assignments!inner(student_id)
-        `)
-        .eq('resource_assignments.student_id', student.id)
-        .order('created_at', { ascending: false });
-        
-      if (resourcesData) {
-        setResources(resourcesData);
-      } else {
-        setResources([]);
-      }
-
-      const { data: lessonsData, error: lessonsError } = await supabase
-        .from('lessons')
-        .select(`
-          id,
-          lesson_date,
-          start_time,
-          duration_minutes,
-          is_recurring,
-          student_name,
-          tutor:profiles (
+        // Fetch assignments
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select(`
             id,
-            full_name,
-            email
-          )
-        `)
-        .eq('student_id', student.id)
-        .order('lesson_date', { ascending: true });
+            title,
+            description,
+            due_date,
+            status,
+            student_id,
+            tutor_id,
+            attachment_path,
+            profiles!assignments_tutor_id_fkey (
+              full_name
+            )
+          `)
+          .eq('student_id', student.id);
 
-      if (lessonsError) throw lessonsError;
-      
-      if (lessonsData) {
-        setLessons(lessonsData);
-      } else {
-        setLessons([]);
-      }
+        console.log('Assignments query result:', assignmentsData);
+        console.log('Assignments query error:', assignmentsError);
 
-      const { data: vacationsData, error: vacationsError } = await supabase
-        .from('tutor_vacation')
-        .select(`
-          id, 
-          tutor_id, 
-          vacation_date, 
-          description,
-          profiles!tutor_vacation_tutor_id_fkey(full_name)
-        `)
-        .eq('tutor_id', student.tutor_id);
+        if (assignmentsData) {
+          const sortedAssignments = (assignmentsData as any[]).sort((a, b) => {
+            // Completed assignments at the bottom
+            const aCompleted = a.status === 'submitted' || a.status === 'approved';
+            const bCompleted = b.status === 'submitted' || b.status === 'approved';
+            if (aCompleted && !bCompleted) return 1;
+            if (!aCompleted && bCompleted) return -1;
 
-      console.log('Student vacations fetch result:', vacationsData);
-      console.log('Student vacations fetch error:', vacationsError);
+            // Sort by due_date ascending (closest first)
+            const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+            const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+            return dateA - dateB;
+          });
+          setAssignments(sortedAssignments);
+        } else {
+          setAssignments([]);
+        }
 
-      if (vacationsData) {
-        setVacations(vacationsData);
-      } else {
-        setVacations([]);
-      }
-      
-      const { data: tutorProfile } = await supabase
-        .from('profiles')
-        .select('meet_link')
-        .eq('id', student.tutor_id)
-        .single();
+        // Fetch resources
+        const { data: resourcesData, error: resourcesError } = await supabase
+          .from('resources')
+          .select(`
+            *,
+            resource_assignments!inner(student_id)
+          `)
+          .eq('resource_assignments.student_id', student.id)
+          .order('created_at', { ascending: false });
 
-      if (tutorProfile?.meet_link) {
-        setMeetLink(tutorProfile.meet_link);
+        if (resourcesData) {
+          setResources(resourcesData);
+        } else {
+          setResources([]);
+        }
+
+        // Fetch lessons
+        const { data: lessonsData, error: lessonsError } = await supabase
+          .from('lessons')
+          .select(`
+            id,
+            lesson_date,
+            start_time,
+            duration_minutes,
+            is_recurring,
+            student_name,
+            tutor:profiles (
+              id,
+              full_name,
+              email
+            )
+          `)
+          .eq('student_id', student.id)
+          .order('lesson_date', { ascending: true });
+
+        if (lessonsError) throw lessonsError;
+
+        if (lessonsData) {
+          setLessons(lessonsData);
+        } else {
+          setLessons([]);
+        }
+
+        // Fetch vacations only if student has a tutor_id
+        if (student.tutor_id) {
+          const { data: vacationsData, error: vacationsError } = await supabase
+            .from('tutor_vacation')
+            .select(`
+              id,
+              tutor_id,
+              vacation_date,
+              description,
+              profiles!tutor_vacation_tutor_id_fkey(full_name)
+            `)
+            .eq('tutor_id', student.tutor_id);
+
+          console.log('Student vacations fetch result:', vacationsData);
+          console.log('Student vacations fetch error:', vacationsError);
+
+          if (vacationsData) {
+            setVacations(vacationsData);
+          } else {
+            setVacations([]);
+          }
+        } else {
+          setVacations([]);
+        }
+
+        // Fetch tutor profile for meet link
+        if (student.tutor_id) {
+          const { data: tutorProfile } = await supabase
+            .from('profiles')
+            .select('meet_link')
+            .eq('id', student.tutor_id)
+            .single();
+
+          if (tutorProfile?.meet_link) {
+            setMeetLink(tutorProfile.meet_link);
+          }
+        }
+      } catch (error) {
+        console.error('Error in fetchData:', error);
+        // Don't throw here, just log the error
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -480,6 +499,18 @@ const StudentDashboard = () => {
         </div>
       );
     } else if (activeTab === 'calendar') {
+      if (loading) {
+        return (
+          <div className="p-4 sm:p-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Timeplan</h1>
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">Laster kalender...</span>
+            </div>
+          </div>
+        );
+      }
+
       const assignmentEvents = assignments
         .filter(a => a.due_date)
         .map(a => ({
@@ -498,8 +529,6 @@ const StudentDashboard = () => {
         };
       });
       
-      console.log('Student lessons:', lessonEvents);
-      console.log('Student vacations:', vacationEvents);
       const vacationEvents = vacations.map(v => ({
         id: `vacation-${v.id}`,
         type: 'vacation',
@@ -507,6 +536,9 @@ const StudentDashboard = () => {
         title: `${v.profiles?.full_name || 'Lærer'} har fri`,
         description: v.description
       }));
+      
+      console.log('Student lessons:', lessonEvents);
+      console.log('Student vacations:', vacationEvents);
       const calendarEvents = [...assignmentEvents, ...lessonEvents, ...vacationEvents];
       console.log('Final merged event array:', calendarEvents);
       return (
@@ -576,27 +608,27 @@ const StudentDashboard = () => {
                     </li>
                   ) : (
                     resources.map((res) => {
-                      const isFile = res.type === 'file';
-                      const isVideo = !isFile && res.url && (res.url.includes('youtube') || res.url.includes('vimeo'));
+                      const isFile = res?.type === 'file';
+                      const isVideo = !isFile && res?.url && (res.url.includes('youtube') || res.url.includes('vimeo'));
                       const iconBg = isFile ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500';
                       const btnClass = isFile 
                         ? 'text-red-600 border-red-200 hover:bg-red-50' 
                         : 'text-blue-600 border-blue-200 hover:bg-blue-50';
                       const icon = isFile ? '📄' : (isVideo ? '🎥' : '🔗');
-                      const dateStr = new Date(res.created_at).toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+                      const dateStr = new Date(res?.created_at).toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
                       
-                      const fileUrl = isFile && res.file_path 
+                      const fileUrl = isFile && res?.file_path 
                         ? supabase.storage.from('resources').getPublicUrl(res.file_path).data.publicUrl 
-                        : res.url;
+                        : res?.url;
                         
                       return (
-                        <li key={res.id} className="p-6 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <li key={res?.id} className="p-6 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center space-x-4">
                             <div className={`p-3 ${iconBg} rounded-xl text-2xl shrink-0`}>
                               {icon}
                             </div>
                             <div>
-                              <p className="text-base font-semibold text-slate-900">{res.title}</p>
+                              <p className="text-base font-semibold text-slate-900">{res?.title}</p>
                               <p className="text-sm text-slate-500 mt-1">Delt: {dateStr}</p>
                             </div>
                           </div>
