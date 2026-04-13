@@ -212,16 +212,17 @@ const saveMeetLink = async (link: string) => {
   };
 
   const saveVacation = async (dates: string[]) => {
-    console.log('Tutor user id:', authUserId);
+    console.log('Auth user id:', authUserId);
     const insertPayload = dates.map(date => ({
       tutor_id: authUserId,
-      date: date
+      vacation_date: date,
+      description: ''
     }));
     console.log('Insert payload:', insertPayload);
 
     if (authUserId) {
       try {
-        const { data, error } = await supabase.from('vacations').insert(insertPayload);
+        const { data, error } = await supabase.from('tutor_vacation').insert(insertPayload);
         console.log('Insert result:', data);
         console.log('Insert error:', error);
         
@@ -244,8 +245,8 @@ const saveMeetLink = async (link: string) => {
     if (!authUserId) return;
     try {
       const { data, error } = await supabase
-        .from('vacations')
-        .select('id, tutor_id, date')
+        .from('tutor_vacation')
+        .select('id, tutor_id, vacation_date, description')
         .eq('tutor_id', authUserId);
       
       if (error) {
@@ -254,7 +255,7 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke hente feriedager fra Supabase:", error);
         }
       } else if (data) {
-        setVacationDays(data.map(v => v.date));
+        setVacationDays(data.map(v => v.vacation_date));
       }
     } catch (error) {
       console.error("Feil ved henting av feriedager:", error);
