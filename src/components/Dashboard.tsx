@@ -2008,127 +2008,196 @@ Per Andersen,per@example.com,Norsk`}
                   </div>
                 </h2>
                 <div className="space-y-4">
-                  {viewMode === 'list' ? (
-                    <div className="calendar-view">
-                      <h3>📅 Dagens og kommende timer</h3>
-                      
-                      {lessons.length > 0 ? (
-                        lessons.map((lesson) => {
-                          const color = getStudentColor(lesson.student_name);
-                          return (
-                            <div 
-                              key={lesson.id} 
-                              className="lesson-card"
-                              style={{ '--card-bg': color.bgHex, '--card-border': color.borderHex } as React.CSSProperties}
-                            >
-                              <div className="lesson-info">
-                                <span className="lesson-student">{lesson.student_name}</span>
-                                <span className="lesson-time">
-                                  🗓️ {new Date(lesson.lesson_date).toLocaleDateString('no-NO')} | ⏰ {lesson.start_time?.substring(0,5)}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div 
-                                  className="lesson-tag" 
-                                  style={{ backgroundColor: color.bgHex, color: color.borderHex, border: `1px solid ${color.borderHex}40` }}
-                                >
-                                  {lesson.duration_minutes} min
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleCompleteLesson(lesson)}
-                                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                    title="Marker som fullført og lag faktura"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteLesson(lesson.id)}
-                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Slett time"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="empty-state">
-                          <p>Ingen timer planlagt ennå.</p>
-                          <small>Trykk på "+ Ny time" for å legge til din første elev.</small>
-                        </div>
-                      )}
-                    </div>
-                  ) : viewMode === 'week' ? (
-                    <div className="weekly-calendar overflow-x-auto">
-                      {(() => {
-                        const today = new Date();
-                        const dayOfWeek = today.getDay();
-                        const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                        
-                        return Array.from({ length: 7 }).map((_, index) => {
-                          const date = new Date(today);
-                          date.setDate(today.getDate() - adjustedDay + index);
-                          const offset = date.getTimezoneOffset() * 60000;
-                          const dateString = new Date(date.getTime() - offset).toISOString().split('T')[0];
-                          const hasVacation = vacationDays.includes(dateString);
-                          const holidayName = getNorwegianHolidayName(date);
-                          const isRedDay = holidayName !== null;
-                          
-                          // Filter lessons for this specific date
-                          const dayLessons = lessons.filter((l: any) => l.lesson_date === dateString);
-                          
-                          return (
-                            <div key={index} className={`calendar-day min-w-[120px] ${isRedDay ? 'bg-red-50/30' : ''}`}>
-                              <span className={`day-name ${isRedDay ? 'text-red-600' : ''}`}>
-                                {weekdays[index]} {date.getDate()}/{date.getMonth() + 1}
-                              </span>
-                              {holidayName && holidayName !== "Søndag" && (
-                                <div className="text-[10px] text-red-500 text-center font-medium mb-2">{holidayName}</div>
-                              )}
-                              <div className="day-content space-y-2 mt-2">
-                                {hasVacation && (
-                                  <div className="bg-orange-100 p-2 rounded-lg border border-orange-200 text-center">
-                                    <span className="text-xl block mb-1">🌴</span>
-                                    <small className="text-orange-800 font-bold block">Ferie / Fri</small>
-                                  </div>
-                                )}
-                                {!hasVacation && dayLessons.map((lesson: any) => {
-                                  const color = getStudentColor(lesson.student_name);
+                  {(() => {
+                    // Create vacation events for tutor calendar
+                    const vacationEvents = vacations.map(v => ({
+                      id: `vacation-${v.id}`,
+                      type: 'vacation',
+                      date: v.vacation_date,
+                      title: 'Ferie / Fri',
+                      description: v.description,
+                      tutor_name: v.tutor_name
+                    }));
+                    
+                    // Create lesson events for tutor calendar
+                    const lessonEvents = lessons.map(lesson => ({
+                      id: lesson.id,
+                      type: 'lesson',
+                      date: lesson.lesson_date,
+                      title: lesson.student_name,
+                      start_time: lesson.start_time,
+                      duration_minutes: lesson.duration_minutes,
+                      student_name: lesson.student_name
+                    }));
+                    
+                    // Merge vacation and lesson events
+                    const allEvents = [...lessonEvents, ...vacationEvents];
+                    console.log('Tutor merged event array:', allEvents);
+                    
+                    return (
+                      <>
+                        {viewMode === 'list' ? (
+                          <div className="calendar-view">
+                            <h3>📅 Dagens og kommende timer</h3>
+                            
+                            {allEvents.length > 0 ? (
+                              allEvents.map((event) => {
+                                if (event.type === 'vacation') {
                                   return (
-                                    <div key={lesson.id} className={`${color.bgClass} p-2 rounded-lg border ${color.borderClass} text-left relative group`}>
-                                      <small className={`${color.textClass} font-bold block`}>{lesson.start_time?.substring(0,5)}</small>
-                                      <p className="text-sm text-slate-800 truncate" title={lesson.student_name}>{lesson.student_name}</p>
-                                      <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                          onClick={() => handleCompleteLesson(lesson)}
-                                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
-                                          title="Marker som fullført og lag faktura"
-                                        >
-                                          <CheckCircle2 className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeleteLesson(lesson.id)}
-                                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                                          title="Slett time"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
+                                    <div 
+                                      key={event.id} 
+                                      className="lesson-card bg-yellow-50 border-yellow-200"
+                                    >
+                                      <div className="lesson-info">
+                                        <span className="lesson-student text-yellow-800 font-bold">🌴 {event.title}</span>
+                                        <span className="lesson-time">
+                                          🗓️ {new Date(event.date).toLocaleDateString('no-NO')}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <div className="lesson-tag bg-yellow-100 text-yellow-800 border-yellow-300">
+                                          Ferie
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => deleteVacation(event.id.replace('vacation-', ''))}
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Slett ferie"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
                                   );
-                                })}
+                                } else {
+                                  // Lesson event
+                                  const color = getStudentColor(event.student_name);
+                                  return (
+                                    <div 
+                                      key={event.id} 
+                                      className="lesson-card"
+                                      style={{ '--card-bg': color.bgHex, '--card-border': color.borderHex } as React.CSSProperties}
+                                    >
+                                      <div className="lesson-info">
+                                        <span className="lesson-student">{event.student_name}</span>
+                                        <span className="lesson-time">
+                                          🗓️ {new Date(event.date).toLocaleDateString('no-NO')} | ⏰ {event.start_time?.substring(0,5)}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <div 
+                                          className="lesson-tag" 
+                                          style={{ backgroundColor: color.bgHex, color: color.borderHex, border: `1px solid ${color.borderHex}40` }}
+                                        >
+                                          {event.duration_minutes} min
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => handleCompleteLesson(event)}
+                                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                            title="Marker som fullført og lag faktura"
+                                          >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteLesson(event.id)}
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Slett time"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              })
+                            ) : (
+                              <div className="empty-state">
+                                <p>Ingen timer planlagt ennå.</p>
+                                <small>Trykk på "+ Ny time" for å legge til din første elev.</small>
                               </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  ) : (
-                    renderMonthView()
-                  )}
+                            )}
+                          </div>
+                        ) : viewMode === 'week' ? (
+                          <div className="weekly-calendar overflow-x-auto">
+                            {(() => {
+                              const today = new Date();
+                              const dayOfWeek = today.getDay();
+                              const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                              
+                              return Array.from({ length: 7 }).map((_, index) => {
+                                const date = new Date(today);
+                                date.setDate(today.getDate() - adjustedDay + index);
+                                const offset = date.getTimezoneOffset() * 60000;
+                                const dateString = new Date(date.getTime() - offset).toISOString().split('T')[0];
+                                const hasVacation = vacationDays.includes(dateString);
+                                const holidayName = getNorwegianHolidayName(date);
+                                const isRedDay = holidayName !== null;
+                                
+                                // Filter events for this specific date
+                                const dayEvents = allEvents.filter((e: any) => e.date === dateString);
+                                
+                                return (
+                                  <div key={index} className={`calendar-day min-w-[120px] ${isRedDay ? 'bg-red-50/30' : ''}`}>
+                                    <span className={`day-name ${isRedDay ? 'text-red-600' : ''}`}>
+                                      {weekdays[index]} {date.getDate()}/{date.getMonth() + 1}
+                                    </span>
+                                    {holidayName && holidayName !== "Søndag" && (
+                                      <div className="text-[10px] text-red-500 text-center font-medium mb-2">{holidayName}</div>
+                                    )}
+                                    <div className="day-content space-y-2 mt-2">
+                                      {dayEvents.map((event: any) => {
+                                        if (event.type === 'vacation') {
+                                          return (
+                                            <div key={event.id} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-center">
+                                              <span className="text-xl block mb-1">🌴</span>
+                                              <small className="text-yellow-800 font-bold block">{event.title}</small>
+                                              {event.description && (
+                                                <small className="text-yellow-700 block text-xs mt-1">{event.description}</small>
+                                              )}
+                                            </div>
+                                          );
+                                        } else {
+                                          // Lesson event
+                                          const color = getStudentColor(event.student_name);
+                                          return (
+                                            <div key={event.id} className={`${color.bgClass} p-2 rounded-lg border ${color.borderClass} text-left relative group`}>
+                                              <small className={`${color.textClass} font-bold block`}>{event.start_time?.substring(0,5)}</small>
+                                              <p className="text-sm text-slate-800 truncate" title={event.student_name}>{event.student_name}</p>
+                                              <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                  onClick={() => handleCompleteLesson(event)}
+                                                  className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                                                  title="Marker som fullført og lag faktura"
+                                                >
+                                                  <CheckCircle2 className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDeleteLesson(event.id)}
+                                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                                  title="Slett time"
+                                                >
+                                                  <Trash2 className="w-3 h-3" />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        ) : (
+                          renderMonthView()
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               

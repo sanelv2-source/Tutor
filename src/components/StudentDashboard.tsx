@@ -154,6 +154,9 @@ const StudentDashboard = () => {
         .eq('profile_id', user.id)
         .single();
 
+      console.log('Student row result:', student);
+      console.log('Student row error:', studentError);
+
       console.log('Loaded student row:', student);
 
       if (studentError || !student) {
@@ -495,13 +498,14 @@ const StudentDashboard = () => {
         };
       });
       const vacationEvents = vacations.map(v => ({
-        title: `${v.profiles?.full_name || 'Lærer'} har fri`,
-        date: v.vacation_date,
+        id: `vacation-${v.id}`,
         type: 'vacation',
-        description: v.description,
-        tutor_name: v.profiles?.full_name || 'Lærer'
+        date: v.vacation_date,
+        title: `${v.profiles?.full_name || 'Lærer'} har fri`,
+        description: v.description
       }));
       const calendarEvents = [...assignmentEvents, ...lessonEvents, ...vacationEvents];
+      console.log('Final merged event array:', calendarEvents);
       return (
         <div className="p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Timeplan</h1>
