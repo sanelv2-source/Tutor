@@ -250,25 +250,28 @@ const StudentDashboard = () => {
         }
 
         // Fetch vacations only if student has a tutor_id
+        // CLEAN FETCH: No joins, no relationships - just simple flat query
         if (student.tutor_id) {
-          const { data: vacationsData, error: vacationsError } = await supabase
-            .from('tutor_vacation')
-            .select(`
-              id,
-              tutor_id,
-              vacation_date,
-              description,
-              profiles!tutor_vacation_tutor_id_fkey(full_name)
-            `)
-            .eq('tutor_id', student.tutor_id);
+          try {
+            const { data: vacationsData, error: vacationsError } = await supabase
+              .from('tutor_vacation')
+              .select('*')
+              .eq('tutor_id', student.tutor_id);
 
-          console.log('Vacations fetched:', vacationsData);
-          console.log('Student vacations fetch error:', vacationsError);
-
-          // Ensure vacations array is initialized as empty array before setting
-          if (vacationsData && Array.isArray(vacationsData)) {
-            setVacations(vacationsData);
-          } else {
+            console.log('Raw data from Supabase (vacations):', vacationsData);
+            
+            if (vacationsError) {
+              console.error('Error fetching vacations:', vacationsError);
+              setVacations([]);
+            } else if (vacationsData && Array.isArray(vacationsData)) {
+              // Transform flat data if needed for display
+              setVacations(vacationsData);
+              console.log(`Successfully loaded ${vacationsData.length} vacation records`);
+            } else {
+              setVacations([]);
+            }
+          } catch (err) {
+            console.error('Exception while fetching vacations:', err);
             setVacations([]);
           }
         } else {
@@ -534,7 +537,7 @@ const StudentDashboard = () => {
         id: `vacation-${v.id}`,
         type: 'vacation',
         date: v.vacation_date,
-        title: `${v.profiles?.full_name || 'Lærer'} har fri`,
+        title: 'Læreren har fri',
         description: v.description
       }));
       
