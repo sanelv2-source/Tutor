@@ -250,25 +250,43 @@ const StudentDashboard = () => {
         }
 
         // Fetch vacations only if student has a tutor_id
+        // CLEAN FETCH: Get vacations and teacher name separately to avoid joins
         if (student.tutor_id) {
-          const { data: vacationsData, error: vacationsError } = await supabase
-            .from('tutor_vacation')
-            .select(`
-              id,
-              tutor_id,
-              vacation_date,
-              description,
-              profiles!tutor_vacation_tutor_id_fkey(full_name)
-            `)
-            .eq('tutor_id', student.tutor_id);
+          try {
+            // First get the vacation records
+            const { data: vacationsData, error: vacationsError } = await supabase
+              .from('tutor_vacation')
+              .select('*')
+              .eq('tutor_id', student.tutor_id);
 
-          console.log('Vacations fetched:', vacationsData);
-          console.log('Student vacations fetch error:', vacationsError);
+            console.log('Raw data from Supabase (vacations):', vacationsData);
 
-          // Ensure vacations array is initialized as empty array before setting
-          if (vacationsData && Array.isArray(vacationsData)) {
-            setVacations(vacationsData);
-          } else {
+            if (vacationsError) {
+              console.error('Error fetching vacations:', vacationsError);
+              setVacations([]);
+            } else if (vacationsData && Array.isArray(vacationsData)) {
+              // Get teacher name from profiles table
+              const { data: teacherProfile, error: teacherError } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', student.tutor_id)
+                .single();
+
+              const teacherName = teacherProfile?.full_name || 'Lærer';
+
+              // Add teacher name to each vacation record
+              const vacationsWithTeacher = vacationsData.map(vacation => ({
+                ...vacation,
+                teacher_name: teacherName
+              }));
+
+              setVacations(vacationsWithTeacher);
+              console.log(`Successfully loaded ${vacationsWithTeacher.length} vacation records for ${teacherName}`);
+            } else {
+              setVacations([]);
+            }
+          } catch (err) {
+            console.error('Exception while fetching vacations:', err);
             setVacations([]);
           }
         } else {
@@ -534,7 +552,7 @@ const StudentDashboard = () => {
         id: `vacation-${v.id}`,
         type: 'vacation',
         date: v.vacation_date,
-        title: `${v.profiles?.full_name || 'Lærer'} har fri`,
+        title: `${v.teacher_name} - Ferie`,
         description: v.description
       }));
       

@@ -243,39 +243,32 @@ const saveMeetLink = async (link: string) => {
 
   const fetchVacations = React.useCallback(async () => {
     if (!authUserId) return;
+    
     try {
+      // CLEAN FETCH: No joins, no relationships - just simple flat query
       const { data, error } = await supabase
         .from('tutor_vacation')
-        .select(`
-          id, 
-          tutor_id, 
-          vacation_date, 
-          description,
-          profiles!tutor_vacation_tutor_id_fkey(full_name)
-        `)
+        .select('*')
         .eq('tutor_id', authUserId);
       
-      console.log('Vacations fetched:', data);
-      console.log('Tutor vacations fetch error:', error);
+      console.log('Raw data from Supabase (tutor vacations):', data);
       
       if (error) {
-        // Ignorer feil hvis tabellen ikke finnes ennå
-        if (!error.message.includes('does not exist')) {
-          console.error("Kunne ikke hente feriedager fra Supabase:", error);
-        }
-      } else if (data) {
-        const vacationsWithNames = data.map(v => ({
-          id: v.id,
-          tutor_id: v.tutor_id,
-          vacation_date: v.vacation_date,
-          description: v.description,
-          tutor_name: v.profiles?.full_name || 'Lærer'
-        }));
-        setVacations(vacationsWithNames);
+        console.error("Error fetching vacations:", error);
+        setVacations([]);
+        setVacationDays([]);
+      } else if (data && Array.isArray(data)) {
+        setVacations(data);
         setVacationDays(data.map(v => v.vacation_date));
+        console.log(`Successfully loaded ${data.length} vacation records for tutor`);
+      } else {
+        setVacations([]);
+        setVacationDays([]);
       }
     } catch (error) {
-      console.error("Feil ved henting av feriedager:", error);
+      console.error("Exception while fetching vacations:", error);
+      setVacations([]);
+      setVacationDays([]);
     }
   }, [authUserId]);
 
@@ -2016,9 +2009,8 @@ Per Andersen,per@example.com,Norsk`}
                       id: `vacation-${v.id}`,
                       type: 'vacation',
                       date: v.vacation_date,
-                      title: `${v.tutor_name || 'Lærer'} har fri`,
-                      description: v.description,
-                      tutor_name: v.tutor_name
+                      title: 'Du har fri',
+                      description: v.description
                     }));
                     
                     // Create lesson events for tutor calendar
