@@ -262,10 +262,11 @@ const StudentDashboard = () => {
             `)
             .eq('tutor_id', student.tutor_id);
 
-          console.log('Student vacations fetch result:', vacationsData);
+          console.log('Vacations fetched:', vacationsData);
           console.log('Student vacations fetch error:', vacationsError);
 
-          if (vacationsData) {
+          // Ensure vacations array is initialized as empty array before setting
+          if (vacationsData && Array.isArray(vacationsData)) {
             setVacations(vacationsData);
           } else {
             setVacations([]);

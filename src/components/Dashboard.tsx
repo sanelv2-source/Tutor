@@ -255,7 +255,7 @@ const saveMeetLink = async (link: string) => {
         `)
         .eq('tutor_id', authUserId);
       
-      console.log('Tutor vacations fetch result:', data);
+      console.log('Vacations fetched:', data);
       console.log('Tutor vacations fetch error:', error);
       
       if (error) {
