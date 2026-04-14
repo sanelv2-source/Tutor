@@ -2010,8 +2010,7 @@ Per Andersen,per@example.com,Norsk`}
                       type: 'vacation',
                       date: v.vacation_date,
                       title: 'Du har fri',
-                      description: v.description,
-                      id: `vacation-${v.id}`
+                      description: v.description
                     }));
                     
                     // Create lesson events for tutor calendar

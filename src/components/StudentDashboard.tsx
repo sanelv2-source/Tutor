@@ -250,23 +250,38 @@ const StudentDashboard = () => {
         }
 
         // Fetch vacations only if student has a tutor_id
-        // CLEAN FETCH: No joins, no relationships - just simple flat query
+        // CLEAN FETCH: Get vacations and teacher name separately to avoid joins
         if (student.tutor_id) {
           try {
+            // First get the vacation records
             const { data: vacationsData, error: vacationsError } = await supabase
               .from('tutor_vacation')
               .select('*')
               .eq('tutor_id', student.tutor_id);
 
             console.log('Raw data from Supabase (vacations):', vacationsData);
-            
+
             if (vacationsError) {
               console.error('Error fetching vacations:', vacationsError);
               setVacations([]);
             } else if (vacationsData && Array.isArray(vacationsData)) {
-              // Transform flat data if needed for display
-              setVacations(vacationsData);
-              console.log(`Successfully loaded ${vacationsData.length} vacation records`);
+              // Get teacher name from profiles table
+              const { data: teacherProfile, error: teacherError } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', student.tutor_id)
+                .single();
+
+              const teacherName = teacherProfile?.full_name || 'Lærer';
+
+              // Add teacher name to each vacation record
+              const vacationsWithTeacher = vacationsData.map(vacation => ({
+                ...vacation,
+                teacher_name: teacherName
+              }));
+
+              setVacations(vacationsWithTeacher);
+              console.log(`Successfully loaded ${vacationsWithTeacher.length} vacation records for ${teacherName}`);
             } else {
               setVacations([]);
             }
@@ -537,7 +552,7 @@ const StudentDashboard = () => {
         id: `vacation-${v.id}`,
         type: 'vacation',
         date: v.vacation_date,
-        title: 'Læreren har fri',
+        title: `${v.teacher_name} - Ferie`,
         description: v.description
       }));
       
