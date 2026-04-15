@@ -3,6 +3,7 @@ import { LogOut, Video, Calendar, CheckCircle, Clock, MessageSquare, ExternalLin
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
+import NotificationBell from './NotificationBell';
 import StudentSidebar from './StudentSidebar';
 import { ChatList } from './ChatList';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
@@ -681,6 +682,9 @@ const StudentDashboard = () => {
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <div className="flex-grow pb-10 overflow-y-auto w-full">
         <main className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-end gap-3 px-4 py-6 sm:px-0">
+            <NotificationBell />
+          </div>
           {renderContent()}
         </main>
       </div>

@@ -36,6 +36,7 @@ import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
 import { supabase } from '../supabaseClient';
+import { sendNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
@@ -211,6 +212,47 @@ const saveMeetLink = async (link: string) => {
     }
   };
 
+  const notifyVacationStudents = async (dates: string[]) => {
+    if (!authUserId || dates.length === 0) return;
+
+    try {
+      const { data: linkedStudents, error: studentError } = await supabase
+        .from('students')
+        .select('profile_id')
+        .eq('tutor_id', authUserId)
+        .not('profile_id', 'is', null);
+
+      if (studentError || !linkedStudents) {
+        console.error('Error fetching linked students for notifications:', studentError);
+        return;
+      }
+
+      const profileIds = (linkedStudents as Array<{ profile_id: string | null }>)
+        .map((row) => row.profile_id)
+        .filter(Boolean) as string[];
+
+      if (profileIds.length === 0) return;
+
+      const notificationMessage = dates.length === 1
+        ? `Læreren din har registrert fri ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
+        : `Læreren din har registrert fri ${dates
+            .map((date) => new Date(date).toLocaleDateString('no-NO'))
+            .join(', ')}.`;
+
+      await Promise.all(profileIds.map((profileId) =>
+        sendNotification(
+          profileId,
+          'vacation',
+          'Ny ferie/fravær',
+          notificationMessage,
+          '/student/portal'
+        )
+      ));
+    } catch (error) {
+      console.error('Feil ved sending av varsler til elever:', error);
+    }
+  };
+
   const saveVacation = async (dates: string[]) => {
     console.log('Auth user id:', authUserId);
     const insertPayload = dates.map(date => ({
@@ -230,7 +272,8 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke lagre ferie til Supabase, bruker lokal state", error);
           setVacationDays(prev => [...prev, ...dates]);
         } else {
-          fetchVacations();
+          await fetchVacations();
+          notifyVacationStudents(dates);
         }
       } catch (err) {
         console.error("Feil ved lagring av ferie:", err);
