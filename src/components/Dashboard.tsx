@@ -364,29 +364,67 @@ const saveMeetLink = async (link: string) => {
   }, [authUserId]);
 
   const oppdaterStatus = async (submissionId: string, assignmentId: string, nyStatus: string) => {
-    // 1. Oppdater selve innsendingen
-    const { error: subError } = await supabase
-      .from('submissions')
-      .update({ status: nyStatus })
-      .eq('id', submissionId);
+    try {
+      // Get submission details to find student
+      const { data: submissionData, error: fetchError } = await supabase
+        .from('submissions')
+        .select('student_id, students(profile_id)')
+        .eq('id', submissionId)
+        .single();
 
-    // 2. Oppdater oppgaven slik at elevens dashboard endrer farge
-    let assignError = null;
-    if (assignmentId) {
-      const { error } = await supabase
-        .from('assignments')
+      if (fetchError || !submissionData) {
+        console.error('Error fetching submission:', fetchError);
+      }
+
+      // 1. Oppdater selve innsendingen
+      const { error: subError } = await supabase
+        .from('submissions')
         .update({ status: nyStatus })
-        .eq('id', assignmentId);
-      assignError = error;
-    }
+        .eq('id', submissionId);
 
-    if (subError || assignError) {
-      console.error("Feil ved oppdatering:", subError || assignError);
-      showToast("Kunne ikke oppdatere oppgave: " + (subError?.message || assignError?.message));
-    } else {
-      // Oppdaterer lista lokalt så svaret forsvinner med en gang
-      setSubmissions(submissions.filter(sub => sub.id !== submissionId));
-      showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave avvist! ❌");
+      // 2. Oppdater oppgaven slik at elevens dashboard endrer farge
+      let assignError = null;
+      if (assignmentId) {
+        const { error } = await supabase
+          .from('assignments')
+          .update({ status: nyStatus })
+          .eq('id', assignmentId);
+        assignError = error;
+      }
+
+      if (subError || assignError) {
+        console.error("Feil ved oppdatering:", subError || assignError);
+        showToast("Kunne ikke oppdatere oppgave: " + (subError?.message || assignError?.message));
+      } else {
+        // Send notification to student about task status
+        try {
+          if (submissionData && submissionData.students?.profile_id) {
+            const studentProfileId = submissionData.students.profile_id;
+            const notificationTitle = nyStatus === 'approved' ? 'Oppgave godkjent! ✅' : 'Oppgave avvist ❌';
+            const notificationMessage = nyStatus === 'approved'
+              ? 'Din lærer har godkjent oppgaven din.'
+              : 'Din lærer har gitt tilbakemelding på oppgaven din.';
+            
+            await sendNotification(
+              studentProfileId,
+              nyStatus === 'approved' ? 'task_approved' : 'task_rejected',
+              notificationTitle,
+              notificationMessage,
+              '/student/portal'
+            );
+          }
+        } catch (notificationError) {
+          console.error('Error sending task status notification:', notificationError);
+          // Don't fail the whole status update if notification fails
+        }
+
+        // Oppdaterer lista lokalt så svaret forsvinner med en gang
+        setSubmissions(submissions.filter(sub => sub.id !== submissionId));
+        showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave avvist! ❌");
+      }
+    } catch (error) {
+      console.error('Unexpected error in oppdaterStatus:', error);
+      showToast('En uventet feil oppstod');
     }
   };
 
@@ -1608,6 +1646,7 @@ const saveMeetLink = async (link: string) => {
       <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-20">
         <Logo iconSize="w-6 h-6 text-base" textSize="text-lg" />
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <button onClick={() => setActiveTab('profil')} className={`p-2 ${activeTab === 'profil' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}>
             <User className="h-5 w-5" />
           </button>
@@ -1619,8 +1658,9 @@ const saveMeetLink = async (link: string) => {
 
       {/* Desktop Sidebar Navigation */}
       <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col h-screen sticky top-0">
-        <div className="h-20 flex items-center px-6 border-b border-slate-100">
+        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
           <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" />
+          <NotificationBell />
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">

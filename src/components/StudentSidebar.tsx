@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Logo from './Logo';
+import NotificationBell from './NotificationBell';
 import { LogOut, Menu, X } from 'lucide-react';
 
 interface StudentSidebarProps {
@@ -35,9 +36,12 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
           </button>
           <Logo iconSize="w-6 h-6 text-sm" textSize="text-lg" />
         </div>
-        <button onClick={onLogout} className="p-2 -mr-2 text-gray-500 hover:bg-gray-100 rounded-lg">
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button onClick={onLogout} className="p-2 -mr-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Mobile Drawer Overlay */}
@@ -79,8 +83,9 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
 
       {/* Desktop Sidebar */}
       <div className="hidden md:flex w-64 h-screen bg-white border-r border-gray-100 p-4 flex-col sticky top-0">
-        <div className="mb-8 px-2 flex items-center">
+        <div className="mb-8 px-2 flex items-center justify-between">
           <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" />
+          <NotificationBell />
         </div>
         <nav className="space-y-1 flex-grow">
           {menuItems.map((item) => (

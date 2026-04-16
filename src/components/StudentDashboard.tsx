@@ -7,6 +7,7 @@ import NotificationBell from './NotificationBell';
 import StudentSidebar from './StudentSidebar';
 import { ChatList } from './ChatList';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
+import { sendNotification } from '../services/notificationService';
 
 interface Assignment {
   id: string;
@@ -99,6 +100,20 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
         if (subError) {
           console.error("Submission insert error:", subError);
           throw new Error(`Klarte ikke lagre innleveringen: ${subError.message}`);
+        }
+
+        // Send notification to tutor that student submitted a task
+        try {
+          await sendNotification(
+            tutorId,
+            'task_submitted',
+            'Ny innlevering',
+            `En elev har levert inn en oppgave. Gå til dashbordet for å se den.`,
+            '/dashboard?tab=oversikt'
+          );
+        } catch (notificationError) {
+          console.error('Error sending task submission notification:', notificationError);
+          // Don't fail the whole submission if notification fails
         }
       } else {
         throw new Error('Mangler elev- eller lærer-ID for å levere.');
