@@ -234,21 +234,27 @@ const saveMeetLink = async (link: string) => {
 
       if (profileIds.length === 0) return;
 
+      const teacherName = user?.name || 'Læreren';
+      const notificationTitle = `${teacherName} har lagt inn ferie`;
       const notificationMessage = dates.length === 1
         ? `Læreren din har registrert fri ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
         : `Læreren din har registrert fri ${dates
             .map((date) => new Date(date).toLocaleDateString('no-NO'))
             .join(', ')}.`;
 
-      await Promise.all(profileIds.map((profileId) =>
+      console.log('Attempting to send vacation notifications to students:', { profileIds, notificationTitle, notificationMessage });
+
+      const results = await Promise.all(profileIds.map((profileId) =>
         sendNotification(
           profileId,
           'vacation',
-          'Ny ferie/fravær',
+          notificationTitle,
           notificationMessage,
           '/student/portal'
         )
       ));
+
+      console.log('Vacation notification results:', results);
     } catch (error) {
       console.error('Feil ved sending av varsler til elever:', error);
     }
@@ -274,7 +280,8 @@ const saveMeetLink = async (link: string) => {
           setVacationDays(prev => [...prev, ...dates]);
         } else {
           await fetchVacations();
-          notifyVacationStudents(dates);
+          console.log('Vacation saved in Supabase, calling notifyVacationStudents', { dates });
+          await notifyVacationStudents(dates);
         }
       } catch (err) {
         console.error("Feil ved lagring av ferie:", err);
@@ -1661,7 +1668,6 @@ const saveMeetLink = async (link: string) => {
       <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col h-screen sticky top-0">
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
           <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" />
-          <NotificationBell />
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -1784,13 +1790,17 @@ const saveMeetLink = async (link: string) => {
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
-          {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
-            <div className="flex gap-2">
-              {activeTab === 'timeplan' && (
-                <button 
-                  onClick={() => setShowFixedModal(true)}
-                  className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
-                >
+          <div className="flex items-center gap-3">
+            <div className="hidden md:block">
+              <NotificationBell />
+            </div>
+            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
+              <div className="flex gap-2">
+                {activeTab === 'timeplan' && (
+                  <button 
+                    onClick={() => setShowFixedModal(true)}
+                    className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
+                  >
                   <Plus className="h-4 w-4 mr-2" />
                   Faste tider
                 </button>

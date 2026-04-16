@@ -25,6 +25,8 @@ export async function sendNotification(
   }
 
   try {
+    console.log('sendNotification called:', { userId, type, title, message, link });
+
     const result = await supabase
       .from('notifications')
       .insert([
@@ -42,6 +44,8 @@ export async function sendNotification(
 
     if (result.error) {
       console.error('Error inserting notification:', result.error);
+    } else {
+      console.log('Notification insert result:', result.data);
     }
 
     return result;
