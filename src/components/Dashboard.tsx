@@ -35,6 +35,7 @@ import { ChatList } from './ChatList';
 import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
+import NotificationBell from './NotificationBell';
 import { supabase } from '../supabaseClient';
 import { sendNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
