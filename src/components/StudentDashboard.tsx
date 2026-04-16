@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
 import StudentSidebar from './StudentSidebar';
+import NotificationBell from './NotificationBell';
 import { ChatList } from './ChatList';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
 import { sendNotification } from '../services/notificationService';
@@ -695,8 +696,14 @@ const StudentDashboard = () => {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row">
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <div className="flex-grow pb-10 overflow-y-auto w-full">
+        <div className="sticky top-0 z-20 bg-gray-50 border-b border-slate-200">
+          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 sm:px-8">
+            <h1 className="text-xl font-semibold text-slate-900">Velkommen tilbake</h1>
+            <NotificationBell />
+          </div>
+        </div>
         <main className="max-w-4xl mx-auto">
-              {renderContent()}
+          {renderContent()}
         </main>
       </div>
 

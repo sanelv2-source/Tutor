@@ -268,6 +268,7 @@ const saveMeetLink = async (link: string) => {
       description: ''
     }));
     console.log('Insert payload:', insertPayload);
+    console.log('SENDING NOTIFICATION TO SUPABASE', { insertPayload });
 
     if (authUserId) {
       try {
@@ -1816,6 +1817,7 @@ const saveMeetLink = async (link: string) => {
             </div>
           )}
         </div>
+      </div>
 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
@@ -3827,7 +3829,10 @@ Per Andersen,per@example.com,Norsk`}
               </button>
             </div>
           </div>
- {/* Innboks for elevsvar */}
+        </div>
+      )}
+
+      {/* Innboks for elevsvar */}
       <div className="max-w-4xl mx-auto mt-12 mb-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -3892,8 +3897,6 @@ Per Andersen,per@example.com,Norsk`}
           )}
         </div>
       </div>
-        </div>
-      )}
 
       {/* Calendar Modal */}
       {calendarModal && (

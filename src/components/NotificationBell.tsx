@@ -139,7 +139,7 @@ const NotificationBell: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 left-auto z-50 mt-3 w-[320px] max-w-[calc(100vw-1rem)] rounded-3xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-200">
+        <div className="absolute right-0 left-auto z-50 mt-3 w-[320px] max-w-[calc(100vw-1rem)] origin-top-right rounded-3xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">Varsler</p>
