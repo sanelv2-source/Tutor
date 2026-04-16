@@ -25,7 +25,7 @@ export async function sendNotification(
   }
 
   try {
-    console.log('sendNotification called:', { userId, type, title, message, link });
+    console.log('DEBUG: Attempting Supabase insert for notification', { userId, title });
 
     const result = await supabase
       .from('notifications')
@@ -43,14 +43,14 @@ export async function sendNotification(
       .select();
 
     if (result.error) {
-      console.error('Error inserting notification:', result.error);
+      console.error('DEBUG: Supabase Insert Error:', result.error);
     } else {
       console.log('Notification insert result:', result.data);
     }
 
     return result;
   } catch (error) {
-    console.error('Exception while sending notification:', error);
+    console.error('DEBUG: Supabase Insert Error:', error);
     return { data: null, error };
   }
 }

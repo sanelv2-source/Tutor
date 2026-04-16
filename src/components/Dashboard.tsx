@@ -232,8 +232,12 @@ const saveMeetLink = async (link: string) => {
         .map((row) => row.profile_id)
         .filter(Boolean) as string[];
 
-      if (profileIds.length === 0) return;
+      if (profileIds.length === 0) {
+        console.warn('DEBUG: No students found for this tutor!');
+        return;
+      }
 
+      console.log('DEBUG: Fetched linked student profile ids for notifications:', profileIds);
       const teacherName = user?.name || 'Læreren';
       const notificationTitle = `${teacherName} har lagt inn ferie`;
       const notificationMessage = dates.length === 1
@@ -261,6 +265,7 @@ const saveMeetLink = async (link: string) => {
   };
 
   const saveVacation = async (dates: string[]) => {
+    console.log('DEBUG: Starting vacation save process');
     console.log('Auth user id:', authUserId);
     const insertPayload = dates.map(date => ({
       tutor_id: authUserId,
@@ -280,6 +285,7 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke lagre ferie til Supabase, bruker lokal state", error);
           setVacationDays(prev => [...prev, ...dates]);
         } else {
+          console.log('DEBUG: Vacation saved, now fetching students for tutor:', authUserId);
           await fetchVacations();
           console.log('Vacation saved in Supabase, calling notifyVacationStudents', { dates });
           await notifyVacationStudents(dates);
