@@ -1,32 +1,30 @@
 import { supabase } from '../supabaseClient';
 
-export type NotificationType = 'vacation' | 'message' | 'task_submitted' | 'task_approved' | 'task_rejected' | 'resource' | 'alert' | 'info' | string;
+export type NotificationType = 'message' | 'lesson' | 'assignment' | 'submission' | string;
 
 /**
- * Sends a notification to a user
+ * Creates a notification for a user
  * @param userId - The user's ID (auth.uid)
  * @param type - The type of notification
  * @param title - Short title for the notification
- * @param message - Main message content
+ * @param body - Main message content
  * @param link - Optional link for the notification
  * @returns Promise with the created notification or error
  */
-export async function sendNotification(
+export async function createNotification(
   userId: string,
   type: NotificationType,
   title: string,
-  message: string,
+  body: string,
   link?: string
 ) {
   // Validate inputs
-  if (!userId || !type || !title || !message) {
-    console.error('Invalid notification params:', { userId, type, title, message });
+  if (!userId || !type || !title || !body) {
+    console.error('Invalid notification params:', { userId, type, title, body });
     return { data: null, error: new Error('Missing required notification parameters') };
   }
 
   try {
-    console.log('sendNotification called:', { userId, type, title, message, link });
-
     const result = await supabase
       .from('notifications')
       .insert([
@@ -34,69 +32,22 @@ export async function sendNotification(
           user_id: userId,
           type,
           title,
-          message,
+          body,
           link: link ?? null,
-          is_read: false,
-          created_at: new Date().toISOString()
+          is_read: false
         }
       ])
       .select();
 
     if (result.error) {
-      console.error('Error inserting notification:', result.error);
-    } else {
-      console.log('Notification insert result:', result.data);
+      console.error('Notification insert error:', result.error);
     }
 
     return result;
   } catch (error) {
-    console.error('Exception while sending notification:', error);
+    console.error('Exception creating notification:', error);
     return { data: null, error };
   }
 }
-
-/**
- * Sends notifications to multiple users
- * @param userIds - Array of user IDs
- * @param type - The type of notification
- * @param title - Short title for the notification
- * @param message - Main message content
- * @param link - Optional link for the notification
- */
-export async function sendNotificationBatch(
-  userIds: string[],
-  type: NotificationType,
-  title: string,
-  message: string,
-  link?: string
-) {
-  if (!userIds || userIds.length === 0) {
-    console.warn('sendNotificationBatch called with empty userIds');
-    return;
-  }
-
-  try {
-    const notifications = userIds.map(userId => ({
-      user_id: userId,
-      type,
-      title,
-      message,
-      link: link ?? null,
-      is_read: false,
-      created_at: new Date().toISOString()
-    }));
-
-    const result = await supabase
-      .from('notifications')
-      .insert(notifications)
-      .select();
-
-    if (result.error) {
-      console.error('Error inserting batch notifications:', result.error);
-    }
-
-    return result;
-  } catch (error) {
-    console.error('Exception while sending batch notifications:', error);
   }
 }
