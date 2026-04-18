@@ -89,8 +89,8 @@ const TeacherProfile = ({ user }: { user: any }) => {
     // Vi lager en lokal "nød-klient" som garantert bruker riktig adresse
     const { createClient } = await import('@supabase/supabase-js');
     const tempSupabase = createClient(
-      'https://jshciiidthsxjhwlxmbh.supabase.co', 
-      'sb_publishable_iaTt8xzIHCGGoy_m2HrV2A_o2rMES6D'
+      import.meta.env.VITE_SUPABASE_URL, 
+      import.meta.env.VITE_SUPABASE_ANON_KEY
     );
 
     const { error } = await tempSupabase
