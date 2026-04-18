@@ -37,7 +37,7 @@ import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
 import NotificationBell from './NotificationBell';
 import { supabase } from '../supabaseClient';
-import { sendNotification } from '../services/notificationService';
+import { createNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
@@ -138,6 +138,7 @@ const saveMeetLink = async (link: string) => {
   const [showVippsConfirm, setShowVippsConfirm] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [vippsModalOpen, setVippsModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [vippsAmount, setVippsAmount] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [subject, setSubject] = useState('');
@@ -506,14 +507,38 @@ const saveMeetLink = async (link: string) => {
     if (data) setResources(data);
   }, [authUserId]);
 
+  const fetchNotifications = React.useCallback(async () => {
+    if (!authUserId) return;
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', authUserId)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false });
+
+    if (data) setNotifications(data);
+  }, [authUserId]);
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    if (!error) {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    }
+  };
+
   useEffect(() => {
     if (authUserId) {
       fetchStudents();
       fetchLessons();
       fetchVacations();
       fetchResources();
+      fetchNotifications();
     }
-  }, [authUserId, fetchStudents, fetchLessons, fetchVacations, fetchResources]);
+  }, [authUserId, fetchStudents, fetchLessons, fetchVacations, fetchResources, fetchNotifications]);
 
   useEffect(() => {
     fetchCalendar();
@@ -781,6 +806,27 @@ const saveMeetLink = async (link: string) => {
         ]);
         
       if (error) throw error;
+
+      // Notify student of new assignment
+      try {
+        const { data: student, error: studentError } = await supabase
+          .from('students')
+          .select('profile_id')
+          .eq('id', studentId)
+          .single();
+
+        if (student?.profile_id) {
+          await createNotification(
+            student.profile_id,
+            'assignment',
+            'Ny oppgave',
+            `Du har fått en ny oppgave: ${taskTitle}`,
+            '/tasks'
+          );
+        }
+      } catch (notificationError) {
+        console.error('Error sending assignment notification:', notificationError);
+      }
       
       showToast("Oppgave sendt!");
       setTaskModal(null);
@@ -1175,6 +1221,29 @@ const saveMeetLink = async (link: string) => {
           });
 
         if (error) throw error;
+
+        // Notify student of new lesson
+        if (newItemData.studentId) {
+          try {
+            const { data: student, error: studentError } = await supabase
+              .from('students')
+              .select('profile_id')
+              .eq('id', newItemData.studentId)
+              .single();
+
+            if (student?.profile_id) {
+              await createNotification(
+                student.profile_id,
+                'lesson',
+                'Ny time',
+                `Du har fått en ny time planlagt: ${lesson_date} kl. ${start_time}`,
+                '/calendar'
+              );
+            }
+          } catch (notificationError) {
+            console.error('Error sending lesson notification:', notificationError);
+          }
+        }
         
         showToast("Timene er lagret i skyen! 🚀");
         fetchLessons();
@@ -1639,6 +1708,29 @@ const saveMeetLink = async (link: string) => {
         .insert(newLessons);
 
       if (error) throw error;
+
+      // Notify student of new recurring lessons
+      if (fixedLessonData.studentId) {
+        try {
+          const { data: student, error: studentError } = await supabase
+            .from('students')
+            .select('profile_id')
+            .eq('id', fixedLessonData.studentId)
+            .single();
+
+          if (student?.profile_id) {
+            await createNotification(
+              student.profile_id,
+              'lesson',
+              'Nye faste timer',
+              `Du har fått nye faste timer planlagt hver uke`,
+              '/calendar'
+            );
+          }
+        } catch (notificationError) {
+          console.error('Error sending recurring lesson notification:', notificationError);
+        }
+      }
       
       showToast('Faste timer lagret for 4 uker!');
       fetchLessons();
@@ -1851,6 +1943,35 @@ const saveMeetLink = async (link: string) => {
                 </button>
               </div>
             </div>
+
+            {/* Notifications Section */}
+            {notifications.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-indigo-600" />
+                  Varsler ({notifications.length})
+                </h3>
+                <div className="space-y-3">
+                  {notifications.map((notification) => (
+                    <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-slate-900">{notification.title}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{notification.body}</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(notification.created_at).toLocaleString('no-NO')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => markNotificationAsRead(notification.id)}
+                        className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                      >
+                        Merk som lest
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mb-4">
               <button

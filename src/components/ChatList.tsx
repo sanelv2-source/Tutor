@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Plus, Search, ArrowLeft, Send } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { sendNotification } from '../services/notificationService';
+import { createNotification } from '../services/notificationService';
 
 export const ChatList = () => {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -470,7 +470,7 @@ export const ChatList = () => {
       // Send notification to recipient
       try {
         const senderName = isTutor ? 'Din lærer' : 'En elev';
-        await sendNotification(
+        await createNotification(
           recipientId,
           'message',
           'Ny melding',
