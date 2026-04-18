@@ -387,7 +387,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             
             <div className="relative z-10 max-w-2xl mx-auto text-center">
               <h2 className="text-4xl sm:text-5xl font-extrabold text-white mb-6">
-                Søk om tidlig tilgang
+                Søknad for Closed-Beta
               </h2>
               <p className="text-xl text-indigo-100 mb-10">
                 Registrer deg under for å søke om plass i vår Closed Beta. 
