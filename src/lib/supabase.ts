@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Vi skriver inn de ekte kodene her for å tvinge appen til å virke
-const supabaseUrl = 'https://jshciiidthsxjhwlxmbh.supabase.co';
-const supabaseAnonKey = 'sb_publishable_iaTt8xzIHCGGoy_m2HrV2A_o2rMES6D';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
