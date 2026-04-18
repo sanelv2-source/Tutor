@@ -251,7 +251,7 @@ const saveMeetLink = async (link: string) => {
       console.log('Attempting to send vacation notifications to students:', { profileIds, notificationTitle, notificationMessage });
 
       const results = await Promise.all(profileIds.map((profileId) =>
-        sendNotification(
+        createNotification(
           profileId,
           'vacation',
           notificationTitle,
@@ -422,7 +422,7 @@ const saveMeetLink = async (link: string) => {
               ? 'Din lærer har godkjent oppgaven din.'
               : 'Din lærer har gitt tilbakemelding på oppgaven din.';
             
-            await sendNotification(
+            await createNotification(
               studentProfileId,
               nyStatus === 'approved' ? 'task_approved' : 'task_rejected',
               notificationTitle,
