@@ -13,6 +13,8 @@ import {
 import Logo from './Logo';
 import Footer from './Footer';
 
+import { supabase } from '../supabaseClient';
+
 // FAQ Accordion Component
 const AccordionItem = ({ question, answer }: { question: string, answer: React.ReactNode }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,10 +38,34 @@ const AccordionItem = ({ question, answer }: { question: string, answer: React.R
 
 export default function Landing({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser?: (user: any) => void }) {
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    onNavigate('signup');
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      // 1. Lagre data i Supabase beta_applicants
+      const { error: insertError } = await supabase
+        .from('beta_applicants')
+        .insert([{ 
+          full_name: fullName, 
+          email: email,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (insertError) throw insertError;
+
+      // 2. Send brukeren til Google Forms etter vellykket lagring
+      window.location.href = "https://docs.google.com/forms/d/e/1FAIpQLSf7_8kcLRF1Qf4e5Z1Th82_FM2hbTcrQXUtL5WKitOWczZ9ww/viewform?usp=dialog";
+    } catch (err: any) {
+      console.error("Feil ved lagring:", err.message);
+      setError("Det oppstod en feil. Vennligst prøv igjen senere.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -359,31 +385,45 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/3 w-96 h-96 bg-indigo-500 rounded-full blur-3xl opacity-50"></div>
             <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-96 h-96 bg-indigo-700 rounded-full blur-3xl opacity-50"></div>
             
-            <div className="relative z-10 max-w-2xl mx-auto">
+            <div className="relative z-10 max-w-2xl mx-auto text-center">
               <h2 className="text-4xl sm:text-5xl font-extrabold text-white mb-6">
-                Klar for en ryddigere hverdag?
+                Søk om tidlig tilgang
               </h2>
               <p className="text-xl text-indigo-100 mb-10">
-                Bli en av våre Beta-testere/Founding Tutors og få gratis tilgang under Closed-beta. <br className="hidden sm:block" />
-                Registrer deg under for påmelding av Closed-beta.
+                Registrer deg under for å søke om plass i vår Closed Beta. 
+                Når du har sendt inn navn og e-post, vil du bli sendt videre til en kort spørreundersøkelse.
               </p>
               
-              <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
+              <form onSubmit={handleSubscribe} className="flex flex-col gap-4 max-w-md mx-auto">
+                <input 
+                  type="text" 
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Ditt fulle navn" 
+                  className="w-full px-6 py-4 rounded-xl text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-400/50 text-lg placeholder:text-slate-400"
+                />
                 <input 
                   type="email" 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Skriv din e-postadresse" 
-                  className="flex-1 px-6 py-4 rounded-xl text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-400/50 text-lg placeholder:text-slate-400"
+                  placeholder="Din e-postadresse" 
+                  className="w-full px-6 py-4 rounded-xl text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-400/50 text-lg placeholder:text-slate-400"
                 />
                 <button 
                   type="submit"
-                  className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-lg transition-colors shadow-lg whitespace-nowrap"
+                  disabled={isSubmitting}
+                  className="w-full px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-[0.98] disabled:opacity-70"
                 >
-                  Gi meg tidlig tilgang
+                  {isSubmitting ? 'Sender...' : 'Søk her'}
                 </button>
               </form>
+              {error && (
+                <p className="mt-4 text-red-200 text-sm font-medium animate-fade-in">
+                  {error}
+                </p>
+              )}
             </div>
           </div>
         </section>

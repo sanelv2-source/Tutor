@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// @ts-ignore - papaparse types
 import Papa from 'papaparse';
 import { 
   Users, 
@@ -414,8 +415,8 @@ const saveMeetLink = async (link: string) => {
       } else {
         // Send notification to student about task status
         try {
-          if (submissionData && submissionData.students?.profile_id) {
-            const studentProfileId = submissionData.students.profile_id;
+          if (submissionData && Array.isArray(submissionData.students) && submissionData.students.length > 0 && submissionData.students[0]?.profile_id) {
+            const studentProfileId = submissionData.students[0].profile_id;
             const notificationTitle = nyStatus === 'approved' ? 'Oppgave godkjent! ✅' : 'Oppgave avvist ❌';
             const notificationMessage = nyStatus === 'approved'
               ? 'Din lærer har godkjent oppgaven din.'
@@ -570,7 +571,7 @@ const saveMeetLink = async (link: string) => {
     setIsBulkImporting(true);
     Papa.parse(file, {
       header: true,
-      complete: async (results) => {
+      complete: async (results: any) => {
         const rows = results.data as { name: string; email: string }[];
         for (const row of rows) {
           if (row.name && row.email) {
@@ -585,7 +586,7 @@ const saveMeetLink = async (link: string) => {
         showToast('Bulk import completed!');
         fetchStudents();
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('CSV parse error:', error);
         setIsBulkImporting(false);
         showToast('Error parsing CSV');
@@ -2290,19 +2291,20 @@ Per Andersen,per@example.com,Norsk`}
                                       </div>
                                     </div>
                                   );
-                                } else {
+                                } else if (event.type === 'lesson') {
                                   // Lesson event
-                                  const color = getStudentColor(event.student_name);
+                                  const lessonEvent = event as any;
+                                  const color = getStudentColor(lessonEvent.student_name);
                                   return (
                                     <div 
-                                      key={event.id} 
+                                      key={lessonEvent.id} 
                                       className="lesson-card"
                                       style={{ '--card-bg': color.bgHex, '--card-border': color.borderHex } as React.CSSProperties}
                                     >
                                       <div className="lesson-info">
-                                        <span className="lesson-student">{event.student_name}</span>
+                                        <span className="lesson-student">{lessonEvent.student_name}</span>
                                         <span className="lesson-time">
-                                          🗓️ {new Date(event.date).toLocaleDateString('no-NO')} | ⏰ {event.start_time?.substring(0,5)}
+                                          🗓️ {new Date(lessonEvent.date).toLocaleDateString('no-NO')} | ⏰ {lessonEvent.start_time?.substring(0,5)}
                                         </span>
                                       </div>
                                       <div className="flex items-center gap-3">
@@ -2310,18 +2312,18 @@ Per Andersen,per@example.com,Norsk`}
                                           className="lesson-tag" 
                                           style={{ backgroundColor: color.bgHex, color: color.borderHex, border: `1px solid ${color.borderHex}40` }}
                                         >
-                                          {event.duration_minutes} min
+                                          {lessonEvent.duration_minutes} min
                                         </div>
                                         <div className="flex items-center gap-1">
                                           <button
-                                            onClick={() => handleCompleteLesson(event)}
+                                            onClick={() => handleCompleteLesson(lessonEvent)}
                                             className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                             title="Marker som fullført og lag faktura"
                                           >
                                             <CheckCircle2 className="w-4 h-4" />
                                           </button>
                                           <button
-                                            onClick={() => handleDeleteLesson(event.id)}
+                                            onClick={() => handleDeleteLesson(lessonEvent.id)}
                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                             title="Slett time"
                                           >
