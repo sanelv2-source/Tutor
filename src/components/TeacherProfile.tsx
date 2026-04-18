@@ -89,8 +89,15 @@ const TeacherProfile = ({ user }: { user: any }) => {
     // Vi lager en lokal "nød-klient" som garantert bruker riktig adresse
     const { createClient } = await import('@supabase/supabase-js');
     const tempSupabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL || '',
-        import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+      import.meta.env.VITE_SUPABASE_URL, 
+      import.meta.env.VITE_SUPABASE_ANON_KEY
+    );
+
+    const { error } = await tempSupabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        full_name: profile.full_name,
         phone: profile.phone,
         updated_at: new Date().toISOString() // Bruker ISO-streng for sikkerhets skyld med Supabase
       });
