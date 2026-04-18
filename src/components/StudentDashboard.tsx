@@ -4,8 +4,10 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
 import StudentSidebar from './StudentSidebar';
+import NotificationBell from './NotificationBell';
 import { ChatList } from './ChatList';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
+import { createNotification } from '../services/notificationService';
 
 interface Assignment {
   id: string;
@@ -99,6 +101,20 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
           console.error("Submission insert error:", subError);
           throw new Error(`Klarte ikke lagre innleveringen: ${subError.message}`);
         }
+
+        // Send notification to tutor that student submitted a task
+        try {
+          await createNotification(
+            tutorId,
+            'submission',
+            'Ny innlevering',
+            `En elev har levert inn en oppgave. Gå til dashbordet for å se den.`,
+            '/dashboard?tab=oversikt'
+          );
+        } catch (notificationError) {
+          console.error('Error sending task submission notification:', notificationError);
+          // Don't fail the whole submission if notification fails
+        }
       } else {
         throw new Error('Mangler elev- eller lærer-ID for å levere.');
       }
@@ -140,6 +156,7 @@ const StudentDashboard = () => {
   const [passwordMessage, setPasswordMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -305,6 +322,20 @@ const StudentDashboard = () => {
             setMeetLink(tutorProfile.meet_link);
           }
         }
+
+        // Fetch notifications
+        const { data: notificationsData, error: notificationsError } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+          .order('created_at', { ascending: false });
+
+        if (notificationsData) {
+          setNotifications(notificationsData);
+        } else {
+          setNotifications([]);
+        }
       } catch (error) {
         console.error('Error in fetchData:', error);
         // Don't throw here, just log the error
@@ -321,6 +352,17 @@ const StudentDashboard = () => {
       navigate('/login');
     } else {
       console.error('Feil ved utlogging:', error.message);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    if (!error) {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
     }
   };
 
@@ -394,6 +436,35 @@ const StudentDashboard = () => {
                 <Video className="w-5 h-5" />
                 Bli med
               </a>
+            </div>
+          )}
+
+          {/* Notifications Section */}
+          {notifications.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-indigo-600" />
+                Varsler ({notifications.length})
+              </h3>
+              <div className="space-y-3">
+                {notifications.map((notification) => (
+                  <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-slate-900">{notification.title}</h4>
+                      <p className="text-sm text-slate-600 mt-1">{notification.body}</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {new Date(notification.created_at).toLocaleString('no-NO')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => markNotificationAsRead(notification.id)}
+                      className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                    >
+                      Merk som lest
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -680,6 +751,12 @@ const StudentDashboard = () => {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row">
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <div className="flex-grow pb-10 overflow-y-auto w-full">
+        <div className="sticky top-0 z-20 bg-gray-50 border-b border-slate-200">
+          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 sm:px-8">
+            <h1 className="text-xl font-semibold text-slate-900">Velkommen tilbake</h1>
+            <NotificationBell />
+          </div>
+        </div>
         <main className="max-w-4xl mx-auto">
           {renderContent()}
         </main>
