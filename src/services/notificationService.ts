@@ -49,5 +49,3 @@ export async function createNotification(
     return { data: null, error };
   }
 }
-  }
-}
