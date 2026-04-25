@@ -2007,6 +2007,7 @@ Per Andersen,per@example.com,Norsk`}
                     // Create vacation events for tutor calendar
                     const vacationEvents = vacations.map(v => ({
                       id: `vacation-${v.id}`,
+                      vacationId: v.id,
                       type: 'vacation',
                       date: v.vacation_date,
                       title: 'Du har fri',
@@ -2028,7 +2029,7 @@ Per Andersen,per@example.com,Norsk`}
                     console.log('Tutor vacations:', vacationEvents);
                     
                     // Merge vacation and lesson events
-                    const allEvents = [...lessonEvents, ...vacationEvents];
+                    const allEvents: any[] = [...lessonEvents, ...vacationEvents];
                     console.log('Tutor merged event array:', allEvents);
                     
                     return (
@@ -2038,7 +2039,7 @@ Per Andersen,per@example.com,Norsk`}
                             <h3>📅 Dagens og kommende timer</h3>
                             
                             {allEvents.length > 0 ? (
-                              allEvents.map((event) => {
+                              allEvents.map((event: any) => {
                                 if (event.type === 'vacation') {
                                   return (
                                     <div 
@@ -2057,7 +2058,7 @@ Per Andersen,per@example.com,Norsk`}
                                         </div>
                                         <div className="flex items-center gap-1">
                                           <button
-                                            onClick={() => deleteVacation(event.id.replace('vacation-', ''))}
+                                            onClick={() => deleteVacation(event.vacationId)}
                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                             title="Slett ferie"
                                           >
@@ -2148,12 +2149,22 @@ Per Andersen,per@example.com,Norsk`}
                                       {dayEvents.map((event: any) => {
                                         if (event.type === 'vacation') {
                                           return (
-                                            <div key={event.id} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-center">
+                                            <div key={event.id} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-center relative group">
                                               <span className="text-xl block mb-1">🌴</span>
-                                              <small className="text-yellow-800 font-bold block">{event.title}</small>
+                                              <small className="text-yellow-800 font-bold block pr-5">{event.title}</small>
+                                              <small className="text-yellow-700 block text-xs mt-1">
+                                                {new Date(event.date).toLocaleDateString('no-NO')}
+                                              </small>
                                               {event.description && (
                                                 <small className="text-yellow-700 block text-xs mt-1">{event.description}</small>
                                               )}
+                                              <button
+                                                onClick={() => deleteVacation(event.vacationId)}
+                                                className="absolute top-1 right-1 p-1 text-yellow-600 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Slett ferie"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
                                             </div>
                                           );
                                         } else {
