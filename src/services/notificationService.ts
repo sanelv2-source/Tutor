@@ -36,8 +36,7 @@ export async function createNotification(
           link: link ?? null,
           is_read: false
         }
-      ])
-      .select();
+      ]);
 
     if (result.error) {
       console.error('Notification insert error:', result.error);
