@@ -451,7 +451,7 @@ const StudentDashboard = () => {
                   <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1">
                       <h4 className="font-medium text-slate-900">{notification.title}</h4>
-                      <p className="text-sm text-slate-600 mt-1">{notification.body}</p>
+                      <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
                       <p className="text-xs text-slate-400 mt-1">
                         {new Date(notification.created_at).toLocaleString('no-NO')}
                       </p>

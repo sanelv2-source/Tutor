@@ -243,8 +243,8 @@ const saveMeetLink = async (link: string) => {
       const teacherName = user?.name || 'Læreren';
       const notificationTitle = `${teacherName} har lagt inn ferie`;
       const notificationMessage = dates.length === 1
-        ? `Læreren din har registrert fri ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
-        : `Læreren din har registrert fri ${dates
+        ? `Fri registrert: ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
+        : `Fri registrert: ${dates
             .map((date) => new Date(date).toLocaleDateString('no-NO'))
             .join(', ')}.`;
 
@@ -1957,7 +1957,7 @@ const saveMeetLink = async (link: string) => {
                     <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                       <div className="flex-1">
                         <h4 className="font-medium text-slate-900">{notification.title}</h4>
-                        <p className="text-sm text-slate-600 mt-1">{notification.body}</p>
+                        <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
                         <p className="text-xs text-slate-400 mt-1">
                           {new Date(notification.created_at).toLocaleString('no-NO')}
                         </p>
