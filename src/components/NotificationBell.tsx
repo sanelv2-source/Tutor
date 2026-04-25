@@ -59,7 +59,7 @@ const NotificationBell: React.FC = () => {
 
         const { data, error } = await supabase
           .from('notifications')
-          .select('id, type, title, body, link, is_read, created_at')
+          .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(5);
