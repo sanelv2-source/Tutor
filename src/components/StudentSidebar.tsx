@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Logo from './Logo';
-import { LogOut, Menu, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ClipboardList, LifeBuoy, LogOut, Menu, MessageCircle, Settings, X } from 'lucide-react';
 
 interface StudentSidebarProps {
   activeTab: string;
@@ -12,18 +12,31 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const menuItems = [
-    { id: 'tasks', label: 'Oppgaver', icon: '📝' },
-    { id: 'calendar', label: 'Timeplan', icon: '📅' },
-    { id: 'uploads', label: 'Innleveringer', icon: '📤' },
-    { id: 'messages', label: 'Meldinger', icon: '💬' },
-    { id: 'resources', label: 'Ressurser', icon: '📚' },
-    { id: 'settings', label: 'Innstillinger', icon: '⚙️' },
+    { id: 'tasks', label: 'Oppgaver', Icon: ClipboardList },
+    { id: 'calendar', label: 'Timeplan', Icon: CalendarDays },
+    { id: 'messages', label: 'Meldinger', Icon: MessageCircle },
+    { id: 'resources', label: 'Ressurser', Icon: BookOpen },
+    { id: 'support', label: 'Support', Icon: LifeBuoy },
+    { id: 'settings', label: 'Innstillinger', Icon: Settings },
   ];
 
   const handleTabClick = (id: string) => {
     setActiveTab(id);
     setIsDrawerOpen(false);
   };
+
+  const renderMenuButton = (item: typeof menuItems[number], onClick: () => void) => (
+    <button
+      key={item.id}
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+        activeTab === item.id ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+      }`}
+    >
+      <item.Icon className="h-5 w-5" />
+      {item.label}
+    </button>
+  );
 
   return (
     <>
@@ -44,7 +57,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
 
       {/* Mobile Drawer Overlay */}
       {isDrawerOpen && (
-        <div 
+        <div
           className="md:hidden fixed inset-0 bg-slate-900/50 z-40"
           onClick={() => setIsDrawerOpen(false)}
         />
@@ -59,22 +72,11 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
           </button>
         </div>
         <nav className="p-4 space-y-1 flex-grow overflow-y-auto">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleTabClick(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === item.id ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+          {menuItems.map((item) => renderMenuButton(item, () => handleTabClick(item.id)))}
         </nav>
         <div className="p-4 border-t border-gray-100">
           <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-            <span>🚪</span> Logg ut
+            <LogOut className="h-5 w-5" /> Logg ut
           </button>
         </div>
       </div>
@@ -85,21 +87,10 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
           <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" />
         </div>
         <nav className="space-y-1 flex-grow">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === item.id ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+          {menuItems.map((item) => renderMenuButton(item, () => setActiveTab(item.id)))}
         </nav>
         <button onClick={onLogout} className="mt-auto w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-          <span>🚪</span> Logg ut
+          <LogOut className="h-5 w-5" /> Logg ut
         </button>
       </div>
     </>
