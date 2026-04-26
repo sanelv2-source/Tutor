@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Plus, Search, ArrowLeft, Send } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { createNotification } from '../services/notificationService';
 
 export const ChatList = () => {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -513,6 +514,21 @@ export const ChatList = () => {
 
       if (insertError) {
         throw insertError;
+      }
+
+      // Send notification to recipient
+      try {
+        const senderName = isTutor ? 'Din lærer' : 'En elev';
+        await createNotification(
+          recipientId,
+          'message',
+          'Ny melding',
+          `${senderName} har sendt deg en melding`,
+          '/messages'
+        );
+      } catch (notificationError) {
+        console.error('Error sending message notification:', notificationError);
+        // Don't fail the whole message send if notification fails
       }
 
       // Replace optimistic message with real message

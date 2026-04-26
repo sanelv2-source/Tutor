@@ -37,7 +37,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
               loop 
               playsInline
             >
-              <source src="https://jshciiidthsxjhwlxmbh.supabase.co/storage/v1/object/sign/Video/63328-506377472_medium.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iMDI1N2Q0Mi04YTljLTQ2OWItOGY2Yy1lZjJiMjE3ZmI0YTAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlby82MzMyOC01MDYzNzc0NzJfbWVkaXVtLm1wNCIsImlhdCI6MTc3MzQ4MjkxOCwiZXhwIjoxODA1MDE4OTE4fQ.W2KgNPPrxQB_9X2dmIsUVKcuILC8GCnOoX5WB6mbAIE" type="video/mp4" />
+              <source src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/sign/Video/63328-506377472_medium.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iMDI1N2Q0Mi04YTljLTQ2OWItOGY2Yy1lZjJiMjE3ZmI0YTAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlby82MzMyOC01MDYzNzc0NzJfbWVkaXVtLm1wNCIsImlhdCI6MTc3MzQ4MjkxOCwiZXhwIjoxODA1MDE4OTE4fQ.W2KgNPPrxQB_9X2dmIsUVKcuILC8GCnOoX5WB6mbAIE`} type="video/mp4" />
               Din nettleser støtter ikke video-taggen.
             </video>
           </div>

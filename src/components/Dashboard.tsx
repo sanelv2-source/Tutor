@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// @ts-ignore - papaparse types
 import Papa from 'papaparse';
 import { 
   Users, 
@@ -35,7 +36,9 @@ import { ChatList } from './ChatList';
 import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
+import NotificationBell from './NotificationBell';
 import { supabase } from '../supabaseClient';
+import { createNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
@@ -136,6 +139,7 @@ const saveMeetLink = async (link: string) => {
   const [showVippsConfirm, setShowVippsConfirm] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [vippsModalOpen, setVippsModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [vippsAmount, setVippsAmount] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [subject, setSubject] = useState('');
@@ -211,7 +215,59 @@ const saveMeetLink = async (link: string) => {
     }
   };
 
+  const notifyVacationStudents = async (dates: string[]) => {
+    if (!authUserId || dates.length === 0) return;
+
+    try {
+      const { data: linkedStudents, error: studentError } = await supabase
+        .from('students')
+        .select('profile_id')
+        .eq('tutor_id', authUserId)
+        .not('profile_id', 'is', null);
+
+      if (studentError || !linkedStudents) {
+        console.error('Error fetching linked students for notifications:', studentError);
+        return;
+      }
+
+      const profileIds = (linkedStudents as Array<{ profile_id: string | null }>)
+        .map((row) => row.profile_id)
+        .filter(Boolean) as string[];
+
+      if (profileIds.length === 0) {
+        console.warn('DEBUG: No students found for this tutor!');
+        return;
+      }
+
+      console.log('DEBUG: Fetched linked student profile ids for notifications:', profileIds);
+      const teacherName = user?.name || 'Læreren';
+      const notificationTitle = `${teacherName} har lagt inn ferie`;
+      const notificationMessage = dates.length === 1
+        ? `Fri registrert: ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
+        : `Fri registrert: ${dates
+            .map((date) => new Date(date).toLocaleDateString('no-NO'))
+            .join(', ')}.`;
+
+      console.log('Attempting to send vacation notifications to students:', { profileIds, notificationTitle, notificationMessage });
+
+      const results = await Promise.all(profileIds.map((profileId) =>
+        createNotification(
+          profileId,
+          'vacation',
+          notificationTitle,
+          notificationMessage,
+          '/student/portal'
+        )
+      ));
+
+      console.log('Vacation notification results:', results);
+    } catch (error) {
+      console.error('Feil ved sending av varsler til elever:', error);
+    }
+  };
+
   const saveVacation = async (dates: string[]) => {
+    console.log('DEBUG: Starting vacation save process');
     console.log('Auth user id:', authUserId);
     const insertPayload = dates.map(date => ({
       tutor_id: authUserId,
@@ -219,6 +275,7 @@ const saveMeetLink = async (link: string) => {
       description: ''
     }));
     console.log('Insert payload:', insertPayload);
+    console.log('SENDING NOTIFICATION TO SUPABASE', { insertPayload });
 
     if (authUserId) {
       try {
@@ -230,7 +287,10 @@ const saveMeetLink = async (link: string) => {
           console.error("Kunne ikke lagre ferie til Supabase, bruker lokal state", error);
           setVacationDays(prev => [...prev, ...dates]);
         } else {
-          fetchVacations();
+          console.log('DEBUG: Vacation saved, now fetching students for tutor:', authUserId);
+          await fetchVacations();
+          console.log('Vacation saved in Supabase, calling notifyVacationStudents', { dates });
+          await notifyVacationStudents(dates);
         }
       } catch (err) {
         console.error("Feil ved lagring av ferie:", err);
@@ -321,29 +381,67 @@ const saveMeetLink = async (link: string) => {
   }, [authUserId]);
 
   const oppdaterStatus = async (submissionId: string, assignmentId: string, nyStatus: string) => {
-    // 1. Oppdater selve innsendingen
-    const { error: subError } = await supabase
-      .from('submissions')
-      .update({ status: nyStatus })
-      .eq('id', submissionId);
+    try {
+      // Get submission details to find student
+      const { data: submissionData, error: fetchError } = await supabase
+        .from('submissions')
+        .select('student_id, students(profile_id)')
+        .eq('id', submissionId)
+        .single();
 
-    // 2. Oppdater oppgaven slik at elevens dashboard endrer farge
-    let assignError = null;
-    if (assignmentId) {
-      const { error } = await supabase
-        .from('assignments')
+      if (fetchError || !submissionData) {
+        console.error('Error fetching submission:', fetchError);
+      }
+
+      // 1. Oppdater selve innsendingen
+      const { error: subError } = await supabase
+        .from('submissions')
         .update({ status: nyStatus })
-        .eq('id', assignmentId);
-      assignError = error;
-    }
+        .eq('id', submissionId);
 
-    if (subError || assignError) {
-      console.error("Feil ved oppdatering:", subError || assignError);
-      showToast("Kunne ikke oppdatere oppgave: " + (subError?.message || assignError?.message));
-    } else {
-      // Oppdaterer lista lokalt så svaret forsvinner med en gang
-      setSubmissions(submissions.filter(sub => sub.id !== submissionId));
-      showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave avvist! ❌");
+      // 2. Oppdater oppgaven slik at elevens dashboard endrer farge
+      let assignError = null;
+      if (assignmentId) {
+        const { error } = await supabase
+          .from('assignments')
+          .update({ status: nyStatus })
+          .eq('id', assignmentId);
+        assignError = error;
+      }
+
+      if (subError || assignError) {
+        console.error("Feil ved oppdatering:", subError || assignError);
+        showToast("Kunne ikke oppdatere oppgave: " + (subError?.message || assignError?.message));
+      } else {
+        // Send notification to student about task status
+        try {
+          if (submissionData && Array.isArray(submissionData.students) && submissionData.students.length > 0 && submissionData.students[0]?.profile_id) {
+            const studentProfileId = submissionData.students[0].profile_id;
+            const notificationTitle = nyStatus === 'approved' ? 'Oppgave godkjent! ✅' : 'Oppgave avvist ❌';
+            const notificationMessage = nyStatus === 'approved'
+              ? 'Din lærer har godkjent oppgaven din.'
+              : 'Din lærer har gitt tilbakemelding på oppgaven din.';
+            
+            await createNotification(
+              studentProfileId,
+              nyStatus === 'approved' ? 'task_approved' : 'task_rejected',
+              notificationTitle,
+              notificationMessage,
+              '/student/portal'
+            );
+          }
+        } catch (notificationError) {
+          console.error('Error sending task status notification:', notificationError);
+          // Don't fail the whole status update if notification fails
+        }
+
+        // Oppdaterer lista lokalt så svaret forsvinner med en gang
+        setSubmissions(submissions.filter(sub => sub.id !== submissionId));
+        showToast(nyStatus === 'approved' ? "Oppgave godkjent! ✅" : "Oppgave avvist! ❌");
+      }
+    } catch (error) {
+      console.error('Unexpected error in oppdaterStatus:', error);
+      showToast('En uventet feil oppstod');
     }
   };
 
@@ -410,14 +508,38 @@ const saveMeetLink = async (link: string) => {
     if (data) setResources(data);
   }, [authUserId]);
 
+  const fetchNotifications = React.useCallback(async () => {
+    if (!authUserId) return;
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', authUserId)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false });
+
+    if (data) setNotifications(data);
+  }, [authUserId]);
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    if (!error) {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    }
+  };
+
   useEffect(() => {
     if (authUserId) {
       fetchStudents();
       fetchLessons();
       fetchVacations();
       fetchResources();
+      fetchNotifications();
     }
-  }, [authUserId, fetchStudents, fetchLessons, fetchVacations, fetchResources]);
+  }, [authUserId, fetchStudents, fetchLessons, fetchVacations, fetchResources, fetchNotifications]);
 
   useEffect(() => {
     fetchCalendar();
@@ -449,7 +571,7 @@ const saveMeetLink = async (link: string) => {
     setIsBulkImporting(true);
     Papa.parse(file, {
       header: true,
-      complete: async (results) => {
+      complete: async (results: any) => {
         const rows = results.data as { name: string; email: string }[];
         for (const row of rows) {
           if (row.name && row.email) {
@@ -464,7 +586,7 @@ const saveMeetLink = async (link: string) => {
         showToast('Bulk import completed!');
         fetchStudents();
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('CSV parse error:', error);
         setIsBulkImporting(false);
         showToast('Error parsing CSV');
@@ -685,6 +807,27 @@ const saveMeetLink = async (link: string) => {
         ]);
         
       if (error) throw error;
+
+      // Notify student of new assignment
+      try {
+        const { data: student, error: studentError } = await supabase
+          .from('students')
+          .select('profile_id')
+          .eq('id', studentId)
+          .single();
+
+        if (student?.profile_id) {
+          await createNotification(
+            student.profile_id,
+            'assignment',
+            'Ny oppgave',
+            `Du har fått en ny oppgave: ${taskTitle}`,
+            '/tasks'
+          );
+        }
+      } catch (notificationError) {
+        console.error('Error sending assignment notification:', notificationError);
+      }
       
       showToast("Oppgave sendt!");
       setTaskModal(null);
@@ -1079,6 +1222,29 @@ const saveMeetLink = async (link: string) => {
           });
 
         if (error) throw error;
+
+        // Notify student of new lesson
+        if (newItemData.studentId) {
+          try {
+            const { data: student, error: studentError } = await supabase
+              .from('students')
+              .select('profile_id')
+              .eq('id', newItemData.studentId)
+              .single();
+
+            if (student?.profile_id) {
+              await createNotification(
+                student.profile_id,
+                'lesson',
+                'Ny time',
+                `Du har fått en ny time planlagt: ${lesson_date} kl. ${start_time}`,
+                '/calendar'
+              );
+            }
+          } catch (notificationError) {
+            console.error('Error sending lesson notification:', notificationError);
+          }
+        }
         
         showToast("Timene er lagret i skyen! 🚀");
         fetchLessons();
@@ -1543,6 +1709,29 @@ const saveMeetLink = async (link: string) => {
         .insert(newLessons);
 
       if (error) throw error;
+
+      // Notify student of new recurring lessons
+      if (fixedLessonData.studentId) {
+        try {
+          const { data: student, error: studentError } = await supabase
+            .from('students')
+            .select('profile_id')
+            .eq('id', fixedLessonData.studentId)
+            .single();
+
+          if (student?.profile_id) {
+            await createNotification(
+              student.profile_id,
+              'lesson',
+              'Nye faste timer',
+              `Du har fått nye faste timer planlagt hver uke`,
+              '/calendar'
+            );
+          }
+        } catch (notificationError) {
+          console.error('Error sending recurring lesson notification:', notificationError);
+        }
+      }
       
       showToast('Faste timer lagret for 4 uker!');
       fetchLessons();
@@ -1565,6 +1754,7 @@ const saveMeetLink = async (link: string) => {
       <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-20">
         <Logo iconSize="w-6 h-6 text-base" textSize="text-lg" />
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <button onClick={() => setActiveTab('profil')} className={`p-2 ${activeTab === 'profil' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}>
             <User className="h-5 w-5" />
           </button>
@@ -1576,7 +1766,7 @@ const saveMeetLink = async (link: string) => {
 
       {/* Desktop Sidebar Navigation */}
       <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col h-screen sticky top-0">
-        <div className="h-20 flex items-center px-6 border-b border-slate-100">
+        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
           <Logo iconSize="w-8 h-8 text-lg" textSize="text-xl" />
         </div>
         
@@ -1700,13 +1890,17 @@ const saveMeetLink = async (link: string) => {
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
-          {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
-            <div className="flex gap-2">
-              {activeTab === 'timeplan' && (
-                <button 
-                  onClick={() => setShowFixedModal(true)}
-                  className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
-                >
+          <div className="flex items-center gap-3">
+            <div className="hidden md:block">
+              <NotificationBell />
+            </div>
+            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
+              <div className="flex gap-2">
+                {activeTab === 'timeplan' && (
+                  <button 
+                    onClick={() => setShowFixedModal(true)}
+                    className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
+                  >
                   <Plus className="h-4 w-4 mr-2" />
                   Faste tider
                 </button>
@@ -1722,6 +1916,7 @@ const saveMeetLink = async (link: string) => {
             </div>
           )}
         </div>
+      </div>
 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
@@ -1749,6 +1944,35 @@ const saveMeetLink = async (link: string) => {
                 </button>
               </div>
             </div>
+
+            {/* Notifications Section */}
+            {notifications.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-indigo-600" />
+                  Varsler ({notifications.length})
+                </h3>
+                <div className="space-y-3">
+                  {notifications.map((notification) => (
+                    <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-slate-900">{notification.title}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(notification.created_at).toLocaleString('no-NO')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => markNotificationAsRead(notification.id)}
+                        className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                      >
+                        Merk som lest
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mb-4">
               <button
@@ -2068,19 +2292,20 @@ Per Andersen,per@example.com,Norsk`}
                                       </div>
                                     </div>
                                   );
-                                } else {
+                                } else if (event.type === 'lesson') {
                                   // Lesson event
-                                  const color = getStudentColor(event.student_name);
+                                  const lessonEvent = event as any;
+                                  const color = getStudentColor(lessonEvent.student_name);
                                   return (
                                     <div 
-                                      key={event.id} 
+                                      key={lessonEvent.id} 
                                       className="lesson-card"
                                       style={{ '--card-bg': color.bgHex, '--card-border': color.borderHex } as React.CSSProperties}
                                     >
                                       <div className="lesson-info">
-                                        <span className="lesson-student">{event.student_name}</span>
+                                        <span className="lesson-student">{lessonEvent.student_name}</span>
                                         <span className="lesson-time">
-                                          🗓️ {new Date(event.date).toLocaleDateString('no-NO')} | ⏰ {event.start_time?.substring(0,5)}
+                                          🗓️ {new Date(lessonEvent.date).toLocaleDateString('no-NO')} | ⏰ {lessonEvent.start_time?.substring(0,5)}
                                         </span>
                                       </div>
                                       <div className="flex items-center gap-3">
@@ -2088,18 +2313,18 @@ Per Andersen,per@example.com,Norsk`}
                                           className="lesson-tag" 
                                           style={{ backgroundColor: color.bgHex, color: color.borderHex, border: `1px solid ${color.borderHex}40` }}
                                         >
-                                          {event.duration_minutes} min
+                                          {lessonEvent.duration_minutes} min
                                         </div>
                                         <div className="flex items-center gap-1">
                                           <button
-                                            onClick={() => handleCompleteLesson(event)}
+                                            onClick={() => handleCompleteLesson(lessonEvent)}
                                             className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                             title="Marker som fullført og lag faktura"
                                           >
                                             <CheckCircle2 className="w-4 h-4" />
                                           </button>
                                           <button
-                                            onClick={() => handleDeleteLesson(event.id)}
+                                            onClick={() => handleDeleteLesson(lessonEvent.id)}
                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                             title="Slett time"
                                           >
@@ -3744,7 +3969,10 @@ Per Andersen,per@example.com,Norsk`}
               </button>
             </div>
           </div>
- {/* Innboks for elevsvar */}
+        </div>
+      )}
+
+      {/* Innboks for elevsvar */}
       <div className="max-w-4xl mx-auto mt-12 mb-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -3809,8 +4037,6 @@ Per Andersen,per@example.com,Norsk`}
           )}
         </div>
       </div>
-        </div>
-      )}
 
       {/* Calendar Modal */}
       {calendarModal && (
