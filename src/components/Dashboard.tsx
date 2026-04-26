@@ -27,7 +27,8 @@ import {
   User,
   Smartphone,
   Copy,
-  Upload
+  Upload,
+  LifeBuoy
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -37,6 +38,7 @@ import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
 import NotificationBell from './NotificationBell';
+import SupportFeedback from './SupportFeedback';
 import { supabase } from '../supabaseClient';
 import { createNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
@@ -1758,6 +1760,9 @@ const saveMeetLink = async (link: string) => {
           <button onClick={() => setActiveTab('profil')} className={`p-2 ${activeTab === 'profil' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}>
             <User className="h-5 w-5" />
           </button>
+          <button onClick={() => setActiveTab('support')} className={`p-2 ${activeTab === 'support' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}>
+            <LifeBuoy className="h-5 w-5" />
+          </button>
           <button onClick={onLogout} className="p-2 text-slate-500 hover:text-slate-900">
             <LogOut className="h-5 w-5" />
           </button>
@@ -1819,6 +1824,13 @@ const saveMeetLink = async (link: string) => {
           >
             <BookOpen className="h-5 w-5" />
             Ressurser
+          </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'support' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <LifeBuoy className="h-5 w-5" />
+            Support
           </button>
         </nav>
 
@@ -1886,7 +1898,7 @@ const saveMeetLink = async (link: string) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 capitalize">
-              {activeTab === 'oversikt' ? 'Dine elever' : activeTab}
+              {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab}
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
@@ -1894,7 +1906,7 @@ const saveMeetLink = async (link: string) => {
             <div className="hidden md:block">
               <NotificationBell />
             </div>
-            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
+            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && (
               <div className="flex gap-2">
                 {activeTab === 'timeplan' && (
                   <button 
@@ -3226,6 +3238,10 @@ Per Andersen,per@example.com,Norsk`}
 
         {activeTab === 'meldinger' && (
           <ChatList />
+        )}
+
+        {activeTab === 'support' && (
+          <SupportFeedback role="tutor" />
         )}
 
       </main>

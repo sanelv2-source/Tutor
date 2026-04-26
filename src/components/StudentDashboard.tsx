@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Video, Calendar, CheckCircle, Clock, MessageSquare, ExternalLink, Upload, Trash2 } from 'lucide-react';
+import { Video, CheckCircle, Clock, MessageSquare, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
 import StudentSidebar from './StudentSidebar';
 import NotificationBell from './NotificationBell';
 import { ChatList } from './ChatList';
+import SupportFeedback from './SupportFeedback';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
 import { createNotification } from '../services/notificationService';
 
@@ -637,6 +638,8 @@ const StudentDashboard = () => {
           <MyCalendar events={calendarEvents} />
         </div>
       );
+    } else if (activeTab === 'support') {
+      return <SupportFeedback role="student" />;
     } else if (activeTab === 'settings') {
       return (
         <div className="p-4 sm:p-8">
@@ -735,7 +738,7 @@ const StudentDashboard = () => {
           ) : (
             <>
               <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
-                {activeTab === 'uploads' && 'Mine Innleveringer'}
+                {activeTab}
               </h1>
               <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-100 text-center">
                 <p className="text-gray-500">Dette området er under utvikling.</p>
