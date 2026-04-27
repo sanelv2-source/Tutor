@@ -11,6 +11,26 @@
   status = 200
 
 [[redirects]]
+  from = "/api/payment/create-intent"
+  to = "/.netlify/functions/payment-create-intent"
+  status = 200
+
+[[redirects]]
+  from = "/api/payment/process"
+  to = "/.netlify/functions/payment-process"
+  status = 200
+
+[[redirects]]
+  from = "/api/payment/create-checkout-session"
+  to = "/.netlify/functions/payment-create-checkout-session"
+  status = 200
+
+[[redirects]]
+  from = "/create-checkout-session"
+  to = "/.netlify/functions/payment-create-checkout-session"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

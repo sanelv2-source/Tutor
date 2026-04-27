@@ -14,7 +14,7 @@ const publishableKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY;
 if (!publishableKey) {
   console.warn('VITE_STRIPE_PUBLISHABLE_KEY is missing. Please add it in the "Settings" menu to enable frontend payments.');
 }
-const stripePromise = loadStripe(publishableKey || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
+const stripePromise = publishableKey ? loadStripe(publishableKey) : Promise.resolve(null);
 
 function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void, pendingUser: any, setPendingUser: (user: any) => void }) {
   const stripe = useStripe();
@@ -27,6 +27,11 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
   const activeName = user?.name || pendingUser?.name;
 
   useEffect(() => {
+    if (!publishableKey) {
+      setError('Stripe-konfigurasjon mangler. Legg inn VITE_STRIPE_PUBLISHABLE_KEY.');
+      return;
+    }
+
     // Create SetupIntent as soon as the page loads
     fetch('/api/payment/create-intent', {
       method: 'POST',
