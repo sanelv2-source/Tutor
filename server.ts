@@ -16,7 +16,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Required for Apple OAuth POST callback
 
 // Initialize Supabase Admin client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
   ? createClient(supabaseUrl, supabaseServiceKey)
