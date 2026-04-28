@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { readApiJson } from '../utils/api';
 
 interface InviteStudentProps {
   tutorId: string;
@@ -169,10 +170,7 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Kunne ikke sende e-post");
-      }
+      await readApiJson(response, "Kunne ikke sende e-post");
 
       setStatus("Elev lagt til og invitasjon sendt!");
       alert("Elev lagt til og invitasjon sendt!"); // Viser en popup-beskjed

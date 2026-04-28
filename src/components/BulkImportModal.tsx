@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, AlertCircle, CheckCircle2, Clock, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { readApiJson } from '../utils/api';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -182,10 +183,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose, tuto
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Kunne ikke sende e-post");
-      }
+      await readApiJson(response, "Kunne ikke sende e-post");
 
       return {
         success: true,

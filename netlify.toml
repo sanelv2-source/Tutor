@@ -26,6 +26,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/invitations/send-email"
+  to = "/.netlify/functions/invitations-send-email"
+  status = 200
+
+[[redirects]]
+  from = "/api/invitations/validate"
+  to = "/.netlify/functions/invitations-validate"
+  status = 200
+
+[[redirects]]
   from = "/create-checkout-session"
   to = "/.netlify/functions/payment-create-checkout-session"
   status = 200

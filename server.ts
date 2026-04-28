@@ -247,6 +247,25 @@ function clipText(value: unknown, maxLength: number) {
   return String(value ?? "").trim().slice(0, maxLength);
 }
 
+function normalizeEmail(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function getBearerToken(value: unknown) {
+  return String(value ?? "").replace(/^Bearer\s+/i, "").trim();
+}
+
+function getAppOrigin(req: any) {
+  const configuredUrl = process.env.APP_URL || "";
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  const origin = req.get("origin") || "";
+  if (origin) return origin.replace(/\/$/, "");
+
+  const host = req.get("host") || "";
+  return host ? `${req.protocol}://${host}` : `http://localhost:${PORT}`;
+}
+
 async function startServer() {
   // API routes
   app.post("/api/auth/magic-link", async (req, res) => {
@@ -367,6 +386,173 @@ async function startServer() {
     }
 
     res.json({ message: "Forespørsel sendt" });
+  });
+
+  app.post("/api/invitations/validate", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const token = clipText(req.body.token, 200);
+    if (!token) {
+      return res.status(400).json({ error: "Mangler invitasjonstoken." });
+    }
+
+    try {
+      const { data: invitation, error: invitationError } = await supabaseAdmin
+        .from("student_invitations")
+        .select("id, student_id, tutor_id, email, status, expires_at, accepted_at")
+        .eq("token", token)
+        .maybeSingle();
+
+      if (invitationError) {
+        console.error("Invitation validation lookup error:", invitationError);
+        return res.status(500).json({ error: "Kunne ikke hente invitasjonen." });
+      }
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Fant ikke invitasjonen." });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(410).json({ error: "Invitasjonen er ikke lenger aktiv." });
+      }
+
+      if (new Date(invitation.expires_at) <= new Date()) {
+        return res.status(410).json({ error: "Invitasjonen er utløpt." });
+      }
+
+      const { data: tutor } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", invitation.tutor_id)
+        .maybeSingle();
+
+      res.json({
+        invitation: {
+          id: invitation.id,
+          student_id: invitation.student_id,
+          email: invitation.email,
+          status: invitation.status,
+          expires_at: invitation.expires_at,
+          tutor: tutor || null,
+        },
+      });
+    } catch (error) {
+      console.error("Error validating invitation:", error);
+      res.status(500).json({ error: "Kunne ikke validere invitasjonen." });
+    }
+  });
+
+  app.post("/api/invitations/send-email", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å sende invitasjon." });
+    }
+
+    const email = normalizeEmail(req.body.email);
+    const inviteToken = clipText(req.body.token, 200);
+
+    if (!email || !inviteToken) {
+      return res.status(400).json({ error: "Mangler e-post eller invitasjonstoken." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: invitation, error: invitationError } = await supabaseAdmin
+        .from("student_invitations")
+        .select("id, email, tutor_id, status, expires_at")
+        .eq("token", inviteToken)
+        .maybeSingle();
+
+      if (invitationError) {
+        console.error("Invitation lookup error:", invitationError);
+        return res.status(500).json({ error: "Kunne ikke hente invitasjonen." });
+      }
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Fant ikke invitasjonen." });
+      }
+
+      if (invitation.tutor_id !== authData.user.id) {
+        return res.status(403).json({ error: "Du kan bare sende egne invitasjoner." });
+      }
+
+      if (normalizeEmail(invitation.email) !== email) {
+        return res.status(400).json({ error: "E-post matcher ikke invitasjonen." });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitasjonen er ikke lenger aktiv." });
+      }
+
+      if (new Date(invitation.expires_at) <= new Date()) {
+        return res.status(410).json({ error: "Invitasjonen er utløpt." });
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const tutorName = clipText(
+        profile?.full_name || authData.user.user_metadata?.full_name || req.body.tutorName || "Læreren din",
+        120,
+      );
+      const inviteUrl = `${getAppOrigin(req)}/student/accept-invite?token=${encodeURIComponent(inviteToken)}`;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
+      if (resend) {
+        const { error: emailError } = await resend.emails.send({
+          from: fromEmail,
+          to: email,
+          subject: "Invitasjon til TutorFlyt",
+          html: `
+            <div style="background-color:#f8fafc;font-family:Arial,sans-serif;padding:40px 20px;">
+              <div style="margin:0 auto;padding:40px 32px;background:#fff;border-radius:12px;max-width:600px;border:1px solid #e2e8f0;text-align:center;">
+                <h1 style="color:#0f172a;font-size:24px;margin:0 0 20px;">Du er invitert til TutorFlyt</h1>
+                <p style="color:#475569;font-size:16px;line-height:26px;margin:0 0 20px;">
+                  <strong>${escapeHtml(tutorName)}</strong> har invitert deg til TutorFlyt.
+                </p>
+                <div style="margin:32px 0;text-align:center;">
+                  <a href="${escapeHtml(inviteUrl)}" style="background:#4f46e5;border-radius:8px;color:#fff;display:inline-block;font-size:16px;font-weight:bold;text-decoration:none;padding:16px 32px;">
+                    Aksepter invitasjon
+                  </a>
+                </div>
+                <p style="color:#94a3b8;font-size:14px;line-height:22px;margin:24px 0 0;">
+                  Lenken er gyldig i 7 dager.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+
+        if (emailError) {
+          console.error("Resend invitation error:", emailError);
+          return res.status(502).json({ error: emailError.message || "Kunne ikke sende invitasjon." });
+        }
+      } else {
+        console.log("=========================================");
+        console.log("RESEND_API_KEY not set. Simulating student invitation email:");
+        console.log(`To: ${email}`);
+        console.log(`Invite Link: ${inviteUrl}`);
+        console.log("=========================================");
+      }
+
+      res.json({ success: true, emailSent: !!resend });
+    } catch (error) {
+      console.error("Error sending invitation:", error);
+      res.status(500).json({ error: "Kunne ikke sende invitasjon." });
+    }
   });
 
   app.post("/api/send-invite", async (req, res) => {
