@@ -194,6 +194,38 @@ app.post("/api/invoices/:id/remind", async (req, res) => {
   }
 });
 
+app.get("/api/invoices/:publicToken", async (req, res) => {
+  const { publicToken } = req.params;
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase Admin not initialized" });
+
+  try {
+    const { data: invoice, error: invoiceError } = await supabaseAdmin
+      .from('invoices')
+      .select('id, public_token, tutor_id, student_name, amount, due_date, status, method, tutor_phone, description, created_at')
+      .eq('public_token', publicToken)
+      .maybeSingle();
+
+    if (invoiceError) throw invoiceError;
+    if (!invoice) return res.status(404).json({ error: "Fakturaen finnes ikke" });
+
+    const { data: tutor, error: tutorError } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', invoice.tutor_id)
+      .maybeSingle();
+
+    if (tutorError) throw tutorError;
+
+    res.json({
+      ...invoice,
+      profiles: tutor || null,
+    });
+  } catch (err) {
+    console.error("Error fetching public invoice:", err);
+    res.status(500).json({ error: "Kunne ikke hente fakturaen" });
+  }
+});
+
 // Initialize Stripe lazily
 let stripeClient: Stripe | null = null;
 function getStripe(): Stripe {
