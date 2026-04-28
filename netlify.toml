@@ -26,6 +26,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/send-report"
+  to = "/.netlify/functions/send-report"
+  status = 200
+
+[[redirects]]
   from = "/api/invitations/send-email"
   to = "/.netlify/functions/invitations-send-email"
   status = 200

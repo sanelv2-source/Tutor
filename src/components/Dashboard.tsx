@@ -40,6 +40,7 @@ import TeacherProfile from './TeacherProfile';
 import NotificationBell from './NotificationBell';
 import SupportFeedback from './SupportFeedback';
 import { supabase } from '../supabaseClient';
+import { readApiJson } from '../utils/api';
 import { createNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
@@ -1110,11 +1111,17 @@ const saveMeetLink = async (link: string) => {
       
       if (student?.email || student?.parentEmail) {
         const targetEmail = student.email || student.parentEmail;
+        const { data: sessionData } = await supabase.auth.getSession();
+        const jwt = sessionData.session?.access_token;
         
         const response = await fetch('/api/send-report', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+          },
           body: JSON.stringify({
+            studentId: selectedStudentId,
             studentEmail: targetEmail,
             studentName: student.full_name || student.name,
             topic,
@@ -1125,13 +1132,13 @@ const saveMeetLink = async (link: string) => {
           }),
         });
         
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          emailError = errData.error || 'Kunne ikke sende e-post via Resend';
-          console.error('Resend error:', emailError);
-        } else {
+        try {
+          await readApiJson(response, 'Kunne ikke sende e-post via Resend');
           emailSent = true;
           console.log(`E-post sendt til ${targetEmail} via Resend!`);
+        } catch (error: any) {
+          emailError = error.message || 'Kunne ikke sende e-post via Resend';
+          console.error('Resend error:', emailError);
         }
       }
 

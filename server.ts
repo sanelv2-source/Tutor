@@ -266,6 +266,13 @@ function getAppOrigin(req: any) {
   return host ? `${req.protocol}://${host}` : `http://localhost:${PORT}`;
 }
 
+function getReportStatusLabel(status: unknown) {
+  if (status === "great") return "Veldig bra";
+  if (status === "good") return "Bra";
+  if (status === "needs_focus") return "Trenger fokus";
+  return "Ikke vurdert";
+}
+
 async function startServer() {
   // API routes
   app.post("/api/auth/magic-link", async (req, res) => {
@@ -386,6 +393,105 @@ async function startServer() {
     }
 
     res.json({ message: "Forespørsel sendt" });
+  });
+
+  app.post("/api/send-report", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å sende rapport." });
+    }
+
+    const studentId = clipText(req.body.studentId, 80);
+    const studentEmail = normalizeEmail(req.body.studentEmail);
+    const studentName = clipText(req.body.studentName || "eleven", 120);
+    const topic = clipText(req.body.topic || "Dagens time", 160);
+    const reportStatus = clipText(req.body.reportStatus, 40);
+    const masteryLevel = Number(req.body.masteryLevel);
+    const reportComment = clipText(req.body.reportComment || "Ingen kommentar.", 4000);
+    const homework = clipText(req.body.homework || "Ingen lekser denne gangen.", 2000);
+
+    if (!studentId || !studentEmail) {
+      return res.status(400).json({ error: "Mangler elev eller e-postadresse." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: student, error: studentError } = await supabaseAdmin
+        .from("students")
+        .select("id, tutor_id, email, parent_email, full_name")
+        .eq("id", studentId)
+        .maybeSingle();
+
+      if (studentError) {
+        console.error("Report student lookup error:", studentError);
+        return res.status(500).json({ error: "Kunne ikke hente eleven." });
+      }
+
+      if (!student || student.tutor_id !== authData.user.id) {
+        return res.status(403).json({ error: "Du kan bare sende rapporter for egne elever." });
+      }
+
+      const allowedEmails = [student.email, student.parent_email].filter(Boolean).map(normalizeEmail);
+      if (!allowedEmails.includes(studentEmail)) {
+        return res.status(400).json({ error: "E-postadressen matcher ikke eleven." });
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const tutorName = clipText(profile?.full_name || authData.user.user_metadata?.full_name || "Læreren din", 120);
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+      const masteryText = Number.isFinite(masteryLevel) ? `${Math.max(0, Math.min(100, masteryLevel))}%` : "Ikke vurdert";
+
+      const { error: emailError } = await resend.emails.send({
+        from: fromEmail,
+        to: studentEmail,
+        subject: `Ny progresjonsrapport fra ${tutorName}`,
+        html: `
+          <div style="background-color:#f8fafc;font-family:Arial,sans-serif;padding:40px 20px;color:#0f172a;">
+            <div style="margin:0 auto;padding:32px;background:#fff;border-radius:12px;max-width:640px;border:1px solid #e2e8f0;">
+              <h1 style="font-size:24px;margin:0 0 12px;">Ny progresjonsrapport</h1>
+              <p style="color:#475569;font-size:16px;line-height:26px;margin:0 0 24px;">
+                Hei ${escapeHtml(student.full_name || studentName)}, her er en oppsummering fra ${escapeHtml(tutorName)}.
+              </p>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin:0 0 24px;">
+                <p><strong>Emne:</strong> ${escapeHtml(topic)}</p>
+                <p><strong>Dagens innsats:</strong> ${escapeHtml(getReportStatusLabel(reportStatus))}</p>
+                <p><strong>Mestring:</strong> ${escapeHtml(masteryText)}</p>
+                <p><strong>Kommentar:</strong><br>${escapeHtml(reportComment).replace(/\n/g, "<br>")}</p>
+                <p><strong>Lekser:</strong><br>${escapeHtml(homework).replace(/\n/g, "<br>")}</p>
+              </div>
+              <p style="color:#64748b;font-size:14px;line-height:22px;margin:0;">Vennlig hilsen<br>TutorFlyt</p>
+            </div>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        console.error("Resend report error:", emailError);
+        return res.status(502).json({ error: emailError.message || "Kunne ikke sende e-post via Resend." });
+      }
+
+      res.json({ success: true, emailSent: true });
+    } catch (error) {
+      console.error("Error sending report:", error);
+      res.status(500).json({ error: "Kunne ikke sende rapport." });
+    }
   });
 
   app.post("/api/invitations/validate", async (req, res) => {
