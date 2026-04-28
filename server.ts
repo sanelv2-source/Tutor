@@ -199,11 +199,27 @@ app.get("/api/invoices/:publicToken", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase Admin not initialized" });
 
   try {
-    const { data: invoice, error: invoiceError } = await supabaseAdmin
+    const fetchInvoice = (columns: string) => supabaseAdmin
       .from('invoices')
-      .select('id, public_token, tutor_id, student_name, amount, due_date, status, method, tutor_phone, description, created_at')
+      .select(columns)
       .eq('public_token', publicToken)
       .maybeSingle();
+
+    let invoice: any = null;
+    let invoiceError: any = null;
+    const invoiceResult = await fetchInvoice(
+      'id, public_token, tutor_id, student_name, amount, due_date, status, method, tutor_phone, description, created_at'
+    );
+    invoice = invoiceResult.data;
+    invoiceError = invoiceResult.error;
+
+    if (invoiceError && /schema cache|Could not find .* column|column .* does not exist/i.test(invoiceError.message || '')) {
+      const fallbackInvoiceResult = await fetchInvoice(
+        'id, public_token, tutor_id, student_name, amount, due_date, status, method, created_at'
+      );
+      invoice = fallbackInvoiceResult.data;
+      invoiceError = fallbackInvoiceResult.error;
+    }
 
     if (invoiceError) throw invoiceError;
     if (!invoice) return res.status(404).json({ error: "Fakturaen finnes ikke" });

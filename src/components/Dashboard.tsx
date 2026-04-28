@@ -192,6 +192,26 @@ const saveMeetLink = async (link: string) => {
     return invoice?.public_token ? `${window.location.origin}/invoice/${invoice.public_token}` : '';
   };
 
+  const isSchemaCacheColumnError = (error: any) => {
+    const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+    return /schema cache|Could not find .* column|column .* does not exist/i.test(message);
+  };
+
+  const saveInvoiceWithSchemaFallback = async (invoice: any, fullPayload: any, fallbackPayload: any) => {
+    const runSave = (payload: any) => invoice.id
+      ? supabase.from('invoices').update(payload).eq('id', invoice.id)
+      : supabase.from('invoices').insert([payload]);
+
+    let { data, error } = await runSave(fullPayload).select().single();
+
+    if (error && isSchemaCacheColumnError(error)) {
+      ({ data, error } = await runSave(fallbackPayload).select().single());
+    }
+
+    if (error) throw error;
+    return data;
+  };
+
   const getVippsSmsText = (invoice: any) => {
     const amount = Number(invoice?.amount || 0).toLocaleString('no-NO');
     const teacherName = profile?.name || user?.name || 'læreren din';
@@ -236,27 +256,26 @@ const saveMeetLink = async (link: string) => {
     }
     if (!user) throw new Error('Vennligst logg inn på nytt.');
 
-    const payload = {
+    const basePayload = {
       student_name: getInvoiceStudentName(invoice),
-      student_phone: getInvoiceStudentPhone(invoice) || null,
       amount: Number(invoice.amount),
       due_date: invoice.due_date || new Date().toISOString().split('T')[0],
       status: invoice.status || 'pending',
       method: 'Vipps',
       tutor_id: user.id,
-      email: invoice.email || null,
+      email: invoice.email || null
+    };
+
+    const payload = {
+      ...basePayload,
+      student_phone: getInvoiceStudentPhone(invoice) || null,
       tutor_phone: profile?.phone || invoice?.tutor_phone || null,
       description: getInvoiceDescription(invoice)
     };
 
-    const query = invoice.id
-      ? supabase.from('invoices').update(payload).eq('id', invoice.id)
-      : supabase.from('invoices').insert([payload]);
+    const data = await saveInvoiceWithSchemaFallback(invoice, payload, basePayload);
 
-    const { data, error } = await query.select().single();
-    if (error) throw error;
-
-    const savedInvoice = { ...invoice, ...data };
+    const savedInvoice = { ...invoice, ...payload, ...data };
     setSelectedVippsInvoice(savedInvoice);
 
     if (invoice.id) {
@@ -277,6 +296,10 @@ const saveMeetLink = async (link: string) => {
 
     const sentAt = new Date().toISOString();
     const studentPhone = getInvoiceStudentPhone(invoice);
+    const fallbackPayload = {
+      status: 'request_sent'
+    };
+
     const payload = {
       status: 'request_sent',
       request_sent_at: sentAt,
@@ -286,30 +309,41 @@ const saveMeetLink = async (link: string) => {
     };
 
     if (invoice.id) {
-      const { error } = await supabase
+      let { error } = await supabase
         .from('invoices')
         .update(payload)
         .eq('id', invoice.id);
+
+      if (error && isSchemaCacheColumnError(error)) {
+        ({ error } = await supabase
+          .from('invoices')
+          .update(fallbackPayload)
+          .eq('id', invoice.id));
+      }
 
       if (error) throw error;
 
       setInvoices(prev => prev.map(inv => inv.id === invoice.id ? { ...inv, ...payload } : inv));
     } else {
-      const { error } = await supabase
-        .from('invoices')
-        .insert([{
-          tutor_id: user.id,
-          student_name: invoice.student_name,
-          amount: Number(invoice.amount),
-          status: 'request_sent',
-          method: 'Vipps',
-          email: invoice.email || null,
-          due_date: invoice.due_date || new Date().toISOString().split('T')[0],
+      const insertBasePayload = {
+        tutor_id: user.id,
+        student_name: invoice.student_name,
+        amount: Number(invoice.amount),
+        status: 'request_sent',
+        method: 'Vipps',
+        email: invoice.email || null,
+        due_date: invoice.due_date || new Date().toISOString().split('T')[0],
+      };
+
+      await saveInvoiceWithSchemaFallback(
+        invoice,
+        {
+          ...insertBasePayload,
           created_at: sentAt,
           ...payload
-        }]);
-
-      if (error) throw error;
+        },
+        insertBasePayload
+      );
       fetchInvoices();
     }
 
