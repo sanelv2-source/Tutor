@@ -430,7 +430,7 @@ async function startServer() {
 
       const { data: student, error: studentError } = await supabaseAdmin
         .from("students")
-        .select("id, tutor_id, email, parent_email, full_name")
+        .select("id, tutor_id, email, full_name")
         .eq("id", studentId)
         .maybeSingle();
 
@@ -443,7 +443,7 @@ async function startServer() {
         return res.status(403).json({ error: "Du kan bare sende rapporter for egne elever." });
       }
 
-      const allowedEmails = [student.email, student.parent_email].filter(Boolean).map(normalizeEmail);
+      const allowedEmails = [student.email].filter(Boolean).map(normalizeEmail);
       if (!allowedEmails.includes(studentEmail)) {
         return res.status(400).json({ error: "E-postadressen matcher ikke eleven." });
       }

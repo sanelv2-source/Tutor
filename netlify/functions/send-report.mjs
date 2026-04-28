@@ -79,7 +79,7 @@ export async function handler(event) {
 
     const { data: student, error: studentError } = await supabaseAdmin
       .from('students')
-      .select('id, tutor_id, email, parent_email, full_name')
+      .select('id, tutor_id, email, full_name')
       .eq('id', studentId)
       .maybeSingle();
 
@@ -92,7 +92,7 @@ export async function handler(event) {
       return json(403, { error: 'Du kan bare sende rapporter for egne elever.' });
     }
 
-    const allowedEmails = [student.email, student.parent_email].filter(Boolean).map(normalizeEmail);
+    const allowedEmails = [student.email].filter(Boolean).map(normalizeEmail);
     if (!allowedEmails.includes(studentEmail)) {
       return json(400, { error: 'E-postadressen matcher ikke eleven.' });
     }
