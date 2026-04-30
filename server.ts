@@ -16,7 +16,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Required for Apple OAuth POST callback
 
 // Initialize Supabase Admin client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
   ? createClient(supabaseUrl, supabaseServiceKey)
@@ -194,6 +194,38 @@ app.post("/api/invoices/:id/remind", async (req, res) => {
   }
 });
 
+app.get("/api/invoices/:publicToken", async (req, res) => {
+  const { publicToken } = req.params;
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase Admin not initialized" });
+
+  try {
+    const { data: invoice, error: invoiceError } = await supabaseAdmin
+      .from('invoices')
+      .select('id, public_token, tutor_id, student_name, amount, due_date, status, method, tutor_phone, description, created_at')
+      .eq('public_token', publicToken)
+      .maybeSingle();
+
+    if (invoiceError) throw invoiceError;
+    if (!invoice) return res.status(404).json({ error: "Fakturaen finnes ikke" });
+
+    const { data: tutor, error: tutorError } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', invoice.tutor_id)
+      .maybeSingle();
+
+    if (tutorError) throw tutorError;
+
+    res.json({
+      ...invoice,
+      profiles: tutor || null,
+    });
+  } catch (err) {
+    console.error("Error fetching public invoice:", err);
+    res.status(500).json({ error: "Kunne ikke hente fakturaen" });
+  }
+});
+
 // Initialize Stripe lazily
 let stripeClient: Stripe | null = null;
 function getStripe(): Stripe {
@@ -234,8 +266,114 @@ function saveUsers(usersMap: Map<string, any>) {
 
 const users = loadUsers(); // email -> { name, email, password, verified, hasPaid, token }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function clipText(value: unknown, maxLength: number) {
+  return String(value ?? "").trim().slice(0, maxLength);
+}
+
+function normalizeEmail(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function getBearerToken(value: unknown) {
+  return String(value ?? "").replace(/^Bearer\s+/i, "").trim();
+}
+
+function getAppOrigin(req: any) {
+  const configuredUrl = process.env.APP_URL || "";
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  const origin = req.get("origin") || "";
+  if (origin) return origin.replace(/\/$/, "");
+
+  const host = req.get("host") || "";
+  return host ? `${req.protocol}://${host}` : `http://localhost:${PORT}`;
+}
+
+function getReportStatusLabel(status: unknown) {
+  if (status === "great") return "Veldig bra";
+  if (status === "good") return "Bra";
+  if (status === "needs_focus") return "Trenger fokus";
+  return "Ikke vurdert";
+}
+
 async function startServer() {
   // API routes
+  app.post("/api/contact", async (req, res) => {
+    const name = clipText(req.body.name, 120);
+    const email = normalizeEmail(req.body.email);
+    const message = clipText(req.body.message, 4000);
+    const pageUrl = clipText(req.body.pageUrl || req.get("origin") || "", 1000);
+    const userAgent = clipText(req.get("user-agent") || "", 1000);
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "Navn, e-post og melding er påkrevd." });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Oppgi en gyldig e-postadresse." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    const contactEmail = process.env.CONTACT_EMAIL || process.env.SUPPORT_EMAIL || "info@tutorflyt.no";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+    const subject = `Ny kontaktmelding fra ${name}`;
+
+    try {
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: contactEmail,
+        replyTo: email,
+        subject,
+        text: [
+          "Ny kontaktmelding fra tutorflyt.no",
+          "",
+          `Navn: ${name}`,
+          `E-post: ${email}`,
+          pageUrl ? `Side: ${pageUrl}` : "",
+          "",
+          message,
+        ].filter(Boolean).join("\n"),
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
+            <h2 style="margin-bottom: 8px;">Ny kontaktmelding</h2>
+            <p style="margin-top: 0; color: #64748b;">Sendt fra kontaktsiden på tutorflyt.no.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 18px 0;">
+              <p><strong>Navn:</strong> ${escapeHtml(name)}</p>
+              <p><strong>E-post:</strong> ${escapeHtml(email)}</p>
+              <p><strong>Side:</strong> ${escapeHtml(pageUrl || "Ikke oppgitt")}</p>
+            </div>
+            <h3 style="margin-bottom: 8px;">Melding</h3>
+            <p style="white-space: pre-wrap; line-height: 1.6;">${escapeHtml(message)}</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #94a3b8;">User agent: ${escapeHtml(userAgent || "Ikke oppgitt")}</p>
+          </div>
+        `,
+      });
+
+      if (error) {
+        console.error("Resend API returned an error for contact message:", error);
+        return res.status(502).json({ error: "Kunne ikke sende meldingen." });
+      }
+
+      res.json({ success: true, emailId: data?.id });
+    } catch (error) {
+      console.error("Error sending contact message:", error);
+      res.status(500).json({ error: "Kunne ikke sende meldingen." });
+    }
+  });
+
   app.post("/api/auth/magic-link", async (req, res) => {
     const { email } = req.body;
     
@@ -354,6 +492,272 @@ async function startServer() {
     }
 
     res.json({ message: "Forespørsel sendt" });
+  });
+
+  app.post("/api/send-report", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å sende rapport." });
+    }
+
+    const studentId = clipText(req.body.studentId, 80);
+    const studentEmail = normalizeEmail(req.body.studentEmail);
+    const studentName = clipText(req.body.studentName || "eleven", 120);
+    const topic = clipText(req.body.topic || "Dagens time", 160);
+    const reportStatus = clipText(req.body.reportStatus, 40);
+    const masteryLevel = Number(req.body.masteryLevel);
+    const reportComment = clipText(req.body.reportComment || "Ingen kommentar.", 4000);
+    const homework = clipText(req.body.homework || "Ingen lekser denne gangen.", 2000);
+
+    if (!studentId || !studentEmail) {
+      return res.status(400).json({ error: "Mangler elev eller e-postadresse." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: student, error: studentError } = await supabaseAdmin
+        .from("students")
+        .select("id, tutor_id, email, full_name")
+        .eq("id", studentId)
+        .maybeSingle();
+
+      if (studentError) {
+        console.error("Report student lookup error:", studentError);
+        return res.status(500).json({ error: "Kunne ikke hente eleven." });
+      }
+
+      if (!student || student.tutor_id !== authData.user.id) {
+        return res.status(403).json({ error: "Du kan bare sende rapporter for egne elever." });
+      }
+
+      const allowedEmails = [student.email].filter(Boolean).map(normalizeEmail);
+      if (!allowedEmails.includes(studentEmail)) {
+        return res.status(400).json({ error: "E-postadressen matcher ikke eleven." });
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const tutorName = clipText(profile?.full_name || authData.user.user_metadata?.full_name || "Læreren din", 120);
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+      const masteryText = Number.isFinite(masteryLevel) ? `${Math.max(0, Math.min(100, masteryLevel))}%` : "Ikke vurdert";
+
+      const { error: emailError } = await resend.emails.send({
+        from: fromEmail,
+        to: studentEmail,
+        subject: `Ny progresjonsrapport fra ${tutorName}`,
+        html: `
+          <div style="background-color:#f8fafc;font-family:Arial,sans-serif;padding:40px 20px;color:#0f172a;">
+            <div style="margin:0 auto;padding:32px;background:#fff;border-radius:12px;max-width:640px;border:1px solid #e2e8f0;">
+              <h1 style="font-size:24px;margin:0 0 12px;">Ny progresjonsrapport</h1>
+              <p style="color:#475569;font-size:16px;line-height:26px;margin:0 0 24px;">
+                Hei ${escapeHtml(student.full_name || studentName)}, her er en oppsummering fra ${escapeHtml(tutorName)}.
+              </p>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin:0 0 24px;">
+                <p><strong>Emne:</strong> ${escapeHtml(topic)}</p>
+                <p><strong>Dagens innsats:</strong> ${escapeHtml(getReportStatusLabel(reportStatus))}</p>
+                <p><strong>Mestring:</strong> ${escapeHtml(masteryText)}</p>
+                <p><strong>Kommentar:</strong><br>${escapeHtml(reportComment).replace(/\n/g, "<br>")}</p>
+                <p><strong>Lekser:</strong><br>${escapeHtml(homework).replace(/\n/g, "<br>")}</p>
+              </div>
+              <p style="color:#64748b;font-size:14px;line-height:22px;margin:0;">Vennlig hilsen<br>TutorFlyt</p>
+            </div>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        console.error("Resend report error:", emailError);
+        return res.status(502).json({ error: emailError.message || "Kunne ikke sende e-post via Resend." });
+      }
+
+      res.json({ success: true, emailSent: true });
+    } catch (error) {
+      console.error("Error sending report:", error);
+      res.status(500).json({ error: "Kunne ikke sende rapport." });
+    }
+  });
+
+  app.post("/api/invitations/validate", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const token = clipText(req.body.token, 200);
+    if (!token) {
+      return res.status(400).json({ error: "Mangler invitasjonstoken." });
+    }
+
+    try {
+      const { data: invitation, error: invitationError } = await supabaseAdmin
+        .from("student_invitations")
+        .select("id, student_id, tutor_id, email, status, expires_at, accepted_at")
+        .eq("token", token)
+        .maybeSingle();
+
+      if (invitationError) {
+        console.error("Invitation validation lookup error:", invitationError);
+        return res.status(500).json({ error: "Kunne ikke hente invitasjonen." });
+      }
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Fant ikke invitasjonen." });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(410).json({ error: "Invitasjonen er ikke lenger aktiv." });
+      }
+
+      if (new Date(invitation.expires_at) <= new Date()) {
+        return res.status(410).json({ error: "Invitasjonen er utløpt." });
+      }
+
+      const { data: tutor } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", invitation.tutor_id)
+        .maybeSingle();
+
+      res.json({
+        invitation: {
+          id: invitation.id,
+          student_id: invitation.student_id,
+          email: invitation.email,
+          status: invitation.status,
+          expires_at: invitation.expires_at,
+          tutor: tutor || null,
+        },
+      });
+    } catch (error) {
+      console.error("Error validating invitation:", error);
+      res.status(500).json({ error: "Kunne ikke validere invitasjonen." });
+    }
+  });
+
+  app.post("/api/invitations/send-email", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å sende invitasjon." });
+    }
+
+    const email = normalizeEmail(req.body.email);
+    const inviteToken = clipText(req.body.token, 200);
+
+    if (!email || !inviteToken) {
+      return res.status(400).json({ error: "Mangler e-post eller invitasjonstoken." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: invitation, error: invitationError } = await supabaseAdmin
+        .from("student_invitations")
+        .select("id, email, tutor_id, status, expires_at")
+        .eq("token", inviteToken)
+        .maybeSingle();
+
+      if (invitationError) {
+        console.error("Invitation lookup error:", invitationError);
+        return res.status(500).json({ error: "Kunne ikke hente invitasjonen." });
+      }
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Fant ikke invitasjonen." });
+      }
+
+      if (invitation.tutor_id !== authData.user.id) {
+        return res.status(403).json({ error: "Du kan bare sende egne invitasjoner." });
+      }
+
+      if (normalizeEmail(invitation.email) !== email) {
+        return res.status(400).json({ error: "E-post matcher ikke invitasjonen." });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitasjonen er ikke lenger aktiv." });
+      }
+
+      if (new Date(invitation.expires_at) <= new Date()) {
+        return res.status(410).json({ error: "Invitasjonen er utløpt." });
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const tutorName = clipText(
+        profile?.full_name || authData.user.user_metadata?.full_name || req.body.tutorName || "Læreren din",
+        120,
+      );
+      const inviteUrl = `${getAppOrigin(req)}/student/accept-invite?token=${encodeURIComponent(inviteToken)}`;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
+      if (resend) {
+        const { error: emailError } = await resend.emails.send({
+          from: fromEmail,
+          to: email,
+          subject: "Invitasjon til TutorFlyt",
+          html: `
+            <div style="background-color:#f8fafc;font-family:Arial,sans-serif;padding:40px 20px;">
+              <div style="margin:0 auto;padding:40px 32px;background:#fff;border-radius:12px;max-width:600px;border:1px solid #e2e8f0;text-align:center;">
+                <h1 style="color:#0f172a;font-size:24px;margin:0 0 20px;">Du er invitert til TutorFlyt</h1>
+                <p style="color:#475569;font-size:16px;line-height:26px;margin:0 0 20px;">
+                  <strong>${escapeHtml(tutorName)}</strong> har invitert deg til TutorFlyt.
+                </p>
+                <div style="margin:32px 0;text-align:center;">
+                  <a href="${escapeHtml(inviteUrl)}" style="background:#4f46e5;border-radius:8px;color:#fff;display:inline-block;font-size:16px;font-weight:bold;text-decoration:none;padding:16px 32px;">
+                    Aksepter invitasjon
+                  </a>
+                </div>
+                <p style="color:#94a3b8;font-size:14px;line-height:22px;margin:24px 0 0;">
+                  Lenken er gyldig i 7 dager.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+
+        if (emailError) {
+          console.error("Resend invitation error:", emailError);
+          return res.status(502).json({ error: emailError.message || "Kunne ikke sende invitasjon." });
+        }
+      } else {
+        console.log("=========================================");
+        console.log("RESEND_API_KEY not set. Simulating student invitation email:");
+        console.log(`To: ${email}`);
+        console.log(`Invite Link: ${inviteUrl}`);
+        console.log("=========================================");
+      }
+
+      res.json({ success: true, emailSent: !!resend });
+    } catch (error) {
+      console.error("Error sending invitation:", error);
+      res.status(500).json({ error: "Kunne ikke sende invitasjon." });
+    }
   });
 
   app.post("/api/send-invite", async (req, res) => {
@@ -858,6 +1262,115 @@ async function startServer() {
     }
 
     res.json({ success: true });
+  });
+
+  app.post("/api/support-feedback", async (req, res) => {
+    const authHeader = String(req.headers.authorization || "");
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+    if (!token) {
+      return res.status(401).json({ error: "Du må være logget inn for å sende supportmelding." });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const category = clipText(req.body.category || "other", 80);
+    const subject = clipText(req.body.subject, 140);
+    const message = clipText(req.body.message, 4000);
+    const pageUrl = clipText(req.body.pageUrl, 1000);
+    const userAgent = clipText(req.body.userAgent, 1000);
+    const requestedRole = clipText(req.body.role, 30);
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: "Tittel og beskrivelse er påkrevd." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email, role")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const senderName = profile?.full_name || authData.user.user_metadata?.full_name || authData.user.email || "Ukjent bruker";
+      const senderEmail = profile?.email || authData.user.email || null;
+      const role = profile?.role || requestedRole || "unknown";
+
+      const { data: feedback, error: feedbackError } = await supabaseAdmin
+        .from("support_feedback")
+        .insert({
+          user_id: authData.user.id,
+          user_role: role,
+          user_name: senderName,
+          user_email: senderEmail,
+          category,
+          subject,
+          message,
+          page_url: pageUrl || null,
+          user_agent: userAgent || null,
+          status: "new",
+        })
+        .select("id")
+        .single();
+
+      if (feedbackError) {
+        console.error("Support feedback insert error:", feedbackError);
+        return res.status(500).json({ error: "Kunne ikke lagre supportmeldingen." });
+      }
+
+      const supportEmail = process.env.SUPPORT_EMAIL || "info@tutorflyt.no";
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
+      if (resend) {
+        const data = await resend.emails.send({
+          from: fromEmail,
+          to: supportEmail,
+          subject: `Support: ${subject}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
+              <h2 style="margin-bottom: 8px;">Ny supportmelding</h2>
+              <p style="margin-top: 0; color: #64748b;">Sak ID: ${escapeHtml(feedback.id)}</p>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 18px 0;">
+                <p><strong>Fra:</strong> ${escapeHtml(senderName)}</p>
+                <p><strong>E-post:</strong> ${escapeHtml(senderEmail || "Ikke oppgitt")}</p>
+                <p><strong>Rolle:</strong> ${escapeHtml(role)}</p>
+                <p><strong>Kategori:</strong> ${escapeHtml(category)}</p>
+                <p><strong>Side:</strong> ${escapeHtml(pageUrl || "Ikke oppgitt")}</p>
+              </div>
+              <h3 style="margin-bottom: 8px;">${escapeHtml(subject)}</h3>
+              <p style="white-space: pre-wrap; line-height: 1.6;">${escapeHtml(message)}</p>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+              <p style="font-size: 12px; color: #94a3b8;">User agent: ${escapeHtml(userAgent || "Ikke oppgitt")}</p>
+            </div>
+          `,
+        });
+
+        if (data.error) {
+          console.error("Resend API returned an error for support feedback:", data.error);
+          return res.status(502).json({ error: "Meldingen ble lagret, men e-post til support feilet." });
+        }
+      } else {
+        console.log("=========================================");
+        console.log("RESEND_API_KEY not set. Simulating support feedback email:");
+        console.log(`To: ${supportEmail}`);
+        console.log(`From user: ${senderName} <${senderEmail || "unknown"}>`);
+        console.log(`Subject: ${subject}`);
+        console.log(`Message: ${message}`);
+        console.log("=========================================");
+      }
+
+      res.json({ success: true, id: feedback.id });
+    } catch (error) {
+      console.error("Error handling support feedback:", error);
+      res.status(500).json({ error: "Kunne ikke sende supportmeldingen." });
+    }
   });
 
   // Vite middleware for development

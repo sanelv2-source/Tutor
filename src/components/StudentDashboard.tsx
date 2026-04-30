@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Video, Calendar, CheckCircle, Clock, MessageSquare, ExternalLink, Upload, Trash2 } from 'lucide-react';
+import { Video, CheckCircle, Clock, MessageSquare, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
 import StudentSidebar from './StudentSidebar';
 import NotificationBell from './NotificationBell';
 import { ChatList } from './ChatList';
+import SupportFeedback from './SupportFeedback';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
 import { createNotification } from '../services/notificationService';
 
@@ -451,7 +452,7 @@ const StudentDashboard = () => {
                   <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1">
                       <h4 className="font-medium text-slate-900">{notification.title}</h4>
-                      <p className="text-sm text-slate-600 mt-1">{notification.body}</p>
+                      <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
                       <p className="text-xs text-slate-400 mt-1">
                         {new Date(notification.created_at).toLocaleString('no-NO')}
                       </p>
@@ -637,6 +638,8 @@ const StudentDashboard = () => {
           <MyCalendar events={calendarEvents} />
         </div>
       );
+    } else if (activeTab === 'support') {
+      return <SupportFeedback role="student" />;
     } else if (activeTab === 'settings') {
       return (
         <div className="p-4 sm:p-8">
@@ -735,7 +738,7 @@ const StudentDashboard = () => {
           ) : (
             <>
               <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
-                {activeTab === 'uploads' && 'Mine Innleveringer'}
+                {activeTab}
               </h1>
               <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-100 text-center">
                 <p className="text-gray-500">Dette området er under utvikling.</p>

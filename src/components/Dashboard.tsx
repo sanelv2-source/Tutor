@@ -27,7 +27,8 @@ import {
   User,
   Smartphone,
   Copy,
-  Upload
+  Upload,
+  LifeBuoy
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -37,7 +38,9 @@ import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
 import NotificationBell from './NotificationBell';
+import SupportFeedback from './SupportFeedback';
 import { supabase } from '../supabaseClient';
+import { readApiJson } from '../utils/api';
 import { createNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
@@ -143,32 +146,211 @@ const saveMeetLink = async (link: string) => {
   const [vippsAmount, setVippsAmount] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [subject, setSubject] = useState('');
+  const [vippsRecipientPhone, setVippsRecipientPhone] = useState('');
+
+  const isMissingPhone = (value: unknown) => {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return !normalized || normalized === 'ikke oppgitt' || normalized === 'mangler nummer';
+  };
+
+  const getStudentPhone = (student: any) => {
+    const phone = student?.phone || student?.parent_phone || student?.parentPhone || student?.mobile || student?.parent_mobile || '';
+    return isMissingPhone(phone) ? '' : String(phone).trim();
+  };
+
+  const formatSmsPhone = (value: unknown) => {
+    const raw = String(value ?? '').trim();
+    const digits = raw.replace(/\D/g, '');
+
+    if (!digits) return '';
+    if (digits.length === 8) return `+47${digits}`;
+    if (digits.length === 10 && digits.startsWith('47')) return `+${digits}`;
+    return raw.startsWith('+') ? raw : digits;
+  };
+
+  const getInvoiceStudentName = (invoice: any) => invoice?.student_name || invoice?.student || '';
+
+  const findStudentForInvoice = (invoice: any) => {
+    const studentName = getInvoiceStudentName(invoice);
+    return students.find(s =>
+      s.id === invoice?.student_id ||
+      s.full_name === studentName ||
+      s.name === studentName
+    );
+  };
+
+  const getInvoiceStudentPhone = (invoice: any) => {
+    const phone = invoice?.student_phone || getStudentPhone(findStudentForInvoice(invoice));
+    return isMissingPhone(phone) ? '' : String(phone).trim();
+  };
+
+  const getInvoiceDescription = (invoice: any) => {
+    return invoice?.description || invoice?.subject || 'privatundervisning';
+  };
+
+  const getInvoicePaymentLink = (invoice: any) => {
+    return invoice?.public_token ? `${window.location.origin}/invoice/${invoice.public_token}` : '';
+  };
+
+  const getVippsSmsText = (invoice: any) => {
+    const amount = Number(invoice?.amount || 0).toLocaleString('no-NO');
+    const teacherName = profile?.name || user?.name || 'læreren din';
+    const tutorPhone = isMissingPhone(invoice?.tutor_phone) ? profile?.phone : invoice?.tutor_phone;
+    const vippsTarget = isMissingPhone(tutorPhone)
+      ? 'Vipps-nummeret til læreren'
+      : formatSmsPhone(tutorPhone);
+    const paymentLink = getInvoicePaymentLink(invoice);
+
+    const lines = [
+      `Hei! ${teacherName} har sendt en betalingsforespørsel for ${getInvoiceDescription(invoice)}.`,
+      `Beløp: ${amount} kr`,
+      `Betal i Vipps til: ${vippsTarget}`
+    ];
+
+    if (paymentLink) {
+      lines.push(`Se betalingslenke: ${paymentLink}`);
+    }
+
+    lines.push('Hilsen Tutorflyt');
+    return lines.join('\n\n');
+  };
+
+  const openSmsDraft = (phone: string, message: string) => {
+    const smsPhone = formatSmsPhone(phone);
+    if (!smsPhone) {
+      alert('Legg inn et gyldig SMS-nummer til betaler først.');
+      return false;
+    }
+
+    const separator = /iPad|iPhone|iPod/i.test(navigator.userAgent) ? '&' : '?';
+    window.location.href = `sms:${smsPhone.replace(/\s/g, '')}${separator}body=${encodeURIComponent(message)}`;
+    return true;
+  };
+
+  const ensureVippsInvoiceSaved = async (invoice: any) => {
+    if (invoice?.id && invoice?.public_token) return invoice;
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError && userError.message.includes('Refresh Token')) {
+      await supabase.auth.signOut().catch(() => {});
+    }
+    if (!user) throw new Error('Vennligst logg inn på nytt.');
+
+    const payload = {
+      student_name: getInvoiceStudentName(invoice),
+      student_phone: getInvoiceStudentPhone(invoice) || null,
+      amount: Number(invoice.amount),
+      due_date: invoice.due_date || new Date().toISOString().split('T')[0],
+      status: invoice.status || 'pending',
+      method: 'Vipps',
+      tutor_id: user.id,
+      email: invoice.email || null,
+      tutor_phone: profile?.phone || invoice?.tutor_phone || null,
+      description: getInvoiceDescription(invoice)
+    };
+
+    const query = invoice.id
+      ? supabase.from('invoices').update(payload).eq('id', invoice.id)
+      : supabase.from('invoices').insert([payload]);
+
+    const { data, error } = await query.select().single();
+    if (error) throw error;
+
+    const savedInvoice = { ...invoice, ...data };
+    setSelectedVippsInvoice(savedInvoice);
+
+    if (invoice.id) {
+      setInvoices(prev => prev.map(inv => inv.id === invoice.id ? { ...inv, ...savedInvoice } : inv));
+    } else {
+      fetchInvoices();
+    }
+
+    return savedInvoice;
+  };
+
+  const saveVippsRequestAsSent = async (invoice: any) => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError && userError.message.includes('Refresh Token')) {
+      await supabase.auth.signOut().catch(() => {});
+    }
+    if (!user) return alert('Vennligst logg inn på nytt.');
+
+    const sentAt = new Date().toISOString();
+    const studentPhone = getInvoiceStudentPhone(invoice);
+    const payload = {
+      status: 'request_sent',
+      request_sent_at: sentAt,
+      student_phone: studentPhone || null,
+      tutor_phone: profile?.phone || invoice?.tutor_phone || null,
+      description: getInvoiceDescription(invoice)
+    };
+
+    if (invoice.id) {
+      const { error } = await supabase
+        .from('invoices')
+        .update(payload)
+        .eq('id', invoice.id);
+
+      if (error) throw error;
+
+      setInvoices(prev => prev.map(inv => inv.id === invoice.id ? { ...inv, ...payload } : inv));
+    } else {
+      const { error } = await supabase
+        .from('invoices')
+        .insert([{
+          tutor_id: user.id,
+          student_name: invoice.student_name,
+          amount: Number(invoice.amount),
+          status: 'request_sent',
+          method: 'Vipps',
+          email: invoice.email || null,
+          due_date: invoice.due_date || new Date().toISOString().split('T')[0],
+          created_at: sentAt,
+          ...payload
+        }]);
+
+      if (error) throw error;
+      fetchInvoices();
+    }
+
+    fetchPaymentStats();
+    showToast('Vipps-kravet er lagret som sendt.');
+    setSelectedVippsInvoice(null);
+    setShowVippsConfirm(false);
+  };
 
   const [isBulkImporting, setIsBulkImporting] = useState(false);
   const [showBulkImportHelp, setShowBulkImportHelp] = useState(false);
 
   const handleGoToVippsPreparation = () => {
-    // 1. Sjekk at elev og beløp er fylt ut
     if (!selectedStudent) return alert("Vennligst velg en elev.");
     if (!totalAmount || Number(totalAmount) <= 0) return alert("Vennligst skriv inn et gyldig beløp.");
 
-    // 2. Sjekk telefonnummer (Slik at vi unngår "Ikke oppgitt")
-    if (!selectedStudent.phone) {
-      return alert(`⚠️ Eleven ${selectedStudent.name} mangler telefonnummer. Gå til elever og legg det inn først.`);
+    const recipientPhone = vippsRecipientPhone || getStudentPhone(selectedStudent);
+    if (isMissingPhone(recipientPhone)) {
+      return alert(`Eleven ${selectedStudent.name} mangler SMS-nummer. Legg inn nummeret i feltet først.`);
     }
 
-    // 3. Alt er OK! Lukk dette skjemaet og åpne Vipps-modalen
-    // setShowNewInvoiceForm(false); // Not defined in this version, ignoring
-    setVippsAmount(totalAmount);
-    setVippsModalOpen(true);
+    setSelectedVippsInvoice({
+      student_name: selectedStudent.name,
+      student_phone: recipientPhone,
+      amount: Number(totalAmount),
+      description: subject || selectedStudent.subject || 'Privatundervisning',
+      email: selectedStudent.parentEmail || selectedStudent.email || null,
+      due_date: new Date().toISOString().split('T')[0],
+      tutor_phone: profile?.phone || null
+    });
+    setShowVippsConfirm(false);
   };
 
   const handleOpenVippsModal = (student: any) => {
-    if (!student.phone || student.phone.trim() === "") {
-      alert("⚠️ Kan ikke klargjøre Vipps-krav: Telefonnummer til betaler mangler. Vennligst oppdater elevprofilen først.");
+    const phone = getStudentPhone(student);
+    if (!phone) {
+      alert("Kan ikke klargjøre Vipps-krav: Telefonnummer til betaler mangler. Oppdater elevprofilen eller bruk Ny betaling.");
       return;
     }
     setSelectedStudent(student);
+    setVippsRecipientPhone(phone);
     setVippsModalOpen(true);
   };
 
@@ -243,8 +425,8 @@ const saveMeetLink = async (link: string) => {
       const teacherName = user?.name || 'Læreren';
       const notificationTitle = `${teacherName} har lagt inn ferie`;
       const notificationMessage = dates.length === 1
-        ? `Læreren din har registrert fri ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
-        : `Læreren din har registrert fri ${dates
+        ? `Fri registrert: ${new Date(dates[0]).toLocaleDateString('no-NO')}.`
+        : `Fri registrert: ${dates
             .map((date) => new Date(date).toLocaleDateString('no-NO'))
             .join(', ')}.`;
 
@@ -347,7 +529,8 @@ const saveMeetLink = async (link: string) => {
         full_name: s.full_name || s.name,
         subject: s.subject || 'Fag: Ikke oppgitt',
         parent: s.parent_email ? 'Oppgitt' : 'Ikke oppgitt',
-        phone: 'Ikke oppgitt',
+        phone: s.phone || s.parent_phone || s.mobile || s.parent_mobile || 'Ikke oppgitt',
+        parentPhone: s.parent_phone || s.phone || s.mobile || s.parent_mobile || '',
         parentEmail: s.parent_email || s.email
       })));
     }
@@ -1108,11 +1291,17 @@ const saveMeetLink = async (link: string) => {
       
       if (student?.email || student?.parentEmail) {
         const targetEmail = student.email || student.parentEmail;
+        const { data: sessionData } = await supabase.auth.getSession();
+        const jwt = sessionData.session?.access_token;
         
         const response = await fetch('/api/send-report', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+          },
           body: JSON.stringify({
+            studentId: selectedStudentId,
             studentEmail: targetEmail,
             studentName: student.full_name || student.name,
             topic,
@@ -1123,13 +1312,13 @@ const saveMeetLink = async (link: string) => {
           }),
         });
         
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          emailError = errData.error || 'Kunne ikke sende e-post via Resend';
-          console.error('Resend error:', emailError);
-        } else {
+        try {
+          await readApiJson(response, 'Kunne ikke sende e-post via Resend');
           emailSent = true;
           console.log(`E-post sendt til ${targetEmail} via Resend!`);
+        } catch (error: any) {
+          emailError = error.message || 'Kunne ikke sende e-post via Resend';
+          console.error('Resend error:', emailError);
         }
       }
 
@@ -1157,7 +1346,7 @@ const saveMeetLink = async (link: string) => {
       return;
     }
 
-    if (activeTab === 'betaling') {
+    if (activeTab === 'betaling' && newItemData.method !== 'Vipps') {
       if (!newItemData.email || !newItemData.email.includes('@')) {
         showToast('Vennligst oppgi en gyldig e-postadresse.');
         return;
@@ -1295,17 +1484,20 @@ const saveMeetLink = async (link: string) => {
 
         if (newItemData.method === 'Vipps') {
           const student = students.find(s => s.full_name === newItemData.name);
-          if (!student?.phone || student.phone.trim() === "") {
-            alert("⚠️ Kan ikke klargjøre Vipps-krav: Telefonnummer til betaler mangler. Vennligst oppdater elevprofilen først.");
+          const studentPhone = getStudentPhone(student);
+          if (!studentPhone) {
+            alert("Kan ikke sende Vipps-SMS: Telefonnummer til betaler mangler. Bruk Ny betaling og legg inn nummeret.");
             setIsSaving(false);
             return;
           }
           setSelectedVippsInvoice({
             student_name: newItemData.name,
-            student_phone: student.phone,
+            student_phone: studentPhone,
             amount: amount,
+            description: subject || student?.subject || 'Privatundervisning',
             email: newItemData.email || null,
-            due_date: newItemData.date || new Date().toISOString().split('T')[0]
+            due_date: newItemData.date || new Date().toISOString().split('T')[0],
+            tutor_phone: cleanPhone || null
           });
           setShowAddModal(false);
           setIsSaving(false);
@@ -1758,6 +1950,9 @@ const saveMeetLink = async (link: string) => {
           <button onClick={() => setActiveTab('profil')} className={`p-2 ${activeTab === 'profil' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}>
             <User className="h-5 w-5" />
           </button>
+          <button onClick={() => setActiveTab('support')} className={`p-2 ${activeTab === 'support' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}>
+            <LifeBuoy className="h-5 w-5" />
+          </button>
           <button onClick={onLogout} className="p-2 text-slate-500 hover:text-slate-900">
             <LogOut className="h-5 w-5" />
           </button>
@@ -1819,6 +2014,13 @@ const saveMeetLink = async (link: string) => {
           >
             <BookOpen className="h-5 w-5" />
             Ressurser
+          </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'support' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <LifeBuoy className="h-5 w-5" />
+            Support
           </button>
         </nav>
 
@@ -1886,7 +2088,7 @@ const saveMeetLink = async (link: string) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 capitalize">
-              {activeTab === 'oversikt' ? 'Dine elever' : activeTab}
+              {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab}
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
@@ -1894,7 +2096,7 @@ const saveMeetLink = async (link: string) => {
             <div className="hidden md:block">
               <NotificationBell />
             </div>
-            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && (
+            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && (
               <div className="flex gap-2">
                 {activeTab === 'timeplan' && (
                   <button 
@@ -1957,7 +2159,7 @@ const saveMeetLink = async (link: string) => {
                     <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                       <div className="flex-1">
                         <h4 className="font-medium text-slate-900">{notification.title}</h4>
-                        <p className="text-sm text-slate-600 mt-1">{notification.body}</p>
+                        <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
                         <p className="text-xs text-slate-400 mt-1">
                           {new Date(notification.created_at).toLocaleString('no-NO')}
                         </p>
@@ -2231,6 +2433,7 @@ Per Andersen,per@example.com,Norsk`}
                     // Create vacation events for tutor calendar
                     const vacationEvents = vacations.map(v => ({
                       id: `vacation-${v.id}`,
+                      vacationId: v.id,
                       type: 'vacation',
                       date: v.vacation_date,
                       title: 'Du har fri',
@@ -2252,7 +2455,7 @@ Per Andersen,per@example.com,Norsk`}
                     console.log('Tutor vacations:', vacationEvents);
                     
                     // Merge vacation and lesson events
-                    const allEvents = [...lessonEvents, ...vacationEvents];
+                    const allEvents: any[] = [...lessonEvents, ...vacationEvents];
                     console.log('Tutor merged event array:', allEvents);
                     
                     return (
@@ -2262,7 +2465,7 @@ Per Andersen,per@example.com,Norsk`}
                             <h3>📅 Dagens og kommende timer</h3>
                             
                             {allEvents.length > 0 ? (
-                              allEvents.map((event) => {
+                              allEvents.map((event: any) => {
                                 if (event.type === 'vacation') {
                                   return (
                                     <div 
@@ -2281,7 +2484,7 @@ Per Andersen,per@example.com,Norsk`}
                                         </div>
                                         <div className="flex items-center gap-1">
                                           <button
-                                            onClick={() => deleteVacation(event.id.replace('vacation-', ''))}
+                                            onClick={() => deleteVacation(event.vacationId)}
                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                             title="Slett ferie"
                                           >
@@ -2373,12 +2576,22 @@ Per Andersen,per@example.com,Norsk`}
                                       {dayEvents.map((event: any) => {
                                         if (event.type === 'vacation') {
                                           return (
-                                            <div key={event.id} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-center">
+                                            <div key={event.id} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-center relative group">
                                               <span className="text-xl block mb-1">🌴</span>
-                                              <small className="text-yellow-800 font-bold block">{event.title}</small>
+                                              <small className="text-yellow-800 font-bold block pr-5">{event.title}</small>
+                                              <small className="text-yellow-700 block text-xs mt-1">
+                                                {new Date(event.date).toLocaleDateString('no-NO')}
+                                              </small>
                                               {event.description && (
                                                 <small className="text-yellow-700 block text-xs mt-1">{event.description}</small>
                                               )}
+                                              <button
+                                                onClick={() => deleteVacation(event.vacationId)}
+                                                className="absolute top-1 right-1 p-1 text-yellow-600 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Slett ferie"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
                                             </div>
                                           );
                                         } else {
@@ -2557,6 +2770,7 @@ Per Andersen,per@example.com,Norsk`}
                       onChange={(e) => {
                         const student = students.find(s => s.id.toString() === e.target.value);
                         setSelectedStudent(student || null);
+                        setVippsRecipientPhone(student ? getStudentPhone(student) : '');
                       }}
                       value={selectedStudent?.id || ''}
                     >
@@ -2565,6 +2779,17 @@ Per Andersen,per@example.com,Norsk`}
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Betalers SMS-nummer</label>
+                    <input
+                      type="tel"
+                      placeholder="f.eks. +47 400 00 000"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none"
+                      value={vippsRecipientPhone}
+                      onChange={(e) => setVippsRecipientPhone(e.target.value)}
+                    />
                   </div>
 
                   {/* Beløp */}
@@ -2591,12 +2816,12 @@ Per Andersen,per@example.com,Norsk`}
                     />
                   </div>
 
-                  {/* Knappen som tar deg videre til "Kopier og krev" */}
                   <button 
                     onClick={handleGoToVippsPreparation}
-                    className="w-full bg-[#ff5b24] text-white font-bold py-4 rounded-xl mt-4 shadow-lg hover:bg-[#e65220] transition"
+                    className="w-full bg-[#ff5b24] text-white font-bold py-4 rounded-xl mt-4 shadow-lg hover:bg-[#e65220] transition flex items-center justify-center gap-2"
                   >
-                    NESTE: KLARGJØR VIPPS-KRAV →
+                    <Send className="h-4 w-4" />
+                    SEND VIPPS-LENKE PÅ SMS
                   </button>
                 </div>
               </div>
@@ -2685,22 +2910,25 @@ Per Andersen,per@example.com,Norsk`}
                                 <div className="flex justify-end items-center gap-2">
                                   <button 
                                     onClick={() => sendEpostFaktura(inv)}
-                                    className="vipps-btn"
+                                    className="vipps-btn inline-flex items-center gap-1.5"
                                   >
-                                    E-post ✉️
+                                    <Send className="h-3.5 w-3.5" />
+                                    E-post
                                   </button>
                                   <button 
-                                    className="vipps-btn" 
+                                    className="vipps-btn inline-flex items-center gap-1.5"
                                     onClick={() => {
-                                      const student = students.find(s => s.full_name === (inv.student_name || inv.student));
-                                      if (!inv.student_phone && (!student?.phone || student.phone.trim() === "")) {
-                                        alert("⚠️ Kan ikke klargjøre Vipps-krav: Telefonnummer til betaler mangler. Vennligst oppdater elevprofilen først.");
+                                      const phone = getInvoiceStudentPhone(inv);
+                                      if (!phone) {
+                                        alert("Kan ikke sende SMS: Telefonnummer til betaler mangler. Bruk Ny betaling og legg inn nummeret.");
                                         return;
                                       }
-                                      setSelectedVippsInvoice(inv);
+                                      setSelectedVippsInvoice({ ...inv, student_phone: phone, tutor_phone: inv.tutor_phone || profile?.phone || null });
+                                      setShowVippsConfirm(false);
                                     }}
                                   >
-                                    Krev via Vipps 📱
+                                    <Smartphone className="h-3.5 w-3.5" />
+                                    Send SMS
                                   </button>
                                 </div>
                               ) : (inv.status === 'Fakturert' || inv.status === 'fakturert' || inv.status === 'Sendt' || inv.status === 'request_sent') ? (
@@ -3217,6 +3445,10 @@ Per Andersen,per@example.com,Norsk`}
           <ChatList />
         )}
 
+        {activeTab === 'support' && (
+          <SupportFeedback role="tutor" />
+        )}
+
       </main>
 
       {/* Task Modal */}
@@ -3593,17 +3825,17 @@ Per Andersen,per@example.com,Norsk`}
             </button>
 
             <div className="flex justify-between items-center mb-6 pr-8">
-              <h2 className="text-xl font-bold text-gray-900">Klargjør Vipps-krav</h2>
-              <span className="text-xs font-medium bg-blue-50 text-blue-600 px-2 py-1 rounded">Steg 1: Kopier data</span>
+              <h2 className="text-xl font-bold text-gray-900">Send Vipps-lenke</h2>
+              <span className="text-xs font-medium bg-orange-50 text-orange-600 px-2 py-1 rounded">SMS-utkast</span>
             </div>
 
             <div className="space-y-3 mb-6">
               {/* Datakortene */}
               {[
                 { label: "Betaler", value: selectedVippsInvoice.student_name || selectedVippsInvoice.student },
-                { label: "Telefonnummer", value: selectedVippsInvoice.student_phone || students.find(s => s.full_name === (selectedVippsInvoice.student_name || selectedVippsInvoice.student))?.phone || 'Mangler nummer' },
+                { label: "SMS til", value: getInvoiceStudentPhone(selectedVippsInvoice) || 'Mangler nummer' },
                 { label: "Beløp", value: `${selectedVippsInvoice.amount} kr` },
-                { label: "Melding", value: `Privatundervisning i matematikk - ${new Date().toLocaleDateString('nb-NO')}` }
+                { label: "Melding", value: getInvoiceDescription(selectedVippsInvoice) }
               ].map((item, idx) => (
                 <div key={idx} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
                   <div>
@@ -3622,24 +3854,104 @@ Per Andersen,per@example.com,Norsk`}
               <button 
                 onClick={() => {
                   const studentName = selectedVippsInvoice.student_name || selectedVippsInvoice.student;
-                  const phone = selectedVippsInvoice.student_phone || students.find(s => s.full_name === studentName)?.phone || 'Mangler nummer';
-                  const allInfo = `Betaler: ${studentName}\nTelefon: ${phone}\nBeløp: ${selectedVippsInvoice.amount} kr\nMelding: Privatundervisning i matematikk - ${new Date().toLocaleDateString('nb-NO')}`;
+                  const phone = getInvoiceStudentPhone(selectedVippsInvoice) || 'Mangler nummer';
+                  const allInfo = `Betaler: ${studentName}\nSMS til: ${phone}\nBeløp: ${selectedVippsInvoice.amount} kr\nMelding: ${getInvoiceDescription(selectedVippsInvoice)}`;
                   navigator.clipboard.writeText(allInfo);
                   showToast("Alt er kopiert til utklippstavlen!");
                 }}
                 className="w-full py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
               >
-                📋 KOPIER ALT
+                KOPIER DETALJER
               </button>
             </div>
 
             <div className="space-y-3">
-              <a href="vipps://" className="flex items-center justify-center gap-2 w-full bg-[#ff5b24] text-white font-extrabold py-4 rounded-xl shadow-lg hover:scale-[1.02] transition">
+              <button
+                onClick={async () => {
+                  try {
+                    const invoiceWithLink = await ensureVippsInvoiceSaved(selectedVippsInvoice);
+                    const phone = getInvoiceStudentPhone(invoiceWithLink);
+                    if (openSmsDraft(phone, getVippsSmsText(invoiceWithLink))) {
+                      setSelectedVippsInvoice(invoiceWithLink);
+                      setShowVippsConfirm(true);
+                    }
+                  } catch (error: any) {
+                    console.error(error);
+                    alert('Kunne ikke lage betalingslenke: ' + error.message);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 w-full bg-[#ff5b24] text-white font-extrabold py-4 rounded-xl shadow-lg hover:bg-[#e65220] transition"
+              >
+                <Smartphone className="h-5 w-5" />
+                SEND SMS MED BETALINGSLENKE
+              </button>
+
+              {!getInvoicePaymentLink(selectedVippsInvoice) ? (
+                <button
+                  onClick={async () => {
+                    try {
+                      await ensureVippsInvoiceSaved(selectedVippsInvoice);
+                      showToast('Betalingslenke er klar.');
+                    } catch (error: any) {
+                      console.error(error);
+                      alert('Kunne ikke lage betalingslenke: ' + error.message);
+                    }
+                  }}
+                  className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-100 rounded-lg hover:bg-orange-100"
+                >
+                  LAG BETALINGSLENKE
+                </button>
+              ) : (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600 mb-1">Betalingslenke</p>
+                  <p className="text-xs text-emerald-800 break-all">{getInvoicePaymentLink(selectedVippsInvoice)}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(getInvoicePaymentLink(selectedVippsInvoice));
+                      showToast('Betalingslenke kopiert');
+                    }}
+                    className="mt-2 w-full py-2 text-xs font-bold text-emerald-700 bg-white border border-emerald-100 rounded-lg hover:bg-emerald-50"
+                  >
+                    KOPIER LENKE
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  const phone = getInvoiceStudentPhone(selectedVippsInvoice);
+                  if (openSmsDraft(phone, getVippsSmsText(selectedVippsInvoice))) {
+                    setShowVippsConfirm(true);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 w-full border border-orange-200 text-orange-600 font-bold py-3 rounded-xl hover:bg-orange-50 transition"
+              >
+                <Smartphone className="h-5 w-5" />
+                SEND SMS UTEN LENKE
+              </button>
+
+              <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-3">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-orange-500 mb-2">SMS-tekst</p>
+                <textarea
+                  readOnly
+                  value={getVippsSmsText(selectedVippsInvoice)}
+                  className="w-full min-h-32 resize-none bg-white border border-orange-100 rounded-lg p-3 text-sm text-slate-700 focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(getVippsSmsText(selectedVippsInvoice));
+                    showToast('SMS-tekst kopiert');
+                  }}
+                  className="mt-2 w-full py-2 text-xs font-bold text-orange-600 bg-white border border-orange-100 rounded-lg hover:bg-orange-50 flex items-center justify-center gap-1.5"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  KOPIER SMS-TEKST
+                </button>
+              </div>
+
+              <a href="vipps://" className="flex items-center justify-center gap-2 w-full border border-orange-200 text-orange-600 font-bold py-3 rounded-xl hover:bg-orange-50 transition">
                 ÅPNE VIPPS-APPEN
               </a>
-              <p className="text-[10px] text-center text-gray-400 italic">
-                Bruk "Be om penger" i Vipps-appen på mobilen.
-              </p>
 
               <div className="pt-4 border-t border-gray-100">
                 {!showVippsConfirm ? (
@@ -3647,12 +3959,12 @@ Per Andersen,per@example.com,Norsk`}
                     onClick={() => setShowVippsConfirm(true)}
                     className="w-full py-3 border-2 border-green-500 text-green-600 font-bold rounded-xl hover:bg-green-50 transition"
                   >
-                    Marker som sendt i Tutorflyt
+                    Marker SMS som sendt
                   </button>
                 ) : (
                   <div className="bg-green-50 p-4 rounded-xl border border-green-100 space-y-3">
                     <p className="text-sm font-medium text-green-800 text-center">
-                      Har du sendt Vipps-kravet manuelt i Vipps-appen?
+                      Lagre Vipps-kravet som sendt i Tutorflyt?
                     </p>
                     <div className="flex gap-2">
                       <button 
@@ -3663,53 +3975,11 @@ Per Andersen,per@example.com,Norsk`}
                       </button>
                       <button 
                         onClick={async () => {
-                          const { data: { user }, error: userError } = await supabase.auth.getUser();
-                          if (userError && userError.message.includes('Refresh Token')) {
-                            await supabase.auth.signOut().catch(() => {});
-                          }
-                          if (!user) return alert("Vennligst logg inn på nytt.");
-
-                          if (selectedVippsInvoice.id) {
-                            // Update existing
-                            const { error } = await supabase
-                              .from('invoices')
-                              .update({ status: 'request_sent', request_sent_at: new Date().toISOString() })
-                              .eq('id', selectedVippsInvoice.id);
-
-                            if (!error) {
-                              showToast("Status oppdatert: Krav sendt! ✓");
-                              setSelectedVippsInvoice(null);
-                              setShowVippsConfirm(false);
-                              setInvoices(prev => prev.map(inv => inv.id === selectedVippsInvoice.id ? {...inv, status: 'request_sent'} : inv));
-                            } else {
-                              alert("Feil ved lagring: " + error.message);
-                            }
-                          } else {
-                            // Insert new
-                            const { error } = await supabase
-                              .from('invoices')
-                              .insert([{
-                                tutor_id: user.id,
-                                student_name: selectedVippsInvoice.student_name,
-                                student_phone: selectedVippsInvoice.student_phone,
-                                amount: selectedVippsInvoice.amount,
-                                status: 'request_sent',
-                                method: 'Vipps',
-                                email: selectedVippsInvoice.email || null,
-                                due_date: selectedVippsInvoice.due_date || new Date().toISOString().split('T')[0],
-                                created_at: new Date().toISOString(),
-                                request_sent_at: new Date().toISOString()
-                              }]);
-
-                            if (!error) {
-                              showToast("Status oppdatert: Krav sendt! ✓");
-                              setSelectedVippsInvoice(null);
-                              setShowVippsConfirm(false);
-                              fetchInvoices();
-                            } else {
-                              console.error(error);
-                              alert("Kunne ikke lagre: " + error.message);
-                            }
+                          try {
+                            await saveVippsRequestAsSent(selectedVippsInvoice);
+                          } catch (error: any) {
+                            console.error(error);
+                            alert("Kunne ikke lagre: " + error.message);
                           }
                         }}
                         className="flex-1 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition text-sm"
@@ -3730,7 +4000,7 @@ Per Andersen,per@example.com,Norsk`}
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-900">
-                Krev via Vipps
+                Send Vipps-SMS
               </h3>
               <button onClick={() => { setVippsModalOpen(false); setVippsAmount(''); }} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">
                 &times;
@@ -3746,6 +4016,18 @@ Per Andersen,per@example.com,Norsk`}
                   value={selectedStudent.name}
                   disabled
                   className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm focus:outline-none text-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Betalers SMS-nummer
+                </label>
+                <input
+                  type="tel"
+                  value={vippsRecipientPhone}
+                  onChange={(e) => setVippsRecipientPhone(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="F.eks. +47 400 00 000"
                 />
               </div>
               <div>
@@ -3775,19 +4057,26 @@ Per Andersen,per@example.com,Norsk`}
                     alert('Vennligst fyll inn et gyldig beløp');
                     return;
                   }
+                  const recipientPhone = vippsRecipientPhone || getStudentPhone(selectedStudent);
+                  if (isMissingPhone(recipientPhone)) {
+                    alert('Legg inn SMS-nummer til betaler først.');
+                    return;
+                  }
                   setSelectedVippsInvoice({
                     student_name: selectedStudent.name,
-                    student_phone: selectedStudent.phone,
-                    amount: vippsAmount,
+                    student_phone: recipientPhone,
+                    amount: Number(vippsAmount),
+                    description: selectedStudent.subject || 'Privatundervisning',
                     email: selectedStudent.email || null,
-                    due_date: new Date().toISOString().split('T')[0]
+                    due_date: new Date().toISOString().split('T')[0],
+                    tutor_phone: profile?.phone || null
                   });
                   setVippsModalOpen(false);
                   setVippsAmount('');
                 }}
                 className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium transition-colors"
               >
-                Gå videre
+                Send SMS
               </button>
             </div>
           </div>

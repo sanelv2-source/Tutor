@@ -1,5 +1,4 @@
 import React from 'react';
-import Logo from './Logo';
 import Footer from './Footer';
 
 export default function Terms({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -20,10 +19,13 @@ export default function Terms({ onNavigate }: { onNavigate: (page: string) => vo
 
             <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">1. Om Tutorflyt</h2>
             <p>
-              Tutorflyt er en digital plattform som kobler privatlærere og elever (eller foresatte) for organisering av undervisningstimer, kommunikasjon, fakturering og betaling. Plattformen fungerer som en formidlings- og administrasjonstjeneste mellom partene.
+              Tutorflyt er en digital administrasjonsplattform for privatlærere som ønsker bedre oversikt over egne elever, timer, kommunikasjon, fakturering og betaling.
             </p>
             <p>
-              Tutorflyt er ikke arbeidsgiver for lærere og er ikke ansvarlig for det faglige innholdet i undervisningen.
+              Tutorflyt er ikke en markedsplass, formidlingstjeneste eller bookingplattform. Privatlærere bruker plattformen for elevforhold de selv har etablert utenfor Tutorflyt.
+            </p>
+            <p>
+              Tutorflyt er ikke arbeidsgiver for lærere, selger ikke undervisningstimer på vegne av lærere og er ikke ansvarlig for det faglige innholdet i undervisningen.
             </p>
 
             <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">2. Brukerkonto</h2>
@@ -50,26 +52,27 @@ export default function Terms({ onNavigate }: { onNavigate: (page: string) => vo
             
             <h3 className="text-lg font-medium text-slate-900 mt-6 mb-3">Privatlærere</h3>
             <p>
-              Privatlærere tilbyr undervisningstjenester gjennom plattformen. Læreren er selv ansvarlig for:
+              Privatlærere bruker Tutorflyt til å administrere egne undervisningsavtaler og elever. Læreren er selv ansvarlig for:
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li>faglig innhold og kvalitet på undervisningen</li>
               <li>korrekt informasjon om kompetanse og erfaring</li>
+              <li>avtaler med elever eller foresatte, inkludert pris, tidspunkt og avbestillingsregler</li>
               <li>overholdelse av gjeldende lover og skatteregler</li>
             </ul>
 
             <h3 className="text-lg font-medium text-slate-900 mt-6 mb-3">Elever / foresatte</h3>
             <p>
-              Elever eller foresatte kan booke undervisningstimer gjennom plattformen og er ansvarlige for:
+              Elever eller foresatte kan få tilgang til deler av plattformen når en privatlærer inviterer dem. De er ansvarlige for:
             </p>
             <ul className="list-disc pl-5 space-y-2">
-              <li>korrekt informasjon ved booking</li>
+              <li>å gi korrekt kontakt- og betalingsinformasjon til læreren</li>
               <li>betaling for avtalte timer</li>
             </ul>
 
-            <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">4. Booking og gjennomføring av timer</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">4. Avtaler og gjennomføring av timer</h2>
             <p>
-              Timer avtales gjennom plattformen mellom lærer og elev.
+              Undervisningstimer avtales direkte mellom lærer og elev eller foresatt utenfor Tutorflyt. Plattformen kan brukes til å registrere, følge opp og administrere timer som allerede er avtalt mellom partene.
             </p>
             <p>
               Læreren er ansvarlig for å:
@@ -91,24 +94,24 @@ export default function Terms({ onNavigate }: { onNavigate: (page: string) => vo
 
             <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">5. Betaling</h2>
             <p>
-              Betaling for undervisning kan håndteres gjennom plattformen via integrerte betalingstjenester (for eksempel Vipps eller andre betalingsløsninger).
+              Tutorflyt kan hjelpe læreren med å opprette, sende eller vise betalingsinformasjon for avtalte undervisningstimer, for eksempel via Vipps eller andre betalingsløsninger.
             </p>
             <p>
-              Ved betaling gjennom plattformen kan Tutorflyt kreve et servicegebyr.
+              Betaling gjelder avtalen mellom lærer og elev eller foresatt. Med mindre annet er tydelig oppgitt, er læreren betalingsmottaker og ansvarlig for pris, levering av undervisningstjenesten, kvittering, skatt og eventuell oppfølging av betalingen.
             </p>
             <p>
-              Alle priser skal være tydelig oppgitt før booking av timer.
+              Tutorflyt kan kreve betaling fra læreren for bruk av plattformen eller tilknyttede funksjoner.
             </p>
 
             <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">6. Avbestilling og refusjon</h2>
             <p>
-              Regler for avbestilling fastsettes av læreren eller av plattformens standardregler dersom annet ikke er oppgitt.
+              Regler for avbestilling, endring av tidspunkt og refusjon avtales direkte mellom læreren og eleven eller foresatte.
             </p>
             <p>
-              Dersom en time avbestilles innen avtalt frist kan eleven ha rett til refusjon eller ny time.
+              Tutorflyt avgjør ikke om en undervisningstime skal refunderes, flyttes eller erstattes. Slike spørsmål håndteres av læreren i tråd med avtalen mellom partene.
             </p>
             <p>
-              Ved sen avbestilling kan læreren ha rett til å beholde betalingen.
+              Eventuelle betalingsgebyrer fra tredjeparts betalingsleverandører kan være underlagt egne vilkår.
             </p>
 
             <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">7. Ansvarsbegrensning</h2>

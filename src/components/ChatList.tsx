@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Plus, Search, ArrowLeft, Send } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { createNotification } from '../services/notificationService';
@@ -18,6 +18,8 @@ export const ChatList = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [linkedTutorId, setLinkedTutorId] = useState<string | null>(null);
   const [studentRecordId, setStudentRecordId] = useState<string | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -53,6 +55,49 @@ export const ChatList = () => {
     fetchUser();
     fetchConversations();
   }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`conversations_${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+        },
+        () => {
+          fetchConversations(false);
+        }
+      )
+      .subscribe((status, err) => {
+        console.log('Conversation subscription status:', status);
+        if (err) {
+          console.error('Conversation subscription error:', err);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (!activeConversation?.id || messagesLoading) return;
+
+    const frameId = requestAnimationFrame(() => {
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        messagesEndRef.current?.scrollIntoView({ block: 'end' });
+      }
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [activeConversation?.id, messages.length, messagesLoading]);
 
   const fetchAvailableStudents = async () => {
     try {
@@ -295,9 +340,11 @@ export const ChatList = () => {
     };
   }, [activeConversation?.id]);
 
-  const fetchConversations = async () => {
+  const fetchConversations = async (showSpinner = true) => {
     try {
-      setLoading(true);
+      if (showSpinner) {
+        setLoading(true);
+      }
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -325,7 +372,9 @@ export const ChatList = () => {
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {
-      setLoading(false);
+      if (showSpinner) {
+        setLoading(false);
+      }
     }
   };
 
@@ -613,8 +662,15 @@ export const ChatList = () => {
                 <div 
                   key={chat.id} 
                   onClick={() => handleConversationClick(chat)}
-                  className={`chat-item flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer group ${isActive ? 'bg-white border border-slate-200 shadow-sm' : 'hover:bg-slate-100 border border-transparent'}`}
+                  className={`chat-item relative flex items-center gap-3 p-3 pl-5 rounded-xl transition-colors cursor-pointer group ${isActive ? 'bg-white border border-slate-200 shadow-sm' : 'hover:bg-slate-100 border border-transparent'}`}
                 >
+                  {unread > 0 && (
+                    <span
+                      className="absolute left-2 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-red-500 ring-2 ring-white shadow-sm"
+                      aria-label="Uleste meldinger"
+                    />
+                  )}
+
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm sm:text-base border border-violet-200">
@@ -672,7 +728,7 @@ export const ChatList = () => {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-white">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-white">
               {messagesLoading ? (
                 <div className="flex justify-center items-center h-full text-slate-500">
                   Henter meldinger...
@@ -716,6 +772,7 @@ export const ChatList = () => {
                   );
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}

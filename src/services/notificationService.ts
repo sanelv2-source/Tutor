@@ -25,22 +25,43 @@ export async function createNotification(
   }
 
   try {
+    const notificationPayload = {
+      user_id: userId,
+      type,
+      title,
+      body,
+      link: link ?? null,
+      is_read: false
+    };
+
     const result = await supabase
       .from('notifications')
-      .insert([
-        {
-          user_id: userId,
-          type,
-          title,
-          body,
-          link: link ?? null,
-          is_read: false
-        }
-      ])
-      .select();
+      .insert([notificationPayload]);
 
     if (result.error) {
       console.error('Notification insert error:', result.error);
+
+      if (
+        result.error.code === '42703' ||
+        result.error.message?.toLowerCase().includes('body')
+      ) {
+        const legacyResult = await supabase
+          .from('notifications')
+          .insert([{
+            user_id: userId,
+            type,
+            title,
+            message: body,
+            link: link ?? null,
+            is_read: false
+          }]);
+
+        if (legacyResult.error) {
+          console.error('Legacy notification insert error:', legacyResult.error);
+        }
+
+        return legacyResult;
+      }
     }
 
     return result;

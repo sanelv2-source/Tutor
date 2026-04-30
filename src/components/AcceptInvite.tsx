@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { BookOpen, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { readApiJson } from '../utils/api';
 
 const AcceptInvite: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -43,33 +44,19 @@ const AcceptInvite: React.FC = () => {
       }
 
       try {
-        // DEBUG SNIPPET START
-        const { data: debugData, error: debugError } = await supabase
-          .from('student_invitations')
-          .select('*')
-          .eq('token', token)
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString())
-          .single();
-
-        console.log('DATA:', debugData);
-        console.log('ERROR:', debugError);
-        // DEBUG SNIPPET END
-
         const response = await fetch('/api/invitations/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || 'Ugyldig invitasjon');
-        } else {
-          setInvitation(data.invitation);
-        }
+        const data = await readApiJson<{ invitation: any }>(response, 'Ugyldig invitasjon');
+        setInvitation(data.invitation);
       } catch (err: any) {
+        if (err.message) {
+          setError(err.message);
+          return;
+        }
         setError('Kunne ikke validere invitasjonen. Prøv igjen senere.');
       } finally {
         setLoading(false);

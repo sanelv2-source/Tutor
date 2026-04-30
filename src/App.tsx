@@ -20,6 +20,8 @@ import Pricing from './components/Pricing';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
+import AcceptInvite from './components/AcceptInvite';
+import { InvoicePage } from './components/InvoicePage';
 
 // Inactivity timeout (45 minutes)
 const INACTIVITY_TIMEOUT = 45 * 60 * 1000;
@@ -285,6 +287,8 @@ export default function App() {
             <StudentDashboard />
           </ProtectedRoute>
         } />
+        <Route path="/student/accept-invite" element={<AcceptInvite />} />
+        <Route path="/invoice/:publicToken" element={<InvoicePage />} />
         
         <Route path="/verify" element={<Verify onNavigate={handleNavigate} setUser={setUser} />} />
         <Route path="/how-it-works" element={<HowItWorks onNavigate={handleNavigate} />} />

@@ -1,0 +1,10 @@
+ALTER TABLE students
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS parent_phone TEXT;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS public_token UUID DEFAULT gen_random_uuid() UNIQUE,
+  ADD COLUMN IF NOT EXISTS student_phone TEXT,
+  ADD COLUMN IF NOT EXISTS tutor_phone TEXT,
+  ADD COLUMN IF NOT EXISTS request_sent_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS description TEXT;

@@ -6,7 +6,7 @@ interface NotificationItem {
   id: string;
   type: string;
   title: string;
-  message: string;
+  body: string;
   link?: string | null;
   is_read?: boolean;
   created_at?: string;
@@ -24,7 +24,7 @@ const NotificationBell: React.FC = () => {
     id: row.id,
     type: row.type || 'info',
     title: row.title || 'Varsel',
-    message: row.message || row.description || '',
+    body: row.body || row.message || row.description || '',
     link: row.link || null,
     is_read: row.is_read,
     created_at: row.created_at || new Date().toISOString()
@@ -59,7 +59,7 @@ const NotificationBell: React.FC = () => {
 
         const { data, error } = await supabase
           .from('notifications')
-          .select('id, type, title, message, link, is_read, created_at')
+          .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(5);
@@ -169,7 +169,7 @@ const NotificationBell: React.FC = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
-                      <p className="mt-1 text-sm text-slate-600 leading-6 truncate">{notification.message}</p>
+                      <p className="mt-1 text-sm text-slate-600 leading-6 truncate">{notification.body}</p>
                     </div>
                     <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500">
                       {notification.type}
