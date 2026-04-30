@@ -307,6 +307,73 @@ function getReportStatusLabel(status: unknown) {
 
 async function startServer() {
   // API routes
+  app.post("/api/contact", async (req, res) => {
+    const name = clipText(req.body.name, 120);
+    const email = normalizeEmail(req.body.email);
+    const message = clipText(req.body.message, 4000);
+    const pageUrl = clipText(req.body.pageUrl || req.get("origin") || "", 1000);
+    const userAgent = clipText(req.get("user-agent") || "", 1000);
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "Navn, e-post og melding er påkrevd." });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Oppgi en gyldig e-postadresse." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    const contactEmail = process.env.CONTACT_EMAIL || process.env.SUPPORT_EMAIL || "info@tutorflyt.no";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+    const subject = `Ny kontaktmelding fra ${name}`;
+
+    try {
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: contactEmail,
+        replyTo: email,
+        subject,
+        text: [
+          "Ny kontaktmelding fra tutorflyt.no",
+          "",
+          `Navn: ${name}`,
+          `E-post: ${email}`,
+          pageUrl ? `Side: ${pageUrl}` : "",
+          "",
+          message,
+        ].filter(Boolean).join("\n"),
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
+            <h2 style="margin-bottom: 8px;">Ny kontaktmelding</h2>
+            <p style="margin-top: 0; color: #64748b;">Sendt fra kontaktsiden på tutorflyt.no.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 18px 0;">
+              <p><strong>Navn:</strong> ${escapeHtml(name)}</p>
+              <p><strong>E-post:</strong> ${escapeHtml(email)}</p>
+              <p><strong>Side:</strong> ${escapeHtml(pageUrl || "Ikke oppgitt")}</p>
+            </div>
+            <h3 style="margin-bottom: 8px;">Melding</h3>
+            <p style="white-space: pre-wrap; line-height: 1.6;">${escapeHtml(message)}</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #94a3b8;">User agent: ${escapeHtml(userAgent || "Ikke oppgitt")}</p>
+          </div>
+        `,
+      });
+
+      if (error) {
+        console.error("Resend API returned an error for contact message:", error);
+        return res.status(502).json({ error: "Kunne ikke sende meldingen." });
+      }
+
+      res.json({ success: true, emailId: data?.id });
+    } catch (error) {
+      console.error("Error sending contact message:", error);
+      res.status(500).json({ error: "Kunne ikke sende meldingen." });
+    }
+  });
+
   app.post("/api/auth/magic-link", async (req, res) => {
     const { email } = req.body;
     
