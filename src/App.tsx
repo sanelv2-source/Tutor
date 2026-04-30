@@ -14,6 +14,7 @@ import Contact from './components/Contact';
 import About from './components/About';
 import EmailPreview from './components/EmailPreview';
 import StudentDashboard from './components/StudentDashboard';
+import ResetPassword from './components/ResetPassword';
 import HowItWorks from './components/HowItWorks';
 import Pricing from './components/Pricing';
 import Navbar from './components/Navbar';
@@ -292,6 +293,7 @@ export default function App() {
         <Route path="/verify" element={<Verify onNavigate={handleNavigate} setUser={setUser} />} />
         <Route path="/how-it-works" element={<HowItWorks onNavigate={handleNavigate} />} />
         <Route path="/pricing" element={<Pricing onNavigate={handleNavigate} />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacy" element={<Privacy onNavigate={handleNavigate} />} />
         <Route path="/terms" element={<Terms onNavigate={handleNavigate} />} />
         <Route path="/contact" element={<Contact onNavigate={handleNavigate} />} />

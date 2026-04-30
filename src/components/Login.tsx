@@ -8,8 +8,42 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const resetRedirectUrl = `${window.location.origin}/reset-password`;
+      console.log('Attempting password reset with redirect:', resetRedirectUrl);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: resetRedirectUrl,
+      });
+
+      if (error) throw error;
+
+      setResetSent(true);
+      setSuccessMessage('Hvis e-posten finnes i vårt system, har vi nå sendt en lenke til deg. Husk å sjekke søppelpost (spam)!');
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      let msg = err.message || 'Kunne ikke sende e-post for tilbakestilling';
+      if (msg.includes('rate limit')) {
+        msg = 'Du har bedt om for mange tilbakestillinger. Vennligst vent en time og prøv igjen.';
+      }
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
@@ -96,7 +130,10 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
       let errorMessage = err instanceof Error ? err.message : 'Innlogging feilet';
       
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
-        errorMessage = 'Kunne ikke koble til serveren (Failed to fetch). Vennligst sjekk internettforbindelsen din eller om Supabase-prosjektet er aktivt.';
+        const url = (import.meta as any).env.VITE_SUPABASE_URL || 'IKKE SATT';
+        errorMessage = `Kunne ikke koble til Supabase (Failed to fetch). 
+          Sjekk at VITE_SUPABASE_URL er satt korrekt i Settings. 
+          Nåværende URL: ${url.substring(0, 15)}...`;
       } else if (errorMessage === '{}' || (typeof err === 'object' && Object.keys(err).length === 0)) {
         errorMessage = 'Kunne ikke logge inn. Sjekk at e-post/passord-innlogging er aktivert i Supabase-prosjektet ditt.';
       }
@@ -123,31 +160,78 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
           <Logo iconSize="w-16 h-16 text-4xl" textSize="text-3xl" showText={false} />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight flex items-center justify-center gap-3">
-          Velkommen til TutorFlyt
+          {isResetMode ? 'Glemt passord?' : 'Velkommen til TutorFlyt'}
           <Send className="w-8 h-8 text-teal-600" />
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Ditt verktøy for en enklere undervisningshverdag
+          {isResetMode ? 'Skriv inn e-posten din for å få en lenke til å lage nytt passord' : 'Ditt verktøy for en enklere undervisningshverdag'}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-slate-100">
           <h3 className="text-xl font-semibold text-slate-800 mb-6 text-center">
-            Logg inn
+            {isResetMode ? 'Tilbakestill passord' : 'Logg inn'}
           </h3>
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-              {error}
+          {(error || successMessage) && (
+            <div className={`mb-4 border px-4 py-3 rounded-lg text-sm ${error ? 'bg-red-50 border-red-200 text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
+              {error || successMessage}
             </div>
           )}
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-                E-postadresse
-              </label>
+          {isResetMode ? (
+            <form className="space-y-6" onSubmit={handleForgotPassword}>
+              <div>
+                <label htmlFor="reset-email" className="block text-sm font-medium text-slate-700">
+                  E-postadresse
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                    placeholder="din@epost.no"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading || resetSent}
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Sender...' : 'Send tilbakestillingslenke'}
+                </button>
+              </div>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetMode(false);
+                    setError('');
+                    setSuccessMessage('');
+                  }}
+                  className="text-sm font-medium text-teal-600 hover:text-teal-500 transition-colors"
+                >
+                  Tilbake til innlogging
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                  E-postadresse
+                </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-slate-400" />
@@ -166,57 +250,72 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
                 </div>
               </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                Passord
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-300 rounded cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
-                  Husk meg
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                  Passord
                 </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-lg py-3 bg-slate-50 border outline-none transition-colors"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Logger inn...' : (
-                  <>
-                    Logg inn
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
+                    Husk meg
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetMode(true);
+                      setError('');
+                      setSuccessMessage('');
+                    }}
+                    className="font-medium text-teal-600 hover:text-teal-500 transition-colors"
+                  >
+                    Glemt passord?
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Logger inn...' : (
+                    <>
+                      Logg inn
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="mt-6">
             <div className="relative">
