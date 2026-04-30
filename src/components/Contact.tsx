@@ -4,19 +4,39 @@ import Footer from './Footer';
 
 export default function Contact({ onNavigate }: { onNavigate: (page: string) => void }) {
   const [isSent, setIsSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    setIsSubmitting(true);
+    setError('');
+
+    const formData = new FormData(form);
     const name = `${formData.get('firstName') || ''} ${formData.get('lastName') || ''}`.trim();
     const email = String(formData.get('email') || '');
     const message = String(formData.get('message') || '');
-    const subject = encodeURIComponent('Kontakt fra tutorflyt.no');
-    const body = encodeURIComponent(`Navn: ${name}\nE-post: ${email}\n\n${message}`);
 
-    window.location.href = `mailto:info@tutorflyt.no?subject=${subject}&body=${body}`;
-    setIsSent(true);
-    e.currentTarget.reset();
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message, pageUrl: window.location.href }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunne ikke sende meldingen akkurat nå.');
+      }
+
+      setIsSent(true);
+      form.reset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunne ikke sende meldingen akkurat nå.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -44,7 +64,7 @@ export default function Contact({ onNavigate }: { onNavigate: (page: string) => 
                 </div>
                 <h3 className="text-lg font-medium text-emerald-900 mb-2">Melding sendt!</h3>
                 <p className="text-emerald-700">
-                  E-postprogrammet ditt er åpnet med meldingen ferdig utfylt. Send e-posten derfra, så svarer vi så fort som mulig.
+                  Takk for at du tok kontakt. Meldingen er sendt til Tutorflyt, og vi svarer så fort som mulig.
                 </p>
                 <button 
                   onClick={() => setIsSent(false)}
@@ -75,10 +95,16 @@ export default function Contact({ onNavigate }: { onNavigate: (page: string) => 
                   <label htmlFor="message" className="block text-sm font-medium text-slate-700 mb-1">Melding</label>
                   <textarea id="message" name="message" rows={4} required className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"></textarea>
                 </div>
+
+                {error && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
                 
-                <button type="submit" className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                <button type="submit" disabled={isSubmitting} className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
                   <Send className="h-4 w-4 mr-2" />
-                  Send melding
+                  {isSubmitting ? 'Sender...' : 'Send melding'}
                 </button>
               </form>
             )}
