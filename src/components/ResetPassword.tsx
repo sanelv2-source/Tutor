@@ -1,19 +1,128 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
+const PASSWORD_RECOVERY_FLAG = 'tutorflyt_password_recovery';
+
+const getRecoveryParams = () => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+  return {
+    tokenHash: searchParams.get('token_hash') || hashParams.get('token_hash'),
+    type: searchParams.get('type') || hashParams.get('type'),
+  };
+};
+
+const clearRecoveryUrl = () => {
+  if (window.location.search || window.location.hash) {
+    window.history.replaceState(null, document.title, '/reset-password');
+  }
+};
+
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const setReady = (isReady: boolean, message = '') => {
+      if (!isMounted) return;
+      setHasRecoverySession(isReady);
+      setError(message);
+      setIsVerifying(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        try {
+          sessionStorage.setItem(PASSWORD_RECOVERY_FLAG, 'true');
+        } catch (e) {
+          // Ignore storage errors
+        }
+        clearRecoveryUrl();
+        setReady(!!session, session ? '' : 'Tilbakestillingslenken er ugyldig eller utløpt. Be om en ny lenke.');
+      }
+    });
+
+    const verifyRecoveryLink = async () => {
+      try {
+        const { tokenHash, type } = getRecoveryParams();
+
+        if (tokenHash && type === 'recovery') {
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          });
+
+          if (verifyError) throw verifyError;
+
+          try {
+            sessionStorage.setItem(PASSWORD_RECOVERY_FLAG, 'true');
+          } catch (e) {
+            // Ignore storage errors
+          }
+
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error('Kunne ikke bekrefte tilbakestillingslenken.');
+          }
+
+          clearRecoveryUrl();
+          setReady(true);
+          return;
+        }
+
+        if (type === 'recovery') {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const hasRecoveryFlag = (() => {
+          try {
+            return sessionStorage.getItem(PASSWORD_RECOVERY_FLAG) === 'true';
+          } catch (e) {
+            return false;
+          }
+        })();
+
+        if (session && hasRecoveryFlag) {
+          clearRecoveryUrl();
+          setReady(true);
+          return;
+        }
+
+        setReady(false, 'Tilbakestillingslenken er ugyldig eller utløpt. Be om en ny lenke.');
+      } catch (err: any) {
+        console.error('Password recovery verification error:', err);
+        setReady(false, 'Tilbakestillingslenken er ugyldig eller utløpt. Be om en ny lenke.');
+      }
+    };
+
+    verifyRecoveryLink();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!hasRecoverySession) {
+      setError('Tilbakestillingslenken er ugyldig eller utløpt. Be om en ny lenke.');
+      return;
+    }
     
     if (password !== confirmPassword) {
       setError('Passordene er ikke like');
@@ -35,6 +144,13 @@ export default function ResetPassword() {
 
       if (error) throw error;
 
+      try {
+        sessionStorage.removeItem(PASSWORD_RECOVERY_FLAG);
+      } catch (e) {
+        // Ignore storage errors
+      }
+      await supabase.auth.signOut();
+
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');
@@ -46,6 +162,41 @@ export default function ResetPassword() {
       setIsLoading(false);
     }
   };
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-12 px-10 shadow-xl sm:rounded-2xl border border-slate-100 text-center">
+            <div className="mx-auto mb-6 h-12 w-12 rounded-full border-4 border-teal-100 border-t-teal-600 animate-spin" />
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">Sjekker lenken...</h2>
+            <p className="text-slate-600">
+              Vent litt mens vi bekrefter tilbakestillingslenken din.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasRecoverySession && error) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-12 px-10 shadow-xl sm:rounded-2xl border border-slate-100 text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Lenken virker ikke</h2>
+            <p className="text-slate-600 mb-8">{error}</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full py-3 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition-colors"
+            >
+              Gå til innlogging
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (

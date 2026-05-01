@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
@@ -22,17 +22,22 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
     setSuccessMessage('');
 
     try {
-      const resetRedirectUrl = `${window.location.origin}/reset-password`;
-      console.log('Attempting password reset with redirect:', resetRedirectUrl);
-
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: resetRedirectUrl,
+      const response = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetEmail,
+          pageUrl: window.location.origin,
+        }),
       });
 
-      if (error) throw error;
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunne ikke sende e-post for tilbakestilling');
+      }
 
       setResetSent(true);
-      setSuccessMessage('Hvis e-posten finnes i vårt system, har vi nå sendt en lenke til deg. Husk å sjekke søppelpost (spam)!');
+      setSuccessMessage('Hvis e-posten finnes i vårt system, har vi nå sendt en lenke til deg.');
     } catch (err: any) {
       console.error('Password reset error:', err);
       let msg = err.message || 'Kunne ikke sende e-post for tilbakestilling';

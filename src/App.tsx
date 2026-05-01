@@ -25,6 +25,26 @@ import { InvoicePage } from './components/InvoicePage';
 
 // Inactivity timeout (45 minutes)
 const INACTIVITY_TIMEOUT = 45 * 60 * 1000;
+const PASSWORD_RECOVERY_FLAG = 'tutorflyt_password_recovery';
+
+const isPasswordResetPage = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname === '/reset-password';
+};
+
+const hasPasswordRecoveryMarker = () => {
+  if (typeof window === 'undefined') return false;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+  return (
+    searchParams.get('type') === 'recovery' ||
+    hashParams.get('type') === 'recovery' ||
+    searchParams.has('token_hash') ||
+    hashParams.has('token_hash')
+  );
+};
 
 export default function App() {
   const navigate = useNavigate();
@@ -49,6 +69,29 @@ export default function App() {
   useEffect(() => {
     const checkRoleAndSetUser = async (session: any, event?: string) => {
       if (!session?.user || !session.user.email) {
+        setUser(null);
+        setIsAuthReady(true);
+        return;
+      }
+
+      const isStoredRecovery = (() => {
+        try {
+          return sessionStorage.getItem(PASSWORD_RECOVERY_FLAG) === 'true';
+        } catch (e) {
+          return false;
+        }
+      })();
+      const hasRecoveryMarker = hasPasswordRecoveryMarker();
+      const isRecoveryFlow = event === 'PASSWORD_RECOVERY' || hasRecoveryMarker || (isPasswordResetPage() && isStoredRecovery);
+
+      if (isRecoveryFlow) {
+        try {
+          if (event === 'PASSWORD_RECOVERY' || hasRecoveryMarker) {
+            sessionStorage.setItem(PASSWORD_RECOVERY_FLAG, 'true');
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
         setUser(null);
         setIsAuthReady(true);
         return;

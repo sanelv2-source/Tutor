@@ -307,6 +307,104 @@ function getReportStatusLabel(status: unknown) {
 
 async function startServer() {
   // API routes
+  app.post("/api/auth/password-reset", async (req, res) => {
+    const email = normalizeEmail(req.body.email);
+
+    if (!email) {
+      return res.status(400).json({ error: "E-postadresse er påkrevd." });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Oppgi en gyldig e-postadresse." });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    const origin = getAppOrigin(req);
+    const resetPageUrl = `${origin}/reset-password`;
+
+    try {
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo: resetPageUrl,
+        },
+      });
+
+      if (error) {
+        console.error("Supabase recovery link error:", error);
+        if (/not found|user.*not.*found|no user/i.test(error.message || "")) {
+          return res.json({ success: true });
+        }
+        return res.status(502).json({ error: "Kunne ikke lage tilbakestillingslenke." });
+      }
+
+      const tokenHash = data?.properties?.hashed_token;
+      const resetUrl = tokenHash
+        ? `${resetPageUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`
+        : data?.properties?.action_link;
+
+      if (!resetUrl) {
+        return res.status(502).json({ error: "Kunne ikke lage tilbakestillingslenke." });
+      }
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+      const replyTo = process.env.SUPPORT_EMAIL || "info@tutorflyt.no";
+      const { error: emailError } = await resend.emails.send({
+        from: fromEmail,
+        to: email,
+        replyTo,
+        subject: "Tilbakestill passordet ditt i TutorFlyt",
+        text: [
+          "Hei!",
+          "",
+          "Vi mottok en forespørsel om å tilbakestille passordet ditt i TutorFlyt.",
+          "Åpne lenken under for å lage et nytt passord:",
+          resetUrl,
+          "",
+          "Hvis du ikke ba om dette, kan du trygt ignorere denne e-posten.",
+          "",
+          "Hilsen TutorFlyt",
+        ].join("\n"),
+        html: `
+          <div style="background-color:#f8fafc;font-family:Arial,sans-serif;padding:40px 20px;">
+            <div style="margin:0 auto;padding:40px 32px;background:#fff;border-radius:12px;max-width:600px;border:1px solid #e2e8f0;text-align:center;color:#0f172a;">
+              <h1 style="font-size:24px;margin:0 0 20px;">Tilbakestill passordet ditt</h1>
+              <p style="color:#475569;font-size:16px;line-height:26px;margin:0 0 20px;">
+                Vi mottok en forespørsel om å lage et nytt passord for TutorFlyt-kontoen din.
+              </p>
+              <div style="margin:32px 0;text-align:center;">
+                <a href="${escapeHtml(resetUrl)}" style="background:#0f766e;border-radius:8px;color:#fff;display:inline-block;font-size:16px;font-weight:bold;text-decoration:none;padding:16px 32px;">
+                  Lag nytt passord
+                </a>
+              </div>
+              <p style="color:#64748b;font-size:14px;line-height:22px;margin:0;">
+                Hvis du ikke ba om dette, kan du trygt ignorere denne e-posten.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        console.error("Resend password reset error:", emailError);
+        return res.status(502).json({ error: "Kunne ikke sende tilbakestillingslenke." });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      res.status(500).json({ error: "Kunne ikke sende tilbakestillingslenke." });
+    }
+  });
+
   app.post("/api/contact", async (req, res) => {
     const name = clipText(req.body.name, 120);
     const email = normalizeEmail(req.body.email);
