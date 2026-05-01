@@ -278,7 +278,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   Klar til å forenkle undervisningen?
                 </h2>
                 <p className="text-xl text-indigo-100 mb-10 max-w-2xl mx-auto">
-                  Bli med i betaen i dag og få en ryddigere hverdag for deg og dine elever.
+                  Start med TutorFlyt i dag og få en ryddigere hverdag for deg og dine elever. Prøv gratis i 14 dager.
                 </p>
                 <button 
                   onClick={() => onNavigate('signup')}
