@@ -591,10 +591,10 @@ export const ChatList = () => {
   };
 
   return (
-    <div className="bg-slate-50 flex h-[calc(100vh-8rem)] text-slate-800 font-sans rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+    <div className="bg-slate-50 flex h-[calc(100vh-10rem)] min-h-[520px] text-slate-800 font-sans rounded-2xl shadow-xl border border-slate-200 overflow-hidden sm:h-[calc(100vh-8rem)]">
       
       {/* Sidebar / Chat List */}
-      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-slate-200 flex flex-col ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full min-w-0 md:w-1/3 lg:w-1/4 border-r border-slate-200 flex flex-col ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
           <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -705,23 +705,23 @@ export const ChatList = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col bg-white ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`min-w-0 flex-1 flex flex-col bg-white ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {activeConversation ? (
           <>
             {/* Chat Header */}
-            <div className="flex items-center gap-4 p-4 sm:p-6 border-b border-slate-200 bg-white">
+            <div className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6 border-b border-slate-200 bg-white">
               <button 
                 onClick={handleBack}
                 className="md:hidden p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm border border-violet-200">
                   {getInitials(getChatName(activeConversation, currentUserId))}
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">{getChatName(activeConversation, currentUserId)}</h2>
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-bold text-slate-900">{getChatName(activeConversation, currentUserId)}</h2>
                   <p className="text-xs text-violet-600">Aktiv nå</p>
                 </div>
               </div>
@@ -777,7 +777,7 @@ export const ChatList = () => {
 
             {/* Input Area */}
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-white">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+              <form onSubmit={handleSendMessage} className="flex min-w-0 items-center gap-3">
                 <div className="flex-1 relative">
                   <input
                     type="text"

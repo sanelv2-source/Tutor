@@ -19,11 +19,11 @@ const AccordionItem = ({ question, answer }: { question: string, answer: React.R
   return (
     <div className="border-b border-slate-200">
       <button 
-        className="w-full py-6 flex justify-between items-center text-left focus:outline-none"
+        className="w-full py-5 sm:py-6 flex justify-between items-center gap-4 text-left focus:outline-none"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="text-lg font-medium text-slate-900">{question}</span>
-        {isOpen ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
+        <span className="text-base sm:text-lg font-medium text-slate-900">{question}</span>
+        {isOpen ? <ChevronUp className="h-5 w-5 shrink-0 text-slate-500" /> : <ChevronDown className="h-5 w-5 shrink-0 text-slate-500" />}
       </button>
       {isOpen && (
         <div className="pb-6 text-slate-600 leading-relaxed">
@@ -39,19 +39,19 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
       <main>
         {/* 1. Hero Section */}
-        <section className="pt-16 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-            <div className="max-w-2xl">
-              <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight text-slate-900 mb-6 leading-[1.1]">
+        <section className="pt-10 sm:pt-16 pb-16 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-8 items-center">
+            <div className="max-w-2xl min-w-0">
+              <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 mb-5 sm:mb-6 leading-[1.08] break-words">
                 Slutt å mase om betaling. <span className="text-indigo-600">Begynn å undervise.</span>
               </h1>
-              <p className="text-xl text-slate-600 mb-8 leading-relaxed">
+              <p className="text-lg sm:text-xl text-slate-600 mb-7 sm:mb-8 leading-relaxed">
                 Det enkle kontrollpanelet bygget for norske privatlærere. Automatiser fakturering, styr timeplanen og imponerer elevene – alt fra mobilen.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <button 
                   onClick={() => onNavigate('signup')}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 text-base font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-5 sm:px-6 py-3 text-base font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-center"
                 >
                   Prøv ut nå – 14 dager gratis prøveperiode
                 </button>
@@ -59,15 +59,15 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
               <p className="mt-3 text-sm text-slate-500 font-medium">
                 Ingen binding. Ingen kredittkort kreves.
               </p>
-              <div className="mt-8 flex items-center gap-3">
-                <div className="flex -space-x-2">
+              <div className="mt-8 flex items-start sm:items-center gap-3">
+                <div className="flex -space-x-2 shrink-0">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden">
                       <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="User" />
                     </div>
                   ))}
                 </div>
-                <div className="flex flex-col">
+                <div className="flex min-w-0 flex-col">
                   <p className="text-sm text-slate-600 font-medium">
                     Allerede <span className="text-indigo-600 font-bold">4 lærere i Agder</span> venter på tilgang
                   </p>
@@ -79,8 +79,8 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             </div>
             
             {/* Hero Illustration / Mockup */}
-            <div className="relative mx-auto w-full max-w-[320px] lg:max-w-none lg:ml-auto flex justify-center">
-              <div className="relative w-[300px] h-[600px] bg-slate-900 rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden">
+            <div className="relative mx-auto w-full max-w-[300px] sm:max-w-[320px] lg:max-w-none lg:ml-auto flex justify-center">
+              <div className="relative w-full max-w-[300px] aspect-[1/2] bg-slate-900 rounded-[2.5rem] sm:rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden">
                 <div className="absolute top-0 inset-x-0 h-6 bg-slate-900 rounded-b-3xl w-40 mx-auto z-20"></div>
                 <div className="bg-slate-50 w-full h-full flex flex-col relative z-10">
                   <div className="bg-indigo-600 text-white pt-12 pb-6 px-6 rounded-b-3xl shadow-sm">
@@ -88,25 +88,25 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                     <h3 className="text-3xl font-bold">kr 12 450</h3>
                   </div>
                   <div className="p-4 flex-1 flex flex-col gap-4 mt-4">
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 animate-fade-in-up">
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 animate-fade-in-up">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900">Vellykket betaling</p>
-                        <p className="text-sm text-slate-500">Mattehjelp - Jonas (Vipps)</p>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
+                        <p className="text-xs sm:text-sm text-slate-500">Mattehjelp - Jonas (Vipps)</p>
                       </div>
-                      <div className="ml-auto font-bold text-emerald-600">+450 kr</div>
+                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">+450 kr</div>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 opacity-70">
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 opacity-70">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900">Vellykket betaling</p>
-                        <p className="text-sm text-slate-500">Pianotime - Sofie (Kort)</p>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
+                        <p className="text-xs sm:text-sm text-slate-500">Pianotime - Sofie (Kort)</p>
                       </div>
-                      <div className="ml-auto font-bold text-emerald-600">+500 kr</div>
+                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">+500 kr</div>
                     </div>
                   </div>
                 </div>
@@ -118,9 +118,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 2. Problem/Agitation Section */}
-        <section className="py-24 bg-slate-50 border-y border-slate-200">
+        <section className="py-16 sm:py-24 bg-slate-50 border-y border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
+            <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
                 Administrasjon skal ikke ta mer tid enn selve undervisningen.
               </h2>
@@ -161,8 +161,8 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 3. Solution/Benefits Section (Z-pattern) */}
-        <section className="py-24 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-24">
+        <section className="py-16 sm:py-24 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 sm:space-y-24">
             
             {/* Benefit 1: Image Right */}
             <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
@@ -176,7 +176,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 </p>
               </div>
               <div className="flex-1 w-full max-w-md mx-auto">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 transform rotate-2 hover:rotate-0 transition-transform duration-300">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-5 sm:p-6 transform rotate-0 sm:rotate-2 hover:rotate-0 transition-transform duration-300">
                   <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                     <span className="font-semibold text-slate-900">Siste fakturaer</span>
                     <span className="text-sm text-indigo-600 font-medium">Se alle</span>
@@ -187,17 +187,17 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                       { name: 'Ola Hansen', status: 'Venter', color: 'text-amber-600', bg: 'bg-amber-50' },
                       { name: 'Ingrid Lien', status: 'Betalt', color: 'text-emerald-600', bg: 'bg-emerald-50' }
                     ].map((inv, i) => (
-                      <div key={i} className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-medium">
+                      <div key={i} className="flex justify-between items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="w-10 h-10 shrink-0 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-medium">
                             {inv.name.charAt(0)}
                           </div>
-                          <div>
-                            <p className="font-medium text-slate-900">{inv.name}</p>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 truncate">{inv.name}</p>
                             <p className="text-xs text-slate-500">Gitarundervisning</p>
                           </div>
                         </div>
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${inv.bg} ${inv.color}`}>
+                        <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${inv.bg} ${inv.color}`}>
                           {inv.status}
                         </span>
                       </div>
@@ -219,7 +219,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 </p>
               </div>
               <div className="flex-1 w-full max-w-md mx-auto">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 transform -rotate-2 hover:rotate-0 transition-transform duration-300">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-5 sm:p-6 transform rotate-0 sm:-rotate-2 hover:rotate-0 transition-transform duration-300">
                   <div className="flex justify-between items-center mb-6">
                     <span className="font-bold text-lg text-slate-900">Oktober 2026</span>
                     <div className="flex gap-2">
@@ -257,7 +257,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 </p>
               </div>
               <div className="flex-1 w-full max-w-md mx-auto">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 transform rotate-2 hover:rotate-0 transition-transform duration-300">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-5 sm:p-6 transform rotate-0 sm:rotate-2 hover:rotate-0 transition-transform duration-300">
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
                       <span className="text-indigo-600 font-bold">M</span>
@@ -268,10 +268,10 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <div className="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none ml-8 text-sm shadow-sm">
+                    <div className="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none sm:ml-8 text-sm shadow-sm">
                       Hei! Dagens time gikk kjempebra. Jonas har virkelig knekt koden på algebra nå. Sender over faktura for timen.
                     </div>
-                    <div className="bg-slate-100 text-slate-800 p-3 rounded-2xl rounded-tl-none mr-8 text-sm">
+                    <div className="bg-slate-100 text-slate-800 p-3 rounded-2xl rounded-tl-none sm:mr-8 text-sm">
                       Så fantastisk å høre! Tusen takk for hjelpen. Faktura er betalt via Vipps nå. 😊
                     </div>
                   </div>
@@ -283,9 +283,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 4. Differentiation Section */}
-        <section className="py-24 bg-slate-900 text-white">
+        <section className="py-16 sm:py-24 bg-slate-900 text-white">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-12 text-center">Endelig et verktøy som snakker ditt språk.</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">Endelig et verktøy som snakker ditt språk.</h2>
             
             <div className="space-y-6">
               {[
@@ -302,13 +302,13 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                   desc: "Vi er ikke et komplisert system for store skoler – vi er bygget for deg som jobber alene."
                 }
               ].map((item, i) => (
-                <div key={i} className="flex gap-4 bg-slate-800/50 p-6 rounded-2xl border border-slate-700">
+                <div key={i} className="flex gap-4 bg-slate-800/50 p-5 sm:p-6 rounded-2xl border border-slate-700">
                   <div className="shrink-0 mt-1">
                     <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold mb-2 text-white">{item.title}</h3>
-                    <p className="text-slate-300 text-lg">{item.desc}</p>
+                    <p className="text-slate-300 text-base sm:text-lg">{item.desc}</p>
                   </div>
                 </div>
               ))}
@@ -317,7 +317,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 5. FAQ Section */}
-        <section className="py-24 bg-white">
+        <section className="py-16 sm:py-24 bg-white">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-slate-900 mb-10 text-center">Ofte stilte spørsmål</h2>
             <div className="border-t border-slate-200">

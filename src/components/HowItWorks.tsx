@@ -16,20 +16,20 @@ import Footer from './Footer';
 export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) => void }) {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
-      <main className="pb-24">
+      <main className="pb-16 sm:pb-24">
         {/* Hero Section */}
-        <section className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 mb-6">
+        <section className="pt-12 sm:pt-20 pb-10 sm:pb-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 mb-5 sm:mb-6 break-words">
             Slik fungerer TutorFlyt
           </h1>
-          <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
             Tre enkle steg for å komme i gang. Enten du er en lærer som vil ha mindre administrasjon, eller en elev som vil ha bedre oversikt.
           </p>
         </section>
 
         {/* Video Demo Section */}
-        <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto mb-24">
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-slate-900 aspect-video group">
+        <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto mb-16 sm:mb-24">
+          <div className="relative rounded-2xl overflow-hidden shadow-xl sm:shadow-2xl border border-slate-200 bg-slate-900 aspect-video group">
             <video 
               className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
               autoPlay 
@@ -43,24 +43,24 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
           </div>
         </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20 sm:space-y-32">
           
           {/* Lærere Section */}
           <section>
-            <div className="text-center mb-16">
+            <div className="text-center mb-10 sm:mb-16">
               <span className="text-indigo-600 font-bold tracking-wider uppercase text-sm mb-2 block">For Lærere</span>
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900">Fokusér på faget, vi tar oss av resten</h2>
             </div>
             
-            <div className="space-y-24">
+            <div className="space-y-16 sm:space-y-24">
               {/* Step 1: Text Left, Image Right */}
-              <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+              <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 lg:gap-20">
                 <div className="flex-1 order-2 md:order-1">
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 font-bold text-xl">1</span>
+                  <div className="flex items-center gap-4 mb-5 sm:mb-6">
+                    <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 font-bold text-xl">1</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Opprett profil</h3>
                   </div>
-                  <p className="text-lg text-slate-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
                     Registrer deg på få minutter. Legg til elevene dine, sett opp fagene du underviser i, og du er klar til å starte. Alt er samlet på ett sted, slik at du slipper å lete gjennom regneark og notatbøker.
                   </p>
                   <ul className="space-y-3">
@@ -87,7 +87,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
               </div>
 
               {/* Step 2: Image Left, Text Right */}
-              <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+              <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 lg:gap-20">
                 <div className="flex-1 w-full">
                   <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 aspect-[4/3]">
                     <img 
@@ -99,11 +99,11 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-orange-100 text-orange-600 font-bold text-xl">2</span>
+                  <div className="flex items-center gap-4 mb-5 sm:mb-6">
+                    <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-orange-100 text-orange-600 font-bold text-xl">2</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Logg timer & progresjon</h3>
                   </div>
-                  <p className="text-lg text-slate-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
                     Etter hver time fyller du raskt ut en statusrapport. Noter mestringsnivå, lekser og kommentarer med noen få klikk. Eleven får automatisk beskjed.
                   </p>
                   <ul className="space-y-3">
@@ -120,13 +120,13 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
               </div>
 
               {/* Step 3: Text Left, Image Right */}
-              <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+              <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 lg:gap-20">
                 <div className="flex-1 order-2 md:order-1">
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 font-bold text-xl">3</span>
+                  <div className="flex items-center gap-4 mb-5 sm:mb-6">
+                    <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 font-bold text-xl">3</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Få betalt</h3>
                   </div>
-                  <p className="text-lg text-slate-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
                     Send automatisk Vipps-krav eller faktura rett etter timen. Få full oversikt over hvem som har betalt og hva som utestår, uten å måtte sjekke banken manuelt.
                   </p>
                   <ul className="space-y-3">
@@ -159,14 +159,14 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
 
           {/* Elever Section */}
           <section>
-            <div className="text-center mb-16">
+            <div className="text-center mb-10 sm:mb-16">
               <span className="text-orange-500 font-bold tracking-wider uppercase text-sm mb-2 block">For Elever</span>
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900">Full oversikt over læringen</h2>
             </div>
             
-            <div className="space-y-24">
+            <div className="space-y-16 sm:space-y-24">
               {/* Step 1: Image Left, Text Right */}
-              <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+              <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 lg:gap-20">
                 <div className="flex-1 w-full">
                   <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 aspect-[4/3]">
                     <img 
@@ -178,11 +178,11 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 font-bold text-xl">1</span>
+                  <div className="flex items-center gap-4 mb-5 sm:mb-6">
+                    <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 font-bold text-xl">1</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Få tilgang til din portal</h3>
                   </div>
-                  <p className="text-lg text-slate-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
                     Motta en sikker, magisk lenke på SMS eller e-post. Ingen passord å huske – bare klikk og du er inne i din personlige portal på mobilen eller PC-en.
                   </p>
                   <ul className="space-y-3">
@@ -199,13 +199,13 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
               </div>
 
               {/* Step 2: Text Left, Image Right */}
-              <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+              <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 lg:gap-20">
                 <div className="flex-1 order-2 md:order-1">
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 text-purple-600 font-bold text-xl">2</span>
+                  <div className="flex items-center gap-4 mb-5 sm:mb-6">
+                    <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-purple-100 text-purple-600 font-bold text-xl">2</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Se fremgang & ressurser</h3>
                   </div>
-                  <p className="text-lg text-slate-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
                     Følg med på mestringsnivået fra uke til uke. Finn lekser, tilbakemeldinger og delte dokumenter samlet på ett sted, slik at du alltid er forberedt.
                   </p>
                   <ul className="space-y-3">
@@ -232,7 +232,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
               </div>
 
               {/* Step 3: Image Left, Text Right */}
-              <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+              <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 lg:gap-20">
                 <div className="flex-1 w-full">
                   <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 aspect-[4/3]">
                     <img 
@@ -244,11 +244,11 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-rose-100 text-rose-600 font-bold text-xl">3</span>
+                  <div className="flex items-center gap-4 mb-5 sm:mb-6">
+                    <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-rose-100 text-rose-600 font-bold text-xl">3</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Kommuniser med din lærer</h3>
                   </div>
-                  <p className="text-lg text-slate-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
                     Be om å flytte timer, still spørsmål om leksene eller gi beskjed om fravær – alt direkte gjennom portalen. Slutt på spredte SMS-er og e-poster.
                   </p>
                   <ul className="space-y-3">
@@ -267,22 +267,22 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
           </section>
 
           {/* CTA Section */}
-          <section className="mt-32">
-            <div className="bg-indigo-600 rounded-[2.5rem] p-10 md:p-20 text-center shadow-2xl relative overflow-hidden max-w-5xl mx-auto">
+          <section className="mt-20 sm:mt-32">
+            <div className="bg-indigo-600 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-10 md:p-20 text-center shadow-xl sm:shadow-2xl relative overflow-hidden max-w-5xl mx-auto">
               {/* Decorative background elements */}
               <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/3 w-96 h-96 bg-indigo-500 rounded-full blur-3xl opacity-50"></div>
               <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-96 h-96 bg-indigo-700 rounded-full blur-3xl opacity-50"></div>
               
               <div className="relative z-10">
-                <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-6">
+                <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-5 sm:mb-6">
                   Klar til å forenkle undervisningen?
                 </h2>
-                <p className="text-xl text-indigo-100 mb-10 max-w-2xl mx-auto">
+                <p className="text-lg sm:text-xl text-indigo-100 mb-8 sm:mb-10 max-w-2xl mx-auto">
                   Start med TutorFlyt i dag og få en ryddigere hverdag for deg og dine elever. Prøv gratis i 14 dager.
                 </p>
                 <button 
                   onClick={() => onNavigate('signup')}
-                  className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                  className="inline-flex w-full sm:w-auto items-center justify-center px-6 sm:px-8 py-4 text-base sm:text-lg font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                 >
                   Kom i gang nå
                   <ArrowRight className="ml-2 h-5 w-5" />

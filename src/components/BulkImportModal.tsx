@@ -275,9 +275,9 @@ Per Andersen,per@example.com,Norsk`;
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+        <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-start gap-3">
           <h3 className="text-xl font-bold text-slate-900">Masseimport av elever</h3>
           <button 
             onClick={onClose}
@@ -288,13 +288,13 @@ Per Andersen,per@example.com,Norsk`;
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {!showResults ? (
             <>
               {/* Upload Section */}
               <div>
                 <h4 className="font-semibold text-slate-900 mb-4">1. Last opp CSV-fil</h4>
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors">
+                <div className="border-2 border-dashed border-slate-300 rounded-xl p-5 sm:p-8 text-center hover:border-indigo-400 transition-colors">
                   <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
                   <input
                     ref={fileInputRef}
@@ -321,7 +321,7 @@ Per Andersen,per@example.com,Norsk`;
               {/* Template Section */}
               <div>
                 <h4 className="font-semibold text-slate-900 mb-3">2. CSV Format</h4>
-                <div className="bg-slate-50 p-4 rounded-lg text-sm font-mono text-slate-700 mb-3">
+                <div className="bg-slate-50 p-4 rounded-lg text-sm font-mono text-slate-700 mb-3 overflow-x-auto">
                   <div>Navn,E-post,Fag</div>
                   <div className="text-slate-500">Ole Nordmann,ole@example.com,Matematikk</div>
                   <div className="text-slate-500">Maria Jensen,maria@example.com,Engelsk</div>
@@ -352,16 +352,16 @@ Per Andersen,per@example.com,Norsk`;
             <>
               {/* Results Section */}
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-lg text-center">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  <div className="bg-slate-50 p-3 sm:p-4 rounded-lg text-center">
                     <p className="text-sm text-slate-600 mb-1">Total</p>
                     <p className="text-2xl font-bold text-slate-900">{results.length}</p>
                   </div>
-                  <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <div className="bg-green-50 p-3 sm:p-4 rounded-lg text-center">
                     <p className="text-sm text-green-600 mb-1">Suksess</p>
                     <p className="text-2xl font-bold text-green-600">{successCount}</p>
                   </div>
-                  <div className="bg-red-50 p-4 rounded-lg text-center">
+                  <div className="bg-red-50 p-3 sm:p-4 rounded-lg text-center">
                     <p className="text-sm text-red-600 mb-1">Feil</p>
                     <p className="text-2xl font-bold text-red-600">{failureCount}</p>
                   </div>
@@ -425,7 +425,7 @@ Per Andersen,per@example.com,Norsk`;
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-100 flex gap-3 justify-end">
+        <div className="p-4 sm:p-6 border-t border-slate-100 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           {showResults ? (
             <>
               <button
@@ -435,13 +435,13 @@ Per Andersen,per@example.com,Norsk`;
                   setShowResults(false);
                   setProgress(0);
                 }}
-                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                className="w-full px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors sm:w-auto"
               >
                 Importer flere
               </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-indigo-600 text-white font-medium hover:bg-indigo-700 rounded-lg transition-colors"
+                className="w-full px-4 py-2 bg-indigo-600 text-white font-medium hover:bg-indigo-700 rounded-lg transition-colors sm:w-auto"
               >
                 Lukk
               </button>
@@ -450,14 +450,14 @@ Per Andersen,per@example.com,Norsk`;
             <>
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                className="w-full px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors sm:w-auto"
               >
                 Avbryt
               </button>
               <button
                 onClick={handleImport}
                 disabled={!file || importing}
-                className="px-4 py-2 bg-indigo-600 text-white font-medium hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full px-4 py-2 bg-indigo-600 text-white font-medium hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:w-auto"
               >
                 {importing ? (
                   <>
