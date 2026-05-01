@@ -1,6 +1,5 @@
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import Logo from './Logo';
 import Footer from './Footer';
 
 export default function Pricing({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -12,7 +11,7 @@ export default function Pricing({ onNavigate }: { onNavigate: (page: string) => 
             Enkel og transparent prising
           </h1>
           <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
-            Ingen skjulte gebyrer. Ingen bindingstid. Prøv gratis i 14 dager.
+            Én enkel pris for hele lærerverktøyet. Ingen skjulte gebyrer. Ingen bindingstid.
           </p>
         </section>
 
@@ -21,21 +20,21 @@ export default function Pricing({ onNavigate }: { onNavigate: (page: string) => 
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -z-10"></div>
             
             <h3 className="text-2xl font-bold text-slate-900 mb-2">Pro Lærer</h3>
-            <p className="text-slate-500 mb-6">Alt du trenger for å drive undervisningen din.</p>
+            <p className="text-slate-500 mb-6">For privatlærere som vil samle elever, timer, betaling og oppfølging på ett sted.</p>
             
             <div className="mb-8">
-              <span className="text-5xl font-extrabold text-slate-900">99,-</span>
+              <span className="text-5xl font-extrabold text-slate-900">149,-</span>
               <span className="text-slate-500 font-medium">/mnd</span>
             </div>
             
             <ul className="space-y-4 mb-10">
               {[
-                'Ubegrenset antall elever',
-                'Automatisk fakturering',
-                'Magic Link-portal for elever',
-                'Kalender og timeplan',
-                'Progresjonssporing',
-                'Norsk kundestøtte'
+                'Ubegrenset antall elever og timer',
+                'Kalender med oversikt over faste og enkeltstående timer',
+                'Betalingsoversikt, fakturaoppfølging og Vipps-flyt',
+                'Elevportal for meldinger, oppgaver og rapporter',
+                'Progresjonssporing etter hver undervisningstime',
+                'Norsk support og ingen bindingstid'
               ].map((feature, i) => (
                 <li key={i} className="flex items-center gap-3 text-slate-700">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
@@ -50,6 +49,9 @@ export default function Pricing({ onNavigate }: { onNavigate: (page: string) => 
             >
               Start din gratis prøveperiode
             </button>
+            <p className="mt-4 text-center text-sm text-slate-500">
+              14 dager gratis. Deretter 149 kr per måned.
+            </p>
           </div>
         </div>
       </main>
