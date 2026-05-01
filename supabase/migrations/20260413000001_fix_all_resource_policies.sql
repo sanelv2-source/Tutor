@@ -2,6 +2,7 @@
 -- Drop ALL old resource policies to prevent conflicts
 
 -- Drop all old policies on resources table
+DROP POLICY IF EXISTS "Tutors can manage their own resources" ON public.resources;
 DROP POLICY IF EXISTS "Students can read assigned resources" ON public.resources;
 DROP POLICY IF EXISTS "Students can read assigned resources v2" ON public.resources;
 DROP POLICY IF EXISTS "Students can read assigned resources v3" ON public.resources;
