@@ -25,6 +25,9 @@
     "noEmit": true
   },
   "exclude": [
+    "dist",
+    "build",
+    "node_modules",
     "supabase/functions"
   ]
 }

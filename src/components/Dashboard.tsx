@@ -550,7 +550,7 @@ const saveMeetLink = async (link: string) => {
         file_url,
         students ( full_name ),
         reports ( topic ),
-        assignments ( title )
+        assignments!submissions_assignment_id_fkey ( title )
       `)
       .eq('tutor_id', authUserId)
       .eq('status', 'pending')
