@@ -97,6 +97,18 @@ export default function App() {
         return;
       }
 
+      if (isStoredRecovery) {
+        try {
+          sessionStorage.removeItem(PASSWORD_RECOVERY_FLAG);
+        } catch (e) {
+          // Ignore storage errors
+        }
+        await supabase.auth.signOut();
+        setUser(null);
+        setIsAuthReady(true);
+        return;
+      }
+
       // Hent profil og sesjons-ID med retry-logikk for å håndtere "Failed to fetch" i AI Studio
       let profile = null;
       let profileError = null;

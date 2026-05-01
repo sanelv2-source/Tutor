@@ -116,6 +116,16 @@ export default function ResetPassword() {
     };
   }, []);
 
+  const abandonPasswordReset = async (destination = '/login') => {
+    try {
+      sessionStorage.removeItem(PASSWORD_RECOVERY_FLAG);
+    } catch (e) {
+      // Ignore storage errors
+    }
+    await supabase.auth.signOut();
+    navigate(destination, { replace: true });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -187,7 +197,7 @@ export default function ResetPassword() {
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Lenken virker ikke</h2>
             <p className="text-slate-600 mb-8">{error}</p>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => abandonPasswordReset('/login')}
               className="w-full py-3 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition-colors"
             >
               Gå til innlogging
@@ -225,7 +235,7 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative">
       <button 
-        onClick={() => navigate('/login')}
+        onClick={() => abandonPasswordReset('/login')}
         className="absolute top-6 left-6 sm:top-8 sm:left-8 flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
