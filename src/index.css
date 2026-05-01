@@ -1,5 +1,36 @@
 @import "tailwindcss";
 
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+#root {
+  overflow-x: clip;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
 .chat-item {
   border: 1px solid rgba(255,255,255,0.05);
 }
@@ -104,12 +135,14 @@
 .lesson-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .lesson-student {
   font-weight: 700;
   color: #2d3436;
   font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .lesson-time {
@@ -179,6 +212,18 @@
 }
 
 @media (max-width: 768px) {
+  .calendar-view {
+    padding: 16px;
+    min-height: auto;
+  }
+  .lesson-card {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .lesson-card:hover {
+    transform: none;
+  }
   .weekly-calendar {
     grid-template-columns: 1fr;
     padding: 15px;
@@ -217,7 +262,7 @@
   background: white;
   padding: 30px;
   border-radius: 20px;
-  width: 400px;
+  width: min(400px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   gap: 15px;

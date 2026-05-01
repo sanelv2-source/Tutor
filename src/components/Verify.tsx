@@ -60,8 +60,8 @@ export default function Verify({ onNavigate, setUser }: { onNavigate: (page: str
   }, [location.search, onNavigate, setUser]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center py-12 sm:px-6 lg:px-8 font-sans">
-      <div className="bg-white p-10 rounded-2xl shadow-xl shadow-slate-200/50 max-w-md w-full text-center border border-slate-100">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-12 sm:px-6 lg:px-8 font-sans">
+      <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-xl shadow-slate-200/50 max-w-md w-full text-center border border-slate-100">
         {status === 'loading' && (
           <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>

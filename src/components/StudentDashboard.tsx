@@ -442,15 +442,15 @@ const StudentDashboard = () => {
 
           {/* Notifications Section */}
           {notifications.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-6">
               <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-indigo-600" />
                 Varsler ({notifications.length})
               </h3>
               <div className="space-y-3">
                 {notifications.map((notification) => (
-                  <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                    <div className="flex-1">
+                  <div key={notification.id} className="flex flex-col items-start gap-3 p-3 bg-slate-50 rounded-lg sm:flex-row">
+                    <div className="min-w-0 flex-1">
                       <h4 className="font-medium text-slate-900">{notification.title}</h4>
                       <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
                       <p className="text-xs text-slate-400 mt-1">
@@ -459,7 +459,7 @@ const StudentDashboard = () => {
                     </div>
                     <button
                       onClick={() => markNotificationAsRead(notification.id)}
-                      className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                      className="w-full shrink-0 px-3 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors sm:w-auto sm:py-1"
                     >
                       Merk som lest
                     </button>
@@ -644,7 +644,7 @@ const StudentDashboard = () => {
       return (
         <div className="p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Innstillinger</h1>
-          <div className="bg-white p-8 rounded-2xl border border-gray-100 max-w-xl">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl border border-gray-100 max-w-xl">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Endre passord</h3>
             <div className="space-y-4">
               <div>
@@ -715,17 +715,17 @@ const StudentDashboard = () => {
                         : res?.url;
                         
                       return (
-                        <li key={res?.id} className="p-6 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex items-center space-x-4">
+                        <li key={res?.id} className="p-4 sm:p-6 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex min-w-0 items-center space-x-4">
                             <div className={`p-3 ${iconBg} rounded-xl text-2xl shrink-0`}>
                               {icon}
                             </div>
-                            <div>
-                              <p className="text-base font-semibold text-slate-900">{res?.title}</p>
+                            <div className="min-w-0">
+                              <p className="text-base font-semibold text-slate-900 break-words">{res?.title}</p>
                               <p className="text-sm text-slate-500 mt-1">Delt: {dateStr}</p>
                             </div>
                           </div>
-                          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`px-5 py-2.5 text-sm font-bold border rounded-xl transition-colors text-center ${btnClass}`}>
+                          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`w-full px-5 py-2.5 text-sm font-bold border rounded-xl transition-colors text-center sm:w-auto ${btnClass}`}>
                             {isVideo ? 'Se video' : 'Åpne ressurs'}
                           </a>
                         </li>
@@ -751,16 +751,16 @@ const StudentDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col md:flex-row overflow-x-hidden">
       <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
-      <div className="flex-grow pb-10 overflow-y-auto w-full">
+      <div className="min-w-0 flex-grow pb-10 overflow-y-auto overflow-x-hidden w-full">
         <div className="sticky top-0 z-20 bg-gray-50 border-b border-slate-200">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 sm:px-8">
             <h1 className="text-xl font-semibold text-slate-900">Velkommen tilbake</h1>
             <NotificationBell />
           </div>
         </div>
-        <main className="max-w-4xl mx-auto">
+        <main className="max-w-4xl mx-auto min-w-0">
           {renderContent()}
         </main>
       </div>
@@ -771,16 +771,16 @@ const StudentDashboard = () => {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Bekreft sletting</h3>
             <p className="text-slate-600 mb-6">Er du sikker på at du vil fjerne denne oppgaven?</p>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button 
                 onClick={() => setAssignmentToDelete(null)} 
-                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                className="w-full px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors sm:w-auto"
               >
                 Avbryt
               </button>
               <button 
                 onClick={handleDeleteAssignment} 
-                className="px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-colors"
+                className="w-full px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-colors sm:w-auto"
               >
                 Ja, fjern oppgave
               </button>

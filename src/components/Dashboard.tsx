@@ -1940,7 +1940,7 @@ const saveMeetLink = async (link: string) => {
   const rapport = generateMonthlyReport(); // Henter tall for inneværende måned
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans pb-16 md:pb-0">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans pb-16 md:pb-0 overflow-x-hidden">
       
       {/* Mobile Header */}
       <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-20">
@@ -2036,7 +2036,7 @@ const saveMeetLink = async (link: string) => {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center h-16 px-2 z-30 pb-safe">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid grid-cols-6 items-center min-h-16 px-1 z-30 pb-safe">
         <button 
           onClick={() => setActiveTab('oversikt')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'oversikt' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -2082,26 +2082,26 @@ const saveMeetLink = async (link: string) => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
+      <main className="flex-1 min-w-0 w-full p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden">
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 capitalize">
               {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab}
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
             <div className="hidden md:block">
               <NotificationBell />
             </div>
             {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && (
-              <div className="flex gap-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 {activeTab === 'timeplan' && (
                   <button 
                     onClick={() => setShowFixedModal(true)}
-                    className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
+                    className="inline-flex w-full items-center justify-center px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors shadow-sm sm:w-auto"
                   >
                   <Plus className="h-4 w-4 mr-2" />
                   Faste tider
@@ -2109,7 +2109,7 @@ const saveMeetLink = async (link: string) => {
               )}
               <button 
                 onClick={handleAddAction}
-                className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                className="inline-flex w-full items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {activeTab === 'timeplan' && 'Ny time'}
@@ -2123,24 +2123,24 @@ const saveMeetLink = async (link: string) => {
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
                 <Video className="w-5 h-5 text-indigo-600" />
                 Din faste videolenke (f.eks. Google Meet, Zoom)
               </h3>
               <p className="text-sm text-slate-500 mb-4">Denne lenken vil vises for elevene dine når de logger inn i elevportalen.</p>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <input 
                   type="url" 
                   value={meetLinkInput}
                   onChange={(e) => setMeetLinkInput(e.target.value)}
                   placeholder="https://meet.google.com/..."
-                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="min-w-0 flex-1 px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <button 
                   onClick={() => saveMeetLink(meetLinkInput)}
                   disabled={isSavingLink}
-                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 sm:w-auto"
                 >
                   {isSavingLink ? 'Lagrer...' : 'Lagre lenke'}
                 </button>
@@ -2149,15 +2149,15 @@ const saveMeetLink = async (link: string) => {
 
             {/* Notifications Section */}
             {notifications.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-indigo-600" />
                   Varsler ({notifications.length})
                 </h3>
                 <div className="space-y-3">
                   {notifications.map((notification) => (
-                    <div key={notification.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                      <div className="flex-1">
+                    <div key={notification.id} className="flex flex-col items-start gap-3 p-3 bg-slate-50 rounded-lg sm:flex-row">
+                      <div className="min-w-0 flex-1">
                         <h4 className="font-medium text-slate-900">{notification.title}</h4>
                         <p className="text-sm text-slate-600 mt-1">{notification.body || notification.message}</p>
                         <p className="text-xs text-slate-400 mt-1">
@@ -2166,7 +2166,7 @@ const saveMeetLink = async (link: string) => {
                       </div>
                       <button
                         onClick={() => markNotificationAsRead(notification.id)}
-                        className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                        className="w-full shrink-0 px-3 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors sm:w-auto sm:py-1"
                       >
                         Merk som lest
                       </button>
@@ -2186,8 +2186,8 @@ const saveMeetLink = async (link: string) => {
                 {isBulkImporting ? 'Importing...' : 'Bulk Import'}
               </button>
               {showBulkImportHelp && (
-                <div className="mt-4 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="mt-4 p-4 sm:p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+                  <div className="flex items-start justify-between gap-3 mb-4">
                     <h3 className="text-lg font-bold text-blue-900">Bulk Import av Elever</h3>
                     <button
                       onClick={() => setShowBulkImportHelp(false)}
@@ -2203,7 +2203,7 @@ const saveMeetLink = async (link: string) => {
                     <div>
                       <strong>Steg 1: Forbered CSV-filen</strong>
                       <p>CSV-filen skal ha følgende format:</p>
-                      <pre className="bg-white p-2 rounded border text-xs mt-2">
+                      <pre className="bg-white p-2 rounded border text-xs mt-2 overflow-x-auto">
 {`Navn,E-post,Fag
 Ole Nordmann,ole@example.com,Matematikk
 Maria Jensen,maria@example.com,Engelsk
@@ -2265,8 +2265,8 @@ Per Andersen,per@example.com,Norsk`}
             />
 
             <div className="max-w-4xl mx-auto mt-12 mb-20">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 flex flex-wrap items-center gap-2">
                   Innleveringer <span className="bg-indigo-100 text-indigo-600 text-sm py-1 px-3 rounded-full">{submissions.length}</span>
                 </h2>
                 <button 
@@ -2280,12 +2280,12 @@ Per Andersen,per@example.com,Norsk`}
               <div className="grid gap-4">
                 {submissions.map((sub) => (
                   <div key={sub.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-all group">
-                    <div className="flex justify-between items-start">
-                      <div className="flex gap-4">
-                        <div className="h-10 w-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+                    <div className="flex flex-col justify-between items-start gap-4 sm:flex-row">
+                      <div className="flex min-w-0 gap-4">
+                        <div className="h-10 w-10 shrink-0 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold">
                           {sub.students?.full_name?.[0] || '?'}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <h3 className="font-bold text-slate-900">{sub.students?.full_name || 'Ukjent elev'} - {sub.assignments?.title || sub.reports?.topic || 'Oppgave'}</h3>
                           <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Sendt inn: {new Date(sub.created_at).toLocaleString('no-NB')}</p>
                           {sub.answer_text && (
@@ -2293,26 +2293,26 @@ Per Andersen,per@example.com,Norsk`}
                               "{sub.answer_text}"
                             </div>
                           )}
-                          <div className="flex gap-2 mt-3">
+                          <div className="flex flex-col gap-2 mt-3 sm:flex-row sm:flex-wrap">
                             {sub.file_url && (
                               <a 
                                 href={sub.file_url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
+                                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
                               >
                                 Se bilde
                               </a>
                             )}
                             <button 
                               onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved')}
-                              className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-sm"
+                              className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-sm"
                             >
                               Godkjenn (Grønn)
                             </button>
                             <button 
                               onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'rejected')}
-                              className="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all flex items-center gap-2 shadow-sm"
+                              className="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all flex items-center justify-center gap-2 shadow-sm"
                             >
                               Ikke godkjent (Rød)
                             </button>
@@ -2352,13 +2352,13 @@ Per Andersen,per@example.com,Norsk`}
                 ) : (
                   students.map((student) => (
                     <div key={student.id} className="p-4 sm:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
+                      <div className="flex min-w-0 items-center gap-4">
+                        <div className="w-12 h-12 shrink-0 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
                           {student.name.charAt(0)}
                         </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900">{student.name}</h3>
-                          <p className="text-sm text-slate-500">{student.subject}</p>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-slate-900 truncate">{student.name}</h3>
+                          <p className="text-sm text-slate-500 break-words">{student.subject}</p>
                         </div>
                       </div>
                       <div className="flex flex-col sm:items-end text-sm text-slate-600 gap-2">
@@ -2366,17 +2366,17 @@ Per Andersen,per@example.com,Norsk`}
                           <span className="flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Forelder: {student.parent}</span>
                           <span className="flex items-center gap-2 mt-1"><MessageSquare className="h-4 w-4 text-slate-400"/> {student.phone}</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                        <div className="flex flex-col gap-2 mt-2 sm:mt-0 sm:flex-row sm:items-center">
                           <button 
                             onClick={() => handleOpenVippsModal(student)}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg text-sm font-medium transition-colors"
+                            className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg text-sm font-medium transition-colors sm:w-auto"
                           >
                             <Smartphone className="w-4 h-4" />
                             Krev via Vipps
                           </button>
                           <button 
                             onClick={() => setTaskModal({ isOpen: true, studentId: student.id.toString(), studentName: student.name })}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors"
+                            className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors sm:w-auto"
                           >
                             <Send className="w-4 h-4" />
                             Send oppgave
@@ -2402,32 +2402,32 @@ Per Andersen,per@example.com,Norsk`}
         {activeTab === 'timeplan' && (
           <div className="space-y-6">
             <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center justify-between">
-                  {viewMode === 'list' ? 'Dagens timer (I dag)' : viewMode === 'week' ? 'Ukeskalender' : 'Månedskalender'}
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-w-0">
+                <div className="text-lg font-bold text-slate-900 mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2>{viewMode === 'list' ? 'Dagens timer (I dag)' : viewMode === 'week' ? 'Ukeskalender' : 'Månedskalender'}</h2>
                   <div className="flex gap-4 items-center">
-                    <div className="flex bg-slate-100 rounded-lg p-1">
+                    <div className="flex w-full bg-slate-100 rounded-lg p-1 sm:w-auto">
                       <button 
-                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                        className={`flex-1 px-3 py-1 text-sm font-medium rounded-md transition-colors sm:flex-none ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                         onClick={() => setViewMode('list')}
                       >
                         Liste
                       </button>
                       <button 
-                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                        className={`flex-1 px-3 py-1 text-sm font-medium rounded-md transition-colors sm:flex-none ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                         onClick={() => setViewMode('week')}
                       >
                         Uke
                       </button>
                       <button 
-                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                        className={`flex-1 px-3 py-1 text-sm font-medium rounded-md transition-colors sm:flex-none ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                         onClick={() => setViewMode('month')}
                       >
                         Måned
                       </button>
                     </div>
                   </div>
-                </h2>
+                </div>
                 <div className="space-y-4">
                   {(() => {
                     // Create vacation events for tutor calendar
@@ -2478,7 +2478,7 @@ Per Andersen,per@example.com,Norsk`}
                                           🗓️ {new Date(event.date).toLocaleDateString('no-NO')}
                                         </span>
                                       </div>
-                                      <div className="flex items-center gap-3">
+                                       <div className="flex shrink-0 items-center gap-3">
                                         <div className="lesson-tag bg-yellow-100 text-yellow-800 border-yellow-300">
                                           Ferie
                                         </div>
@@ -2504,13 +2504,13 @@ Per Andersen,per@example.com,Norsk`}
                                       className="lesson-card"
                                       style={{ '--card-bg': color.bgHex, '--card-border': color.borderHex } as React.CSSProperties}
                                     >
-                                      <div className="lesson-info">
+                                      <div className="lesson-info min-w-0">
                                         <span className="lesson-student">{lessonEvent.student_name}</span>
                                         <span className="lesson-time">
                                           🗓️ {new Date(lessonEvent.date).toLocaleDateString('no-NO')} | ⏰ {lessonEvent.start_time?.substring(0,5)}
                                         </span>
                                       </div>
-                                      <div className="flex items-center gap-3">
+                                      <div className="flex shrink-0 items-center gap-3">
                                         <div 
                                           className="lesson-tag" 
                                           style={{ backgroundColor: color.bgHex, color: color.borderHex, border: `1px solid ${color.borderHex}40` }}
@@ -2637,7 +2637,7 @@ Per Andersen,per@example.com,Norsk`}
               </div>
               
               <div className="space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                       <CalendarIcon className="w-5 h-5 text-indigo-600" />
@@ -2678,7 +2678,7 @@ Per Andersen,per@example.com,Norsk`}
                               <div className="text-xs font-bold uppercase">{startDate.toLocaleDateString('no-NO', { month: 'short' })}</div>
                               <div className="text-lg font-black leading-none">{startDate.getDate()}</div>
                             </div>
-                            <div className="flex-1">
+                            <div className="min-w-0 flex-1">
                               <h4 className="font-bold text-slate-900 text-sm">{event.summary || 'Uten tittel'}</h4>
                               <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                                 <Clock className="w-3 h-3" />
@@ -2701,7 +2701,7 @@ Per Andersen,per@example.com,Norsk`}
                   )}
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                   <h2 className="text-lg font-bold text-slate-900 mb-4">Hurtighandlinger</h2>
                   <div className="space-y-3">
                   <button 
@@ -2712,9 +2712,9 @@ Per Andersen,per@example.com,Norsk`}
                     }}
                     className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
                   >
-                    <span className="font-medium text-slate-700 flex items-center gap-2">
-                      <LinkIcon className="h-4 w-4 text-indigo-600" />
-                      Kopier lenke til elevportal
+                    <span className="min-w-0 font-medium text-slate-700 flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4 shrink-0 text-indigo-600" />
+                      <span className="truncate">Kopier lenke til elevportal</span>
                     </span>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   </button>
@@ -2743,22 +2743,22 @@ Per Andersen,per@example.com,Norsk`}
           <div className="space-y-6">
             {/* Stats Row */}
             <div className="grid sm:grid-cols-3 gap-4">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-sm font-medium text-slate-500 mb-1">Inntjent denne måneden</p>
-                <h3 className="text-3xl font-bold text-slate-900">kr {stats.earned.toLocaleString('no-NO')}</h3>
+                <h3 className="text-2xl sm:text-3xl font-bold text-slate-900">kr {stats.earned.toLocaleString('no-NO')}</h3>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-sm font-medium text-slate-500 mb-1">Utestående</p>
-                <h3 className="text-3xl font-bold text-amber-600">kr {stats.pending.toLocaleString('no-NO')}</h3>
+                <h3 className="text-2xl sm:text-3xl font-bold text-amber-600">kr {stats.pending.toLocaleString('no-NO')}</h3>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-sm font-medium text-slate-500 mb-1">Betalt via Vipps</p>
-                <h3 className="text-3xl font-bold text-emerald-600">{stats.vippsPercent}%</h3>
+                <h3 className="text-2xl sm:text-3xl font-bold text-emerald-600">{stats.vippsPercent}%</h3>
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6 items-start">
-              <div className="p-6 bg-white rounded-2xl shadow-xl max-w-md mx-auto w-full">
+              <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl max-w-md mx-auto w-full">
                 <h2 className="text-xl font-bold mb-6 text-gray-800">Ny betaling</h2>
                 
                 <div className="space-y-4">
@@ -2859,11 +2859,11 @@ Per Andersen,per@example.com,Norsk`}
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <div className="p-4 sm:p-6 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-900">Nylige fakturaer</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-4">Elev</th>
@@ -2980,7 +2980,7 @@ Per Andersen,per@example.com,Norsk`}
             <div className="grid lg:grid-cols-2 gap-6">
               
               {/* Write Report */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-slate-900 mb-6">Status på timen</h2>
                 <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
                   <div>
@@ -3018,47 +3018,47 @@ Per Andersen,per@example.com,Norsk`}
                   {/* Status / Smilefjes */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Dagens innsats</label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                       {/* Veldig bra - Grønn */}
                       <button 
                         type="button"
                         onClick={() => setReportStatus('great')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                        className={`flex min-h-24 flex-col items-center justify-center p-2 sm:p-3 rounded-xl border-2 transition-all ${
                           reportStatus === 'great' 
                           ? 'bg-green-500 text-white border-green-600 scale-105 shadow-sm' 
                           : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         <Smile className="h-8 w-8 mb-1" />
-                        <span className="text-xs font-bold">Veldig bra</span>
+                        <span className="text-center text-[11px] sm:text-xs font-bold leading-tight">Veldig bra</span>
                       </button>
 
                       {/* Bra - Oransje/Varm gul */}
                       <button 
                         type="button"
                         onClick={() => setReportStatus('good')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                        className={`flex min-h-24 flex-col items-center justify-center p-2 sm:p-3 rounded-xl border-2 transition-all ${
                           reportStatus === 'good' 
                           ? 'bg-orange-500 text-white border-orange-600 scale-105 shadow-sm' 
                           : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         <Meh className="h-8 w-8 mb-1" />
-                        <span className="text-xs font-bold">Bra</span>
+                        <span className="text-center text-[11px] sm:text-xs font-bold leading-tight">Bra</span>
                       </button>
 
                       {/* Trenger fokus - Rød */}
                       <button 
                         type="button"
                         onClick={() => setReportStatus('needs_focus')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                        className={`flex min-h-24 flex-col items-center justify-center p-2 sm:p-3 rounded-xl border-2 transition-all ${
                           reportStatus === 'needs_focus' 
                           ? 'bg-red-500 text-white border-red-600 scale-105 shadow-sm' 
                           : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         <Frown className="h-8 w-8 mb-1" />
-                        <span className="text-xs font-bold">Trenger fokus</span>
+                        <span className="text-center text-[11px] sm:text-xs font-bold leading-tight">Trenger fokus</span>
                       </button>
                     </div>
                   </div>
@@ -3116,10 +3116,10 @@ Per Andersen,per@example.com,Norsk`}
 
               {/* Preview - NÅ HELT DYNAMISK */}
               <div className="flex flex-col gap-6">
-                <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-6 text-white relative overflow-hidden">
-                  <div className="flex justify-between items-start mb-6 relative z-10">
-                    <div>
-                      <h3 className="text-white font-bold">{topic || 'Emne'}</h3>
+                <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-4 sm:p-6 text-white relative overflow-hidden">
+                  <div className="flex justify-between items-start gap-4 mb-6 relative z-10">
+                    <div className="min-w-0">
+                      <h3 className="text-white font-bold break-words">{topic || 'Emne'}</h3>
                       <p className="text-slate-400 text-sm">{masteryLevel}% Mestring</p>
                     </div>
                     <div className="text-2xl">
@@ -3128,17 +3128,17 @@ Per Andersen,per@example.com,Norsk`}
                       {reportStatus === 'needs_focus' && '😐'}
                     </div>
                   </div>
-                  <div className="bg-white text-slate-900 rounded-xl p-5 relative z-10">
-                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
-                      <div>
+                  <div className="bg-white text-slate-900 rounded-xl p-4 sm:p-5 relative z-10">
+                    <div className="flex items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4">
+                      <div className="min-w-0">
                         <h4 className="font-bold text-lg">
                           {selectedStudentId 
                             ? students.find(s => s.id === selectedStudentId)?.full_name || 'Elevens navn'
                             : 'Elevens navn'}
                         </h4>
-                        <p className="text-sm text-slate-500">{topic} • I dag</p>
+                        <p className="text-sm text-slate-500 break-words">{topic} • I dag</p>
                       </div>
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center ${
                         reportStatus === 'great' ? 'bg-green-100 text-green-600' : 
                         reportStatus === 'good' ? 'bg-orange-100 text-orange-600' : 
                         'bg-red-100 text-red-600'
@@ -3183,7 +3183,7 @@ Per Andersen,per@example.com,Norsk`}
           <div className="space-y-6">
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-200 flex justify-between items-center">
+                <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-bold text-slate-900">Ditt bibliotek</h3>
                   <span className="text-xs font-medium text-slate-500">{resources.length} filer delt av lærer</span>
                 </div>
@@ -3218,22 +3218,22 @@ Per Andersen,per@example.com,Norsk`}
                         
                       return (
                         <li key={res.id} className="p-4 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex items-center space-x-4">
+                          <div className="flex min-w-0 items-center space-x-4">
                             <div className={`p-2 ${iconBg} rounded-lg text-xl shrink-0`}>
                               {icon}
                             </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">{res.title}</p>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 break-words">{res.title}</p>
                               <div className="flex flex-col gap-0.5 mt-0.5">
                                 <p className="text-xs text-slate-500">Lagt til: {dateStr}</p>
                                 {assignedStudentNames && (
-                                  <p className="text-xs text-indigo-600">Delt med: {assignedStudentNames}</p>
+                                  <p className="text-xs text-indigo-600 break-words">Delt med: {assignedStudentNames}</p>
                                 )}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors text-center ${btnClass}`}>
+                          <div className="flex w-full items-center gap-2 sm:w-auto">
+                            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={`flex-1 px-4 py-2 text-sm font-medium border rounded-lg transition-colors text-center sm:flex-none ${btnClass}`}>
                               {isVideo ? 'Se video' : 'Åpne'}
                             </a>
                             <button
@@ -3251,7 +3251,7 @@ Per Andersen,per@example.com,Norsk`}
                 </ul>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-slate-900 mb-6">Legg til ny ressurs</h2>
                 <form 
                   className="space-y-4"
@@ -3329,7 +3329,7 @@ Per Andersen,per@example.com,Norsk`}
                     }
                   }}
                 >
-                  <div className="flex gap-4 mb-2">
+                  <div className="flex flex-col gap-3 mb-2 sm:flex-row sm:gap-4">
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
                       <input 
                         type="radio" 
