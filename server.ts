@@ -1,4 +1,4 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
@@ -8,6 +8,9 @@ import fs from "fs";
 import path from "path";
 
 import { createClient } from "@supabase/supabase-js";
+
+dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
