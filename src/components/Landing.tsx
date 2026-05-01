@@ -325,14 +325,14 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 question="Hva koster det?" 
                 answer={
                   <div className="space-y-3">
-                    <p>Vi har ulike faser for våre tidlige brukere:</p>
+                    <p>TutorFlyt koster <span className="text-indigo-600 font-bold">149 kr per måned</span> etter gratis prøveperiode.</p>
                     <ul className="list-disc pl-5 space-y-2">
-                      <li><span className="font-bold text-slate-900">Closed Beta:</span> Helt gratis tilgang for inviterte beta-testere.</li>
-                      <li><span className="font-bold text-slate-900">Open Beta:</span> Redusert pris på <span className="text-indigo-600 font-bold">99,-/mnd</span>.</li>
-                      <li><span className="font-bold text-slate-900">Verv-en-venn:</span> Få en gratis måned dersom du inviterer 10 nye brukere som registrerer seg via din referal-link.</li>
+                      <li>14 dager gratis prøveperiode.</li>
+                      <li>Ingen bindingstid eller skjulte gebyrer.</li>
+                      <li>Én pris for elever, timeplan, rapporter, meldinger og betalingsoversikt.</li>
                     </ul>
                     <p className="pt-2 border-t border-slate-100 text-sm text-slate-500 italic">
-                      Ordinær pris uten rabatter eller tilbud er 148,-/mnd.
+                      Abonnementet kan avsluttes når som helst.
                     </p>
                   </div>
                 } 
