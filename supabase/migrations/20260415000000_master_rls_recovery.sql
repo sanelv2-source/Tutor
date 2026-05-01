@@ -19,12 +19,17 @@ DROP POLICY IF EXISTS "Tutors can view own assignments" ON public.assignments;
 DROP POLICY IF EXISTS "Tutors can insert own assignments" ON public.assignments;
 DROP POLICY IF EXISTS "Tutors can update own assignments" ON public.assignments;
 DROP POLICY IF EXISTS "Students can view own assignments" ON public.assignments;
+DROP POLICY IF EXISTS "Teachers manage own assignments" ON public.assignments;
+DROP POLICY IF EXISTS "Students view their assignments" ON public.assignments;
+DROP POLICY IF EXISTS "Students update their assignments" ON public.assignments;
 
 -- Resources table - Remove ALL versions
 DROP POLICY IF EXISTS "Tutors can manage their own resources" ON public.resources;
 DROP POLICY IF EXISTS "Students can read assigned resources" ON public.resources;
 DROP POLICY IF EXISTS "Students can read assigned resources v2" ON public.resources;
 DROP POLICY IF EXISTS "Students can read assigned resources v3" ON public.resources;
+DROP POLICY IF EXISTS "Teachers manage own resources" ON public.resources;
+DROP POLICY IF EXISTS "Students view assigned resources" ON public.resources;
 
 -- Resource Assignments table - Remove ALL versions
 DROP POLICY IF EXISTS "Tutors can manage assignments for their resources" ON public.resource_assignments;
@@ -33,6 +38,8 @@ DROP POLICY IF EXISTS "Tutors can view assignments for their resources v3" ON pu
 DROP POLICY IF EXISTS "Students can read their own assignments" ON public.resource_assignments;
 DROP POLICY IF EXISTS "Students can read their own assignments v2" ON public.resource_assignments;
 DROP POLICY IF EXISTS "Students can read their own assignments v3" ON public.resource_assignments;
+DROP POLICY IF EXISTS "Students view resource assignments" ON public.resource_assignments;
+DROP POLICY IF EXISTS "Teachers manage resource assignments" ON public.resource_assignments;
 
 -- ============================================================================
 -- PHASE 2: BUILD CLEAN RLS POLICIES - Assignments
