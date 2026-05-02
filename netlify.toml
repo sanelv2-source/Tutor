@@ -6,8 +6,23 @@
   directory = "netlify/functions"
 
 [[redirects]]
+  from = "/api/auth/password-reset"
+  to = "/.netlify/functions/auth-password-reset"
+  status = 200
+
+[[redirects]]
+  from = "/api/contact"
+  to = "/.netlify/functions/contact"
+  status = 200
+
+[[redirects]]
   from = "/api/support-feedback"
   to = "/.netlify/functions/support-feedback"
+  status = 200
+
+[[redirects]]
+  from = "/api/account/delete"
+  to = "/.netlify/functions/account-delete"
   status = 200
 
 [[redirects]]

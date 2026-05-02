@@ -14,6 +14,7 @@ import Contact from './components/Contact';
 import About from './components/About';
 import EmailPreview from './components/EmailPreview';
 import StudentDashboard from './components/StudentDashboard';
+import ResetPassword from './components/ResetPassword';
 import HowItWorks from './components/HowItWorks';
 import Pricing from './components/Pricing';
 import Navbar from './components/Navbar';
@@ -24,6 +25,26 @@ import { InvoicePage } from './components/InvoicePage';
 
 // Inactivity timeout (45 minutes)
 const INACTIVITY_TIMEOUT = 45 * 60 * 1000;
+const PASSWORD_RECOVERY_FLAG = 'tutorflyt_password_recovery';
+
+const isPasswordResetPage = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname === '/reset-password';
+};
+
+const hasPasswordRecoveryMarker = () => {
+  if (typeof window === 'undefined') return false;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+  return (
+    searchParams.get('type') === 'recovery' ||
+    hashParams.get('type') === 'recovery' ||
+    searchParams.has('token_hash') ||
+    hashParams.has('token_hash')
+  );
+};
 
 export default function App() {
   const navigate = useNavigate();
@@ -48,6 +69,41 @@ export default function App() {
   useEffect(() => {
     const checkRoleAndSetUser = async (session: any, event?: string) => {
       if (!session?.user || !session.user.email) {
+        setUser(null);
+        setIsAuthReady(true);
+        return;
+      }
+
+      const isStoredRecovery = (() => {
+        try {
+          return sessionStorage.getItem(PASSWORD_RECOVERY_FLAG) === 'true';
+        } catch (e) {
+          return false;
+        }
+      })();
+      const hasRecoveryMarker = hasPasswordRecoveryMarker();
+      const isRecoveryFlow = event === 'PASSWORD_RECOVERY' || hasRecoveryMarker || (isPasswordResetPage() && isStoredRecovery);
+
+      if (isRecoveryFlow) {
+        try {
+          if (event === 'PASSWORD_RECOVERY' || hasRecoveryMarker) {
+            sessionStorage.setItem(PASSWORD_RECOVERY_FLAG, 'true');
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
+        setUser(null);
+        setIsAuthReady(true);
+        return;
+      }
+
+      if (isStoredRecovery) {
+        try {
+          sessionStorage.removeItem(PASSWORD_RECOVERY_FLAG);
+        } catch (e) {
+          // Ignore storage errors
+        }
+        await supabase.auth.signOut();
         setUser(null);
         setIsAuthReady(true);
         return;
@@ -292,6 +348,7 @@ export default function App() {
         <Route path="/verify" element={<Verify onNavigate={handleNavigate} setUser={setUser} />} />
         <Route path="/how-it-works" element={<HowItWorks onNavigate={handleNavigate} />} />
         <Route path="/pricing" element={<Pricing onNavigate={handleNavigate} />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacy" element={<Privacy onNavigate={handleNavigate} />} />
         <Route path="/terms" element={<Terms onNavigate={handleNavigate} />} />
         <Route path="/contact" element={<Contact onNavigate={handleNavigate} />} />

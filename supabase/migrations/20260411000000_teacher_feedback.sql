@@ -1,5 +1,5 @@
 -- Add teacher_comment column to submissions table
-ALTER TABLE public.submissions ADD COLUMN teacher_comment TEXT;
+ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS teacher_comment TEXT;
 
 -- Update the status to use 'approved' and 'needs_revision' instead of 'approved' and 'rejected'
 -- Note: 'approved' stays the same, 'rejected' becomes 'needs_revision'

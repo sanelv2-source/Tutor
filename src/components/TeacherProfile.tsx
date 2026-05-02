@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, Phone, Mail, ShieldCheck, X } from 'lucide-react';
+import DeleteAccountPanel from './DeleteAccountPanel';
 
 const TeacherProfile = ({ user }: { user: any }) => {
   const [profile, setProfile] = useState({
@@ -358,6 +359,8 @@ const TeacherProfile = ({ user }: { user: any }) => {
               <p className="text-2xl font-bold text-gray-800">{stats.totalInvoices}</p>
             </div>
           </div>
+
+          <DeleteAccountPanel redirectTo="/" />
         </div>
 
       </div>

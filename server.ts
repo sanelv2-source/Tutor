@@ -1,4 +1,4 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
@@ -8,6 +8,10 @@ import fs from "fs";
 import path from "path";
 
 import { createClient } from "@supabase/supabase-js";
+import { deleteAccountForUser } from "./netlify/shared/account-delete-core.mjs";
+
+dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
@@ -323,6 +327,195 @@ function getReportStatusLabel(status: unknown) {
 
 async function startServer() {
   // API routes
+  app.post("/api/account/delete", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å slette kontoen." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const result = await deleteAccountForUser(supabaseAdmin, authData.user);
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Account deletion error:", error);
+      return res.status(500).json({ error: error.message || "Kunne ikke slette kontoen." });
+    }
+  });
+
+  app.post("/api/auth/password-reset", async (req, res) => {
+    const email = normalizeEmail(req.body.email);
+
+    if (!email) {
+      return res.status(400).json({ error: "E-postadresse er påkrevd." });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Oppgi en gyldig e-postadresse." });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    const origin = getAppOrigin(req);
+    const resetPageUrl = `${origin}/reset-password`;
+
+    try {
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo: resetPageUrl,
+        },
+      });
+
+      if (error) {
+        console.error("Supabase recovery link error:", error);
+        if (/not found|user.*not.*found|no user/i.test(error.message || "")) {
+          return res.json({ success: true });
+        }
+        return res.status(502).json({ error: "Kunne ikke lage tilbakestillingslenke." });
+      }
+
+      const tokenHash = data?.properties?.hashed_token;
+      const resetUrl = tokenHash
+        ? `${resetPageUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`
+        : data?.properties?.action_link;
+
+      if (!resetUrl) {
+        return res.status(502).json({ error: "Kunne ikke lage tilbakestillingslenke." });
+      }
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+      const replyTo = process.env.SUPPORT_EMAIL || "info@tutorflyt.no";
+      const { error: emailError } = await resend.emails.send({
+        from: fromEmail,
+        to: email,
+        replyTo,
+        subject: "Tilbakestill passordet ditt i TutorFlyt",
+        text: [
+          "Hei!",
+          "",
+          "Vi mottok en forespørsel om å tilbakestille passordet ditt i TutorFlyt.",
+          "Åpne lenken under for å lage et nytt passord:",
+          resetUrl,
+          "",
+          "Hvis du ikke ba om dette, kan du trygt ignorere denne e-posten.",
+          "",
+          "Hilsen TutorFlyt",
+        ].join("\n"),
+        html: `
+          <div style="background-color:#f8fafc;font-family:Arial,sans-serif;padding:40px 20px;">
+            <div style="margin:0 auto;padding:40px 32px;background:#fff;border-radius:12px;max-width:600px;border:1px solid #e2e8f0;text-align:center;color:#0f172a;">
+              <h1 style="font-size:24px;margin:0 0 20px;">Tilbakestill passordet ditt</h1>
+              <p style="color:#475569;font-size:16px;line-height:26px;margin:0 0 20px;">
+                Vi mottok en forespørsel om å lage et nytt passord for TutorFlyt-kontoen din.
+              </p>
+              <div style="margin:32px 0;text-align:center;">
+                <a href="${escapeHtml(resetUrl)}" style="background:#0f766e;border-radius:8px;color:#fff;display:inline-block;font-size:16px;font-weight:bold;text-decoration:none;padding:16px 32px;">
+                  Lag nytt passord
+                </a>
+              </div>
+              <p style="color:#64748b;font-size:14px;line-height:22px;margin:0;">
+                Hvis du ikke ba om dette, kan du trygt ignorere denne e-posten.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        console.error("Resend password reset error:", emailError);
+        return res.status(502).json({ error: "Kunne ikke sende tilbakestillingslenke." });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      res.status(500).json({ error: "Kunne ikke sende tilbakestillingslenke." });
+    }
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    const name = clipText(req.body.name, 120);
+    const email = normalizeEmail(req.body.email);
+    const message = clipText(req.body.message, 4000);
+    const pageUrl = clipText(req.body.pageUrl || req.get("origin") || "", 1000);
+    const userAgent = clipText(req.get("user-agent") || "", 1000);
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "Navn, e-post og melding er påkrevd." });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Oppgi en gyldig e-postadresse." });
+    }
+
+    if (!resend) {
+      return res.status(500).json({ error: "E-posttjenesten er ikke konfigurert." });
+    }
+
+    const contactEmail = process.env.CONTACT_EMAIL || process.env.SUPPORT_EMAIL || "info@tutorflyt.no";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+    const subject = `Ny kontaktmelding fra ${name}`;
+
+    try {
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: contactEmail,
+        replyTo: email,
+        subject,
+        text: [
+          "Ny kontaktmelding fra tutorflyt.no",
+          "",
+          `Navn: ${name}`,
+          `E-post: ${email}`,
+          pageUrl ? `Side: ${pageUrl}` : "",
+          "",
+          message,
+        ].filter(Boolean).join("\n"),
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
+            <h2 style="margin-bottom: 8px;">Ny kontaktmelding</h2>
+            <p style="margin-top: 0; color: #64748b;">Sendt fra kontaktsiden på tutorflyt.no.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 18px 0;">
+              <p><strong>Navn:</strong> ${escapeHtml(name)}</p>
+              <p><strong>E-post:</strong> ${escapeHtml(email)}</p>
+              <p><strong>Side:</strong> ${escapeHtml(pageUrl || "Ikke oppgitt")}</p>
+            </div>
+            <h3 style="margin-bottom: 8px;">Melding</h3>
+            <p style="white-space: pre-wrap; line-height: 1.6;">${escapeHtml(message)}</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #94a3b8;">User agent: ${escapeHtml(userAgent || "Ikke oppgitt")}</p>
+          </div>
+        `,
+      });
+
+      if (error) {
+        console.error("Resend API returned an error for contact message:", error);
+        return res.status(502).json({ error: "Kunne ikke sende meldingen." });
+      }
+
+      res.json({ success: true, emailId: data?.id });
+    } catch (error) {
+      console.error("Error sending contact message:", error);
+      res.status(500).json({ error: "Kunne ikke sende meldingen." });
+    }
+  });
+
   app.post("/api/auth/magic-link", async (req, res) => {
     const { email } = req.body;
     
