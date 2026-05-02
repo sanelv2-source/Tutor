@@ -30,6 +30,7 @@ export async function createNotification(
       type,
       title,
       body,
+      message: body,
       link: link ?? null,
       is_read: false
     };
@@ -43,18 +44,31 @@ export async function createNotification(
 
       if (
         result.error.code === '42703' ||
-        result.error.message?.toLowerCase().includes('body')
+        result.error.code === '23502' ||
+        result.error.message?.toLowerCase().includes('body') ||
+        result.error.message?.toLowerCase().includes('message')
       ) {
+        const legacyPayload = result.error.message?.toLowerCase().includes('message')
+          ? {
+              user_id: userId,
+              type,
+              title,
+              body,
+              link: link ?? null,
+              is_read: false
+            }
+          : {
+              user_id: userId,
+              type,
+              title,
+              message: body,
+              link: link ?? null,
+              is_read: false
+            };
+
         const legacyResult = await supabase
           .from('notifications')
-          .insert([{
-            user_id: userId,
-            type,
-            title,
-            message: body,
-            link: link ?? null,
-            is_read: false
-          }]);
+          .insert([legacyPayload]);
 
         if (legacyResult.error) {
           console.error('Legacy notification insert error:', legacyResult.error);
