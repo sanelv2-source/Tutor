@@ -324,6 +324,7 @@ const saveMeetLink = async (link: string) => {
         },
         body: JSON.stringify({
           invoiceId: savedInvoice.id,
+          studentId: invoice.student_id || savedInvoice.student_id || null,
           recipientEmail,
           paymentPageUrl: getInvoicePaymentLink(savedInvoice)
         })

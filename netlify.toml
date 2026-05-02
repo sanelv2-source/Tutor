@@ -41,6 +41,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/student/payment-requests"
+  to = "/.netlify/functions/student-payment-requests"
+  status = 200
+
+[[redirects]]
   from = "/api/payment/create-checkout-session"
   to = "/.netlify/functions/payment-create-checkout-session"
   status = 200

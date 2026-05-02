@@ -21,6 +21,80 @@ const normalizeEmail = (value) => String(value ?? '').trim().toLowerCase();
 const getBearerToken = (value) => String(value ?? '').replace(/^Bearer\s+/i, '').trim();
 const isSchemaCacheColumnError = (error) => /schema cache|Could not find .* column|column .* does not exist/i.test(error?.message || '');
 
+async function findStudentForPayment(supabaseAdmin, { studentId, tutorId, recipientEmail, studentName }) {
+  if (studentId) {
+    const { data, error } = await supabaseAdmin
+      .from('students')
+      .select('id, profile_id, full_name, email, tutor_id')
+      .eq('id', studentId)
+      .eq('tutor_id', tutorId)
+      .maybeSingle();
+
+    if (!error && data) return data;
+  }
+
+  const { data: students, error } = await supabaseAdmin
+    .from('students')
+    .select('id, profile_id, full_name, email, tutor_id')
+    .eq('tutor_id', tutorId);
+
+  if (error) {
+    console.warn('Could not look up student for payment notification:', error.message);
+    return null;
+  }
+
+  const normalizedRecipientEmail = normalizeEmail(recipientEmail);
+  const normalizedStudentName = String(studentName || '').trim().toLowerCase();
+
+  return (students || []).find((student) =>
+    (student.email && normalizeEmail(student.email) === normalizedRecipientEmail) ||
+    (student.full_name && student.full_name.trim().toLowerCase() === normalizedStudentName)
+  ) || null;
+}
+
+async function createPaymentNotification(supabaseAdmin, userId, { teacherName, amount, link }) {
+  if (!userId) return;
+
+  const body = `${teacherName} har sendt deg et betalingskrav på ${amount} kr.`;
+  const payload = {
+    user_id: userId,
+    type: 'payment',
+    title: 'Nytt betalingskrav',
+    body,
+    message: body,
+    link,
+    is_read: false,
+  };
+
+  let { error } = await supabaseAdmin.from('notifications').insert([payload]);
+
+  if (error && /message|body|column/i.test(error.message || '')) {
+    ({ error } = await supabaseAdmin.from('notifications').insert([{
+      user_id: userId,
+      type: 'payment',
+      title: 'Nytt betalingskrav',
+      body,
+      link,
+      is_read: false,
+    }]));
+  }
+
+  if (error && /message|body|column/i.test(error.message || '')) {
+    ({ error } = await supabaseAdmin.from('notifications').insert([{
+      user_id: userId,
+      type: 'payment',
+      title: 'Nytt betalingskrav',
+      message: body,
+      link,
+      is_read: false,
+    }]));
+  }
+
+  if (error) {
+    console.warn('Could not create payment notification:', error.message);
+  }
+}
+
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
     return json(405, { error: 'Method not allowed' });
@@ -47,6 +121,7 @@ export async function handler(event) {
   }
 
   const invoiceId = clipText(payload.invoiceId, 80);
+  const studentId = clipText(payload.studentId, 80);
   const recipientEmail = normalizeEmail(payload.recipientEmail);
   const paymentPageUrl = clipText(payload.paymentPageUrl, 1000);
 
@@ -172,6 +247,21 @@ export async function handler(event) {
     if (updateError) {
       console.error('Vipps invoice update error:', updateError);
       return json(500, { error: 'Kunne ikke oppdatere betalingsstatus.' });
+    }
+
+    const student = await findStudentForPayment(supabaseAdmin, {
+      studentId,
+      tutorId: authData.user.id,
+      recipientEmail,
+      studentName: invoice.student_name,
+    });
+
+    if (student?.profile_id) {
+      await createPaymentNotification(supabaseAdmin, student.profile_id, {
+        teacherName,
+        amount,
+        link: '/student/dashboard?tab=payments',
+      });
     }
 
     return json(200, { success: true });

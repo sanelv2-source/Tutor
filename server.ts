@@ -1417,6 +1417,7 @@ async function startServer() {
     }
 
     const invoiceId = clipText(req.body.invoiceId, 80);
+    const studentId = clipText(req.body.studentId, 80);
     const recipientEmail = normalizeEmail(req.body.recipientEmail);
     const paymentPageUrl = clipText(req.body.paymentPageUrl, 1000);
 
@@ -1537,6 +1538,82 @@ async function startServer() {
       }
 
       if (updateError) throw updateError;
+
+      try {
+        let student: any = null;
+
+        if (studentId) {
+          const { data: studentById } = await supabaseAdmin
+            .from("students")
+            .select("id, profile_id, full_name, email, tutor_id")
+            .eq("id", studentId)
+            .eq("tutor_id", authData.user.id)
+            .maybeSingle();
+          student = studentById;
+        }
+
+        if (!student) {
+          const { data: possibleStudents } = await supabaseAdmin
+            .from("students")
+            .select("id, profile_id, full_name, email, tutor_id")
+            .eq("tutor_id", authData.user.id);
+
+          const normalizedStudentName = String(invoice.student_name || "").trim().toLowerCase();
+          student = (possibleStudents || []).find((candidate: any) =>
+            normalizeEmail(candidate.email) === recipientEmail ||
+            String(candidate.full_name || "").trim().toLowerCase() === normalizedStudentName
+          );
+        }
+
+        if (student?.profile_id) {
+          const notificationBody = `${teacherName} har sendt deg et betalingskrav på ${amount} kr.`;
+          const notificationPayload = {
+            user_id: student.profile_id,
+            type: "payment",
+            title: "Nytt betalingskrav",
+            body: notificationBody,
+            message: notificationBody,
+            link: "/student/dashboard?tab=payments",
+            is_read: false,
+          };
+
+          let { error: notificationError } = await supabaseAdmin
+            .from("notifications")
+            .insert([notificationPayload]);
+
+          if (notificationError && /message|body|column/i.test(notificationError.message || "")) {
+            ({ error: notificationError } = await supabaseAdmin
+              .from("notifications")
+              .insert([{
+                user_id: student.profile_id,
+                type: "payment",
+                title: "Nytt betalingskrav",
+                body: notificationBody,
+                link: "/student/dashboard?tab=payments",
+                is_read: false,
+              }]));
+          }
+
+          if (notificationError && /message|body|column/i.test(notificationError.message || "")) {
+            ({ error: notificationError } = await supabaseAdmin
+              .from("notifications")
+              .insert([{
+                user_id: student.profile_id,
+                type: "payment",
+                title: "Nytt betalingskrav",
+                message: notificationBody,
+                link: "/student/dashboard?tab=payments",
+                is_read: false,
+              }]));
+          }
+
+          if (notificationError) {
+            console.warn("Could not create payment notification:", notificationError.message);
+          }
+        }
+      } catch (notificationError) {
+        console.warn("Payment notification failed:", notificationError);
+      }
 
       res.json({ success: true });
     } catch (error) {

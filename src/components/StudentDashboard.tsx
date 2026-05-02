@@ -32,6 +32,8 @@ interface PaymentRequest {
   due_date: string | null;
   status: string;
   method?: string | null;
+  email?: string | null;
+  tutor_id?: string | null;
   payment_link?: string | null;
   tutor_phone?: string | null;
   description?: string | null;
@@ -158,7 +160,10 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'payments' ? 'payments' : 'tasks';
+  });
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [resources, setResources] = useState<any[]>([]);
@@ -200,29 +205,74 @@ const StudentDashboard = () => {
         console.log('Loaded student row:', student);
         setStudentId(student.id);
 
-        const fetchStudentInvoices = async (columns: string) => supabase
-          .from('invoices')
-          .select(columns)
-          .eq('student_id', student.id)
-          .order('created_at', { ascending: false });
-
         try {
-          let { data: invoicesData, error: invoicesError } = await fetchStudentInvoices(
-            'id, student_name, amount, due_date, status, method, payment_link, tutor_phone, description, created_at'
-          );
+          const fetchPaymentRequestsFromApi = async () => {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData.session?.access_token;
+            if (!token) return null;
 
-          if (invoicesError && /schema cache|Could not find .* column|column .* does not exist/i.test(invoicesError.message || '')) {
-            ({ data: invoicesData, error: invoicesError } = await fetchStudentInvoices(
-              'id, student_name, amount, due_date, status, method, created_at'
-            ));
-          }
+            const response = await fetch('/api/student/payment-requests', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
-          if (invoicesError) {
-            console.error('Error fetching payment requests:', invoicesError);
-            setPaymentRequests([]);
-          } else {
-            setPaymentRequests(((invoicesData || []) as unknown) as PaymentRequest[]);
-          }
+            if (!response.ok) return null;
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) return null;
+            const apiData = await response.json();
+            return Array.isArray(apiData.paymentRequests) ? apiData.paymentRequests : [];
+          };
+
+          const fetchStudentInvoicesWithFallback = async () => {
+            const selectOptions = [
+              'id, student_id, student_name, amount, due_date, status, method, payment_link, tutor_phone, description, created_at, email, tutor_id',
+              'id, student_name, amount, due_date, status, method, payment_link, tutor_phone, description, created_at, email, tutor_id',
+              'id, student_name, amount, due_date, status, method, created_at, email, tutor_id',
+              'id, student_name, amount, due_date, status, method, created_at, tutor_id'
+            ];
+
+            const isSchemaError = (error: any) => /schema cache|Could not find .* column|column .* does not exist/i.test(error?.message || '');
+            const runInvoiceQuery = async (applyFilters: (query: any) => any) => {
+              for (const columns of selectOptions) {
+                const query = applyFilters(supabase.from('invoices').select(columns))
+                  .order('created_at', { ascending: false });
+                const { data, error } = await query;
+                if (error && isSchemaError(error)) continue;
+                if (error) {
+                  console.error('Error fetching payment requests:', error);
+                  return [];
+                }
+                return data || [];
+              }
+              return [];
+            };
+
+            const invoiceGroups = [];
+            invoiceGroups.push(await runInvoiceQuery((query) => query.eq('student_id', student.id)));
+
+            if (student.email && student.tutor_id) {
+              invoiceGroups.push(await runInvoiceQuery((query) =>
+                query.eq('tutor_id', student.tutor_id).eq('email', student.email)
+              ));
+            }
+
+            if (student.full_name && student.tutor_id) {
+              invoiceGroups.push(await runInvoiceQuery((query) =>
+                query.eq('tutor_id', student.tutor_id).eq('student_name', student.full_name)
+              ));
+            }
+
+            const byId = new Map<string, any>();
+            invoiceGroups.flat().forEach((invoice) => {
+              if (invoice?.id) byId.set(invoice.id, invoice);
+            });
+
+            return Array.from(byId.values()).sort((a, b) =>
+              String(b.created_at || '').localeCompare(String(a.created_at || ''))
+            );
+          };
+
+          const invoicesData = await fetchPaymentRequestsFromApi() ?? await fetchStudentInvoicesWithFallback();
+          setPaymentRequests(((invoicesData || []) as unknown) as PaymentRequest[]);
         } catch (invoiceError) {
           console.error('Exception while fetching payment requests:', invoiceError);
           setPaymentRequests([]);
