@@ -12,6 +12,127 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
   const [studentName, setStudentName] = useState('');
   const [subject, setSubject] = useState('');
   const [status, setStatus] = useState('');
+  const [existingStudent, setExistingStudent] = useState<{
+    exists: boolean;
+    alreadyLinked: boolean;
+    profile?: { id: string; email: string; full_name?: string | null } | null;
+    student?: any;
+  } | null>(null);
+  const [isCheckingExisting, setIsCheckingExisting] = useState(false);
+  const [isLinkingExisting, setIsLinkingExisting] = useState(false);
+
+  const getAccessToken = async () => {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      if (sessionError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(() => {});
+      }
+      throw sessionError;
+    }
+    return sessionData.session?.access_token;
+  };
+
+  const checkExistingStudent = async (rawEmail = email) => {
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    setExistingStudent(null);
+
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      return null;
+    }
+
+    setIsCheckingExisting(true);
+    try {
+      const jwt = await getAccessToken();
+      const response = await fetch('/api/students/existing/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+
+      const result = await readApiJson<{
+        exists: boolean;
+        alreadyLinked: boolean;
+        profile?: { id: string; email: string; full_name?: string | null } | null;
+        student?: any;
+      }>(response, 'Kunne ikke sjekke om eleven finnes');
+
+      setExistingStudent(result);
+
+      if (result.alreadyLinked) {
+        setStatus('Denne eleven ligger allerede i elevlisten din.');
+      } else if (result.exists) {
+        setStatus('Eleven har allerede en bruker på TutorFlyt. Bruk "Inviter eksisterende elev".');
+        if (!studentName && result.profile?.full_name) {
+          setStudentName(result.profile.full_name);
+        }
+      }
+
+      return result;
+    } catch (err: any) {
+      console.error('Existing student check error:', err);
+      return null;
+    } finally {
+      setIsCheckingExisting(false);
+    }
+  };
+
+  const handleLinkExistingStudent = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setStatus('Skriv inn en gyldig e-postadresse først.');
+      return;
+    }
+
+    setIsLinkingExisting(true);
+    setStatus('Kobler eksisterende elev...');
+
+    try {
+      const latestLookup = existingStudent?.exists ? existingStudent : await checkExistingStudent(normalizedEmail);
+
+      if (!latestLookup?.exists) {
+        setStatus('Fant ingen eksisterende elevbruker med denne e-posten. Bruk vanlig invitasjon.');
+        return;
+      }
+
+      if (latestLookup.alreadyLinked) {
+        setStatus('Denne eleven ligger allerede i elevlisten din.');
+        return;
+      }
+
+      const jwt = await getAccessToken();
+      const response = await fetch('/api/students/existing/link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          studentName: studentName || latestLookup.profile?.full_name || '',
+          subject: subject || ''
+        }),
+      });
+
+      await readApiJson(response, 'Kunne ikke invitere eksisterende elev');
+
+      setStatus('Eksisterende elev er lagt til uten ny konto-invitasjon.');
+      if (onInviteSuccess) {
+        onInviteSuccess(normalizedEmail);
+      }
+      setEmail('');
+      setStudentName('');
+      setSubject('');
+      setExistingStudent(null);
+    } catch (err: any) {
+      console.error('Existing student link error:', err);
+      setStatus('Kunne ikke invitere eksisterende elev: ' + err.message);
+    } finally {
+      setIsLinkingExisting(false);
+    }
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,10 +152,21 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
       }
 
       const normalizedEmail = email.trim().toLowerCase();
+      const latestLookup = existingStudent || await checkExistingStudent(normalizedEmail);
+
+      if (latestLookup?.alreadyLinked) {
+        setStatus('Denne eleven ligger allerede i elevlisten din.');
+        return;
+      }
+
+      if (latestLookup?.exists) {
+        setStatus('Eleven har allerede en bruker på TutorFlyt. Bruk "Inviter eksisterende elev" i stedet.');
+        return;
+      }
 
       // 2. Sjekk om elev finnes
       console.log("Checking if student exists with email:", normalizedEmail, "and tutor_id:", admin.id);
-      const { data: existingStudent, error: existingStudentError } = await supabase
+      const { data: existingStudentRow, error: existingStudentError } = await supabase
         .from('students')
         .select('id')
         .eq('tutor_id', admin.id)
@@ -45,12 +177,12 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         console.error("Error checking existing student:", existingStudentError);
         throw existingStudentError;
       }
-      console.log("Existing student result:", existingStudent);
+      console.log("Existing student result:", existingStudentRow);
 
       let studentId;
 
-      if (existingStudent) {
-        studentId = existingStudent.id;
+      if (existingStudentRow) {
+        studentId = existingStudentRow.id;
         console.log("Using existing student ID:", studentId);
       } else {
         // Opprett elev
@@ -212,15 +344,53 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         <input 
           type="email" 
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setExistingStudent(null);
+            setStatus('');
+          }}
+          onBlur={() => checkExistingStudent()}
           placeholder="elev@eksempel.no"
           className="flex-1 border border-slate-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           required
         />
-        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm whitespace-nowrap">
-          Legg til elev
-        </button>
+        {existingStudent?.exists && !existingStudent.alreadyLinked ? (
+          <button
+            type="button"
+            onClick={handleLinkExistingStudent}
+            disabled={isLinkingExisting}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm whitespace-nowrap disabled:opacity-60"
+          >
+            {isLinkingExisting ? 'Kobler...' : 'Inviter eksisterende elev'}
+          </button>
+        ) : (
+          <button type="submit" disabled={isCheckingExisting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm whitespace-nowrap disabled:opacity-60">
+            {isCheckingExisting ? 'Sjekker...' : 'Legg til elev'}
+          </button>
+        )}
       </div>
+
+      {existingStudent?.exists && !existingStudent.alreadyLinked && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">
+            Eleven har allerede en bruker på TutorFlyt.
+          </p>
+          <p className="text-sm text-emerald-800 mt-1">
+            Bruk "Inviter eksisterende elev" for å legge eleven til hos deg uten ny passordflyt eller ekstra konto-invitasjon.
+          </p>
+        </div>
+      )}
+
+      {existingStudent?.alreadyLinked && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Denne eleven er allerede koblet til deg.
+          </p>
+          <p className="text-sm text-amber-800 mt-1">
+            Du trenger ikke sende en ny invitasjon.
+          </p>
+        </div>
+      )}
       
       {status && (
         <p className={`text-sm mt-3 ${status.includes('feil') || status.includes('Kunne ikke') ? 'text-red-600' : 'text-emerald-600 font-medium'}`}>
