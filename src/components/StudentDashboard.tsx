@@ -7,6 +7,7 @@ import StudentSidebar from './StudentSidebar';
 import NotificationBell from './NotificationBell';
 import { ChatList } from './ChatList';
 import SupportFeedback from './SupportFeedback';
+import DeleteAccountPanel from './DeleteAccountPanel';
 import { linkStudentProfileByEmail } from '../utils/studentLinking';
 import { createNotification } from '../services/notificationService';
 
@@ -644,44 +645,47 @@ const StudentDashboard = () => {
       return (
         <div className="p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Innstillinger</h1>
-          <div className="bg-white p-4 sm:p-8 rounded-2xl border border-gray-100 max-w-xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Endre passord</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Nytt passord</label>
-                <input 
-                  type="password"
-                  className="w-full p-3 border border-slate-300 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Minst 6 tegn"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Bekreft nytt passord</label>
-                <input 
-                  type="password"
-                  className="w-full p-3 border border-slate-300 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Gjenta nytt passord"
-                />
-              </div>
-
-              {passwordMessage && (
-                <div className={`p-3 rounded-lg text-sm ${passwordMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {passwordMessage.text}
+          <div className="space-y-6 max-w-xl">
+            <div className="bg-white p-4 sm:p-8 rounded-2xl border border-gray-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Endre passord</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Nytt passord</label>
+                  <input
+                    type="password"
+                    className="w-full p-3 border border-slate-300 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Minst 6 tegn"
+                  />
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Bekreft nytt passord</label>
+                  <input
+                    type="password"
+                    className="w-full p-3 border border-slate-300 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Gjenta nytt passord"
+                  />
+                </div>
 
-              <button 
-                onClick={handlePasswordUpdate}
-                disabled={savingPassword || !newPassword || !confirmPassword}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-slate-400 transition-colors mt-4"
-              >
-                {savingPassword ? 'Oppdaterer...' : 'Oppdater passord'}
-              </button>
+                {passwordMessage && (
+                  <div className={`p-3 rounded-lg text-sm ${passwordMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {passwordMessage.text}
+                  </div>
+                )}
+
+                <button
+                  onClick={handlePasswordUpdate}
+                  disabled={savingPassword || !newPassword || !confirmPassword}
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-slate-400 transition-colors mt-4"
+                >
+                  {savingPassword ? 'Oppdaterer...' : 'Oppdater passord'}
+                </button>
+              </div>
             </div>
+            <DeleteAccountPanel redirectTo="/login" />
           </div>
         </div>
       );
