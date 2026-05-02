@@ -9,6 +9,10 @@ import path from "path";
 
 import { createClient } from "@supabase/supabase-js";
 import { deleteAccountForUser } from "./netlify/shared/account-delete-core.mjs";
+import {
+  generateTeacherAssistantContent,
+  normalizeTeacherAssistantRequest,
+} from "./netlify/shared/teacher-ai-core.mjs";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -24,6 +28,9 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ||
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
   ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
+const supabaseAuth = (supabaseUrl && (supabaseServiceKey || process.env.VITE_SUPABASE_ANON_KEY))
+  ? createClient(supabaseUrl, supabaseServiceKey || process.env.VITE_SUPABASE_ANON_KEY || "")
   : null;
 
 // Initialize Resend
@@ -1728,6 +1735,40 @@ async function startServer() {
     } catch (error) {
       console.error("Error handling support feedback:", error);
       res.status(500).json({ error: "Kunne ikke sende supportmeldingen." });
+    }
+  });
+
+  app.post("/api/ai/teacher-assistant", async (req, res) => {
+    const authHeader = String(req.headers.authorization || "");
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+    if (!token) {
+      return res.status(401).json({ error: "Du må være logget inn for å bruke AI-assistenten." });
+    }
+
+    if (!supabaseAuth) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAuth.auth.getUser(token);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const request = normalizeTeacherAssistantRequest({
+        ...req.body,
+        teacherName: req.body.teacherName || authData.user.user_metadata?.name || authData.user.email?.split("@")[0] || "Lærer",
+      });
+      const content = await generateTeacherAssistantContent(request);
+
+      res.json({ content });
+    } catch (error: any) {
+      const statusCode = Number(error?.statusCode) || 500;
+      if (statusCode >= 500) {
+        console.error("Teacher AI error:", error);
+      }
+      res.status(statusCode).json({ error: error?.message || "Kunne ikke generere AI-utkast." });
     }
   });
 
