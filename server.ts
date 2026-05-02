@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 
 import { createClient } from "@supabase/supabase-js";
+import { deleteAccountForUser } from "./netlify/shared/account-delete-core.mjs";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -310,6 +311,30 @@ function getReportStatusLabel(status: unknown) {
 
 async function startServer() {
   // API routes
+  app.post("/api/account/delete", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å slette kontoen." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const result = await deleteAccountForUser(supabaseAdmin, authData.user);
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Account deletion error:", error);
+      return res.status(500).json({ error: error.message || "Kunne ikke slette kontoen." });
+    }
+  });
+
   app.post("/api/auth/password-reset", async (req, res) => {
     const email = normalizeEmail(req.body.email);
 
