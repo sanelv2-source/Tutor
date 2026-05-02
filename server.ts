@@ -798,6 +798,192 @@ async function startServer() {
     }
   });
 
+  app.post("/api/students/existing/check", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å sjekke elever." });
+    }
+
+    const email = normalizeEmail(req.body.email);
+    if (!email) {
+      return res.status(400).json({ error: "E-postadresse er påkrevd." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name, role")
+        .eq("email", email)
+        .eq("role", "student")
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Existing student profile lookup error:", profileError);
+        return res.status(500).json({ error: "Kunne ikke sjekke om eleven finnes." });
+      }
+
+      const { data: linkedStudents, error: linkedStudentError } = await supabaseAdmin
+        .from("students")
+        .select("id, full_name, email, subject, profile_id")
+        .eq("tutor_id", authData.user.id)
+        .or(`email.eq.${email}${profile?.id ? `,profile_id.eq.${profile.id}` : ""}`)
+        .limit(1);
+
+      if (linkedStudentError) {
+        console.error("Existing linked student lookup error:", linkedStudentError);
+        return res.status(500).json({ error: "Kunne ikke sjekke lærerens elevliste." });
+      }
+
+      const linkedStudent = linkedStudents?.[0] || null;
+
+      res.json({
+        exists: !!profile,
+        alreadyLinked: !!linkedStudent,
+        profile: profile
+          ? {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+            }
+          : null,
+        student: linkedStudent || null,
+      });
+    } catch (error) {
+      console.error("Error checking existing student:", error);
+      res.status(500).json({ error: "Kunne ikke sjekke om eleven finnes." });
+    }
+  });
+
+  app.post("/api/students/existing/link", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å invitere eksisterende elev." });
+    }
+
+    const email = normalizeEmail(req.body.email);
+    const studentName = clipText(req.body.studentName, 120);
+    const subject = clipText(req.body.subject, 120);
+
+    if (!email) {
+      return res.status(400).json({ error: "E-postadresse er påkrevd." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name, role")
+        .eq("email", email)
+        .eq("role", "student")
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Existing student profile lookup error:", profileError);
+        return res.status(500).json({ error: "Kunne ikke hente eksisterende elev." });
+      }
+
+      if (!profile) {
+        return res.status(404).json({ error: "Fant ingen eksisterende elevbruker med denne e-posten." });
+      }
+
+      const { data: existingStudents, error: existingStudentError } = await supabaseAdmin
+        .from("students")
+        .select("id")
+        .eq("tutor_id", authData.user.id)
+        .or(`email.eq.${email},profile_id.eq.${profile.id}`)
+        .limit(1);
+
+      if (existingStudentError) {
+        console.error("Existing tutor student lookup error:", existingStudentError);
+        return res.status(500).json({ error: "Kunne ikke sjekke om eleven allerede er lagt til." });
+      }
+
+      const existingStudent = existingStudents?.[0] || null;
+
+      const payload = {
+        email,
+        full_name: studentName || profile.full_name || email.split("@")[0],
+        subject: subject || "Fag: Ikke oppgitt",
+        tutor_id: authData.user.id,
+        status: "active",
+        profile_id: profile.id,
+      };
+
+      let student;
+
+      if (existingStudent) {
+        const { data, error } = await supabaseAdmin
+          .from("students")
+          .update(payload)
+          .eq("id", existingStudent.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Existing student update error:", error);
+          return res.status(500).json({ error: "Kunne ikke oppdatere eleven." });
+        }
+
+        student = data;
+      } else {
+        const { data, error } = await supabaseAdmin
+          .from("students")
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Existing student link insert error:", error);
+          return res.status(500).json({ error: "Kunne ikke legge til eksisterende elev." });
+        }
+
+        student = data;
+      }
+
+      const { data: tutorProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const tutorName = tutorProfile?.full_name || authData.user.user_metadata?.full_name || "Læreren din";
+
+      await supabaseAdmin
+        .from("notifications")
+        .insert({
+          user_id: profile.id,
+          type: "student_linked",
+          title: "Du er lagt til hos en lærer",
+          body: `${tutorName} har lagt deg til som elev i TutorFlyt.`,
+          message: `${tutorName} har lagt deg til som elev i TutorFlyt.`,
+          link: "/student/dashboard",
+          is_read: false,
+        });
+
+      res.json({ success: true, student, profile });
+    } catch (error) {
+      console.error("Error linking existing student:", error);
+      res.status(500).json({ error: "Kunne ikke invitere eksisterende elev." });
+    }
+  });
+
   app.post("/api/invitations/send-email", async (req, res) => {
     if (!supabaseAdmin) {
       return res.status(500).json({ error: "Supabase Admin not initialized" });
