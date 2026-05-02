@@ -79,42 +79,60 @@ const saveMeetLink = async (link: string) => {
     }
   };
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-        if (userError && userError.message.includes('Refresh Token')) {
-          await supabase.auth.signOut().catch(() => {});
-        }
-        if (authUser) {
-          setAuthUserId(authUser.id);
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('full_name, trial_ends_at, subscription_status, meet_link, phone')
-            .eq('id', authUser.id)
-            .single();
-            
-          if (data) {
-            setProfile({
-              name: data.full_name,
-              trial_ends_at: data.trial_ends_at,
-              subscription_status: data.subscription_status,
-              meet_link: data.meet_link,
-              phone: data.phone
-            });
-            if (data.meet_link) {
-              setMeetLinkInput(data.meet_link);
-            }
+  const fetchTutorProfile = React.useCallback(async () => {
+    try {
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+      if (userError && userError.message.includes('Refresh Token')) {
+        await supabase.auth.signOut().catch(() => {});
+      }
+      if (authUser) {
+        setAuthUserId(authUser.id);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name, trial_ends_at, subscription_status, meet_link, phone')
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setProfile({
+            name: data.full_name,
+            trial_ends_at: data.trial_ends_at,
+            subscription_status: data.subscription_status,
+            meet_link: data.meet_link,
+            phone: data.phone || ''
+          });
+          if (data.meet_link) {
+            setMeetLinkInput(data.meet_link);
           }
         }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      } finally {
-        setIsLoadingProfile(false);
       }
-    };
-    
-    fetchProfile();
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTutorProfile();
+  }, [fetchTutorProfile]);
+
+  useEffect(() => {
+    if (activeTab === 'betaling') {
+      fetchTutorProfile();
+    }
+  }, [activeTab, fetchTutorProfile]);
+
+  const handleTeacherProfileSaved = React.useCallback((savedProfile: { full_name?: string; phone?: string; meet_link?: string }) => {
+    setProfile(prev => ({
+      name: savedProfile.full_name ?? prev?.name ?? '',
+      trial_ends_at: prev?.trial_ends_at ?? '',
+      subscription_status: prev?.subscription_status ?? 'trial',
+      meet_link: savedProfile.meet_link ?? prev?.meet_link,
+      phone: savedProfile.phone ?? prev?.phone ?? ''
+    }));
   }, []);
 
   const isTrialExpired = profile && 
@@ -3454,7 +3472,7 @@ Per Andersen,per@example.com,Norsk`}
         )}
 
         {activeTab === 'profil' && (
-          <TeacherProfile user={{ ...user, id: authUserId }} />
+          <TeacherProfile user={{ ...user, id: authUserId }} onProfileSaved={handleTeacherProfileSaved} />
         )}
 
         {activeTab === 'meldinger' && (
