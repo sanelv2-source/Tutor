@@ -36,6 +36,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/payment/send-vipps-request"
+  to = "/.netlify/functions/payment-send-vipps-request"
+  status = 200
+
+[[redirects]]
   from = "/api/payment/create-checkout-session"
   to = "/.netlify/functions/payment-create-checkout-session"
   status = 200
