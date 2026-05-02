@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Smartphone } from 'lucide-react';
+import { Copy, Smartphone } from 'lucide-react';
 import Logo from './Logo';
 
 export const InvoicePage = () => {
@@ -37,6 +37,10 @@ export const InvoicePage = () => {
     fetchInvoice();
   }, [publicToken]);
 
+  const copyToClipboard = async (value: string) => {
+    if (value) await navigator.clipboard.writeText(value);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -62,7 +66,7 @@ export const InvoicePage = () => {
   }
 
   const isPaid = invoice.status?.toLowerCase() === 'betalt' || invoice.status?.toLowerCase() === 'paid';
-  const vippsLink = invoice.payment_link || '';
+  const vippsNumber = String(invoice.tutor_phone || tutor?.phone || '').trim();
   const paymentMessage = invoice.description || `Undervisning - ${invoice.student_name}`;
 
   return (
@@ -92,6 +96,10 @@ export const InvoicePage = () => {
             <span className="text-slate-500">Gjelder</span>
             <span className="font-medium text-slate-900 text-right">{paymentMessage}</span>
           </div>
+          <div className="flex justify-between gap-4 py-3 border-b border-slate-100">
+            <span className="text-slate-500">Vipps til</span>
+            <span className="font-bold text-[#ff5b24] text-right">{vippsNumber || 'Mangler nummer'}</span>
+          </div>
           <div className="flex justify-between py-3 border-b border-slate-100">
             <span className="text-slate-500">Status</span>
             <span className={`font-medium ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -113,21 +121,35 @@ export const InvoicePage = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            <button
-              onClick={() => {
-                if (vippsLink) {
-                  window.location.href = vippsLink;
-                }
-              }}
-              disabled={!vippsLink}
-              className="w-full bg-[#ff5b24] hover:bg-[#e04d1c] text-white font-bold py-4 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <Smartphone className="h-5 w-5" />
-              Betal med Vipps
-            </button>
-            {!vippsLink && (
+            {vippsNumber ? (
+              <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Smartphone className="mt-1 h-5 w-5 text-orange-500" />
+                  <div>
+                    <p className="font-bold text-slate-900">Åpne Vipps og send til lærerens mobilnummer.</p>
+                    <p className="mt-1 text-sm text-slate-600">Bruk meldingen: {paymentMessage}</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => copyToClipboard(vippsNumber)}
+                    className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-orange-600 border border-orange-100 hover:bg-orange-100"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Kopier nummer
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(paymentMessage)}
+                    className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-orange-600 border border-orange-100 hover:bg-orange-100"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Kopier melding
+                  </button>
+                </div>
+              </div>
+            ) : (
               <p className="rounded-xl bg-slate-50 p-3 text-center text-sm text-slate-500">
-                Betalingslenken mangler. Be læreren sende betalingskravet på nytt.
+                Vipps-nummeret mangler. Be læreren oppdatere lærerprofilen og sende betalingskravet på nytt.
               </p>
             )}
           </div>
@@ -135,7 +157,7 @@ export const InvoicePage = () => {
       </div>
       
       <p className="text-slate-400 text-sm mt-8 text-center max-w-sm">
-        Betalingen skjer direkte via Vipps-lenken fra læreren. Tutorflyt viser status og historikk.
+        Betalingen skjer direkte i Vipps til lærerens registrerte mobilnummer. Tutorflyt viser status og historikk.
       </p>
     </div>
   );

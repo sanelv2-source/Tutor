@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Video, CheckCircle, Clock, CreditCard, ExternalLink, MessageSquare, Trash2 } from 'lucide-react';
+import { Video, CheckCircle, Clock, Copy, CreditCard, MessageSquare, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
@@ -33,6 +33,7 @@ interface PaymentRequest {
   status: string;
   method?: string | null;
   payment_link?: string | null;
+  tutor_phone?: string | null;
   description?: string | null;
   created_at?: string | null;
 }
@@ -207,7 +208,7 @@ const StudentDashboard = () => {
 
         try {
           let { data: invoicesData, error: invoicesError } = await fetchStudentInvoices(
-            'id, student_name, amount, due_date, status, method, payment_link, description, created_at'
+            'id, student_name, amount, due_date, status, method, payment_link, tutor_phone, description, created_at'
           );
 
           if (invoicesError && /schema cache|Could not find .* column|column .* does not exist/i.test(invoicesError.message || '')) {
@@ -643,6 +644,11 @@ const StudentDashboard = () => {
 
       const renderPaymentCard = (payment: PaymentRequest) => {
         const isPaid = String(payment.status || '').toLowerCase() === 'betalt' || String(payment.status || '').toLowerCase() === 'paid';
+        const tutorPhone = String(payment.tutor_phone || '').trim();
+        const paymentMessage = payment.description || 'Privatundervisning';
+        const copyPaymentValue = async (value: string) => {
+          if (value) await navigator.clipboard.writeText(value);
+        };
 
         return (
           <div key={payment.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -655,7 +661,7 @@ const StudentDashboard = () => {
                   </span>
                   {payment.method && <span className="text-xs font-medium text-slate-400">{payment.method}</span>}
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">{payment.description || 'Privatundervisning'}</h3>
+                <h3 className="text-lg font-bold text-slate-900">{paymentMessage}</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Forfall: {payment.due_date ? new Date(payment.due_date).toLocaleDateString('no-NO') : 'Ikke satt'}
                 </p>
@@ -665,21 +671,40 @@ const StudentDashboard = () => {
               </div>
             </div>
 
-            {!isPaid && payment.payment_link && (
-              <a
-                href={payment.payment_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff5b24] px-4 py-3 font-bold text-white hover:bg-[#e65220] transition"
-              >
-                Betal med Vipps
-                <ExternalLink className="h-4 w-4" />
-              </a>
+            {!isPaid && tutorPhone && (
+              <div className="mt-5 rounded-xl border border-orange-100 bg-orange-50 p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-bold uppercase text-orange-500">Vipps til</p>
+                    <p className="mt-1 text-lg font-black text-slate-900">{tutorPhone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-orange-500">Melding</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{paymentMessage}</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <button
+                    onClick={() => copyPaymentValue(tutorPhone)}
+                    className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-orange-600 border border-orange-100 hover:bg-orange-100 transition"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Kopier nummer
+                  </button>
+                  <button
+                    onClick={() => copyPaymentValue(paymentMessage)}
+                    className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-orange-600 border border-orange-100 hover:bg-orange-100 transition"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Kopier melding
+                  </button>
+                </div>
+              </div>
             )}
 
-            {!isPaid && !payment.payment_link && (
+            {!isPaid && !tutorPhone && (
               <p className="mt-5 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
-                Betalingslenken mangler. Be læreren sende betalingskravet på nytt.
+                Vipps-nummeret mangler. Be læreren oppdatere lærerprofilen og sende betalingskravet på nytt.
               </p>
             )}
           </div>

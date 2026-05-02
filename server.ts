@@ -1406,7 +1406,7 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.post("/api/payment/send-vipps-link", async (req, res) => {
+  app.post("/api/payment/send-vipps-request", async (req, res) => {
     const authToken = getBearerToken(req.headers.authorization);
     if (!authToken) {
       return res.status(401).json({ error: "Du må være logget inn for å sende betalingskrav." });
@@ -1418,11 +1418,10 @@ async function startServer() {
 
     const invoiceId = clipText(req.body.invoiceId, 80);
     const recipientEmail = normalizeEmail(req.body.recipientEmail);
-    const paymentLink = clipText(req.body.paymentLink, 1000);
     const paymentPageUrl = clipText(req.body.paymentPageUrl, 1000);
 
-    if (!invoiceId || !recipientEmail || !paymentLink) {
-      return res.status(400).json({ error: "Mangler faktura, mottaker eller Vipps-lenke." });
+    if (!invoiceId || !recipientEmail) {
+      return res.status(400).json({ error: "Mangler faktura eller mottaker." });
     }
 
     try {
@@ -1457,11 +1456,16 @@ async function startServer() {
 
       const { data: tutorProfile } = await supabaseAdmin
         .from("profiles")
-        .select("full_name, email")
+        .select("full_name, email, phone")
         .eq("id", authData.user.id)
         .maybeSingle();
 
       const teacherName = tutorProfile?.full_name || authData.user.user_metadata?.full_name || "Læreren din";
+      const tutorPhone = clipText(tutorProfile?.phone, 80);
+      if (!tutorPhone || /ikke oppgitt|mangler nummer/i.test(tutorPhone)) {
+        return res.status(400).json({ error: "Læreren mangler mobilnummer på profilen." });
+      }
+
       const amount = Number(invoice.amount || 0).toLocaleString("no-NO");
       const description = invoice.description || `Undervisning - ${invoice.student_name || "elev"}`;
       const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
@@ -1478,12 +1482,14 @@ async function startServer() {
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 22px 0;">
                 <p style="margin: 0 0 8px;"><strong>Elev:</strong> ${escapeHtml(invoice.student_name || "Ikke oppgitt")}</p>
                 <p style="margin: 0 0 8px;"><strong>Gjelder:</strong> ${escapeHtml(description)}</p>
-                <p style="margin: 0;"><strong>Beløp:</strong> ${escapeHtml(amount)} kr</p>
+                <p style="margin: 0 0 8px;"><strong>Beløp:</strong> ${escapeHtml(amount)} kr</p>
+                <p style="margin: 0;"><strong>Vipps til:</strong> <span style="font-size: 20px; font-weight: 800; color: #ff5b24;">${escapeHtml(tutorPhone)}</span></p>
               </div>
-              <a href="${escapeHtml(paymentLink)}" style="display: block; text-align: center; background: #ff5b24; color: #ffffff; text-decoration: none; font-weight: 800; border-radius: 12px; padding: 16px 20px; margin: 22px 0;">
-                Betal med Vipps
-              </a>
-              ${paymentPageUrl ? `<p style="font-size: 14px; line-height: 1.6; color: #64748b;">Du kan også se betalingskravet i elevportalen: <a href="${escapeHtml(paymentPageUrl)}">${escapeHtml(paymentPageUrl)}</a></p>` : ""}
+              <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 14px; padding: 16px; margin: 22px 0;">
+                <p style="margin: 0 0 8px; color: #9a3412; font-weight: 700;">Åpne Vipps og send beløpet til lærerens mobilnummer.</p>
+                <p style="margin: 0; color: #9a3412;">Bruk gjerne meldingen: ${escapeHtml(description)}</p>
+              </div>
+              ${paymentPageUrl ? `<p style="font-size: 14px; line-height: 1.6; color: #64748b;">Du kan også se betalingskravet her: <a href="${escapeHtml(paymentPageUrl)}">${escapeHtml(paymentPageUrl)}</a></p>` : ""}
               <p style="font-size: 12px; color: #94a3b8; margin-top: 28px;">Betalingen skjer direkte i Vipps. Tutorflyt lagrer status og historikk.</p>
             </div>
           `,
@@ -1495,10 +1501,11 @@ async function startServer() {
         }
       } else {
         console.log("=========================================");
-        console.log("RESEND_API_KEY not set. Simulating Vipps payment link email:");
+        console.log("RESEND_API_KEY not set. Simulating Vipps payment request email:");
         console.log(`To: ${recipientEmail}`);
         console.log(`Subject: Betalingskrav fra ${teacherName}`);
-        console.log(`Vipps link: ${paymentLink}`);
+        console.log(`Vipps to: ${tutorPhone}`);
+        console.log(`Amount: ${amount} kr`);
         console.log("=========================================");
       }
 
@@ -1506,13 +1513,21 @@ async function startServer() {
         status: "request_sent",
         request_sent_at: new Date().toISOString(),
         email: recipientEmail,
-        payment_link: paymentLink,
+        tutor_phone: tutorPhone,
+        payment_link: null,
       };
 
       let { error: updateError } = await supabaseAdmin
         .from("invoices")
         .update(updatePayload)
         .eq("id", invoiceId);
+
+      if (updateError && /schema cache|Could not find .* column|column .* does not exist/i.test(updateError.message || "")) {
+        ({ error: updateError } = await supabaseAdmin
+          .from("invoices")
+          .update({ status: "request_sent", email: recipientEmail, tutor_phone: tutorPhone })
+          .eq("id", invoiceId));
+      }
 
       if (updateError && /schema cache|Could not find .* column|column .* does not exist/i.test(updateError.message || "")) {
         ({ error: updateError } = await supabaseAdmin
@@ -1525,7 +1540,7 @@ async function startServer() {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error sending Vipps payment link:", error);
+      console.error("Error sending Vipps payment request:", error);
       res.status(500).json({ error: "Kunne ikke sende betalingskravet." });
     }
   });

@@ -344,7 +344,7 @@ const TeacherProfile = ({ user }: { user: any }) => {
               </div>
             </div>
             <p className="mt-4 text-xs text-gray-400 italic">
-              * Dette nummeret brukes automatisk for generering av Vipps-lenker i dine fakturaer.
+              * Dette nummeret brukes automatisk når Tutorflyt sender Vipps-betalingskrav.
             </p>
           </div>
 
