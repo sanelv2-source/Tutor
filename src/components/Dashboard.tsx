@@ -249,9 +249,8 @@ const saveMeetLink = async (link: string) => {
     }
     if (!user) throw new Error('Vennligst logg inn på nytt.');
 
-    const basePayload = {
+    const legacyPayload = {
       student_name: getInvoiceStudentName(invoice),
-      student_id: invoice.student_id || null,
       amount: Number(invoice.amount),
       due_date: invoice.due_date || new Date().toISOString().split('T')[0],
       status: invoice.status || 'pending',
@@ -261,13 +260,14 @@ const saveMeetLink = async (link: string) => {
     };
 
     const payload = {
-      ...basePayload,
+      ...legacyPayload,
+      student_id: invoice.student_id || null,
       tutor_phone: getTeacherVippsPhone(invoice) || null,
       payment_link: null,
       description: getInvoiceDescription(invoice)
     };
 
-    const data = await saveInvoiceWithSchemaFallback(invoice, payload, basePayload);
+    const data = await saveInvoiceWithSchemaFallback(invoice, payload, legacyPayload);
 
     const savedInvoice = { ...invoice, ...payload, ...data };
     setSelectedVippsInvoice(savedInvoice);
