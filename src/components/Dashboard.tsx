@@ -27,7 +27,8 @@ import {
   User,
   Smartphone,
   Upload,
-  LifeBuoy
+  LifeBuoy,
+  Bot
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -36,6 +37,7 @@ import { ChatList } from './ChatList';
 import PaymentWall from './PaymentWall';
 import WelcomeGuide from './WelcomeGuide';
 import TeacherProfile from './TeacherProfile';
+import AIAssistant from './AIAssistant';
 import NotificationBell from './NotificationBell';
 import SupportFeedback from './SupportFeedback';
 import { supabase } from '../supabaseClient';
@@ -2032,6 +2034,13 @@ const saveMeetLink = async (link: string) => {
             <CreditCard className="h-5 w-5" />
             Betalingsstatus
           </button>
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'ai' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <Bot className="h-5 w-5" />
+            AI-assistent
+          </button>
           <button 
             onClick={() => setActiveTab('meldinger')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'meldinger' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -2074,7 +2083,7 @@ const saveMeetLink = async (link: string) => {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid grid-cols-6 items-center min-h-16 px-1 z-30 pb-safe">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid grid-cols-7 items-center min-h-16 px-1 z-30 pb-safe">
         <button 
           onClick={() => setActiveTab('oversikt')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'oversikt' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -2087,35 +2096,42 @@ const saveMeetLink = async (link: string) => {
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'timeplan' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <CalendarIcon className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Timeplan</span>
+          <span className="text-[10px] font-medium">Timer</span>
         </button>
         <button 
           onClick={() => setActiveTab('betaling')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'betaling' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <CreditCard className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Betaling</span>
+          <span className="text-[10px] font-medium">Betal</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('ai')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'ai' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <Bot className="h-5 w-5" />
+          <span className="text-[10px] font-medium">AI</span>
         </button>
         <button 
           onClick={() => setActiveTab('meldinger')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'meldinger' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <MessageCircle className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Meldinger</span>
+          <span className="text-[10px] font-medium">Meld</span>
         </button>
         <button 
           onClick={() => setActiveTab('rapporter')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'rapporter' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <MessageSquare className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Rapporter</span>
+          <span className="text-[10px] font-medium">Rapport</span>
         </button>
         <button 
           onClick={() => setActiveTab('ressurser')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'ressurser' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <BookOpen className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Ressurser</span>
+          <span className="text-[10px] font-medium">Ress.</span>
         </button>
       </nav>
 
@@ -2126,7 +2142,7 @@ const saveMeetLink = async (link: string) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 capitalize">
-              {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab}
+              {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab === 'ai' ? 'AI-assistent' : activeTab}
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
@@ -2134,7 +2150,7 @@ const saveMeetLink = async (link: string) => {
             <div className="hidden md:block">
               <NotificationBell />
             </div>
-            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && (
+            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && activeTab !== 'ai' && (
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 {activeTab === 'timeplan' && (
                   <button 
@@ -3474,6 +3490,10 @@ Per Andersen,per@example.com,Norsk`}
 
         {activeTab === 'profil' && (
           <TeacherProfile user={{ ...user, id: authUserId }} onProfileSaved={handleTeacherProfileSaved} />
+        )}
+
+        {activeTab === 'ai' && (
+          <AIAssistant students={students} teacherName={profile?.name || user?.name || 'Lærer'} />
         )}
 
         {activeTab === 'meldinger' && (

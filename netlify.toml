@@ -21,6 +21,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/ai/teacher-assistant"
+  to = "/.netlify/functions/teacher-ai"
+  status = 200
+
+[[redirects]]
   from = "/api/account/delete"
   to = "/.netlify/functions/account-delete"
   status = 200
