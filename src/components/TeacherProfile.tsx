@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../supabaseClient';
 import { User, Phone, Mail, ShieldCheck, X } from 'lucide-react';
 import DeleteAccountPanel from './DeleteAccountPanel';
 
-const TeacherProfile = ({ user }: { user: any }) => {
+type TeacherProfileProps = {
+  user: any;
+  onProfileSaved?: (profile: { full_name?: string; phone?: string; meet_link?: string }) => void;
+};
+
+const TeacherProfile = ({ user, onProfileSaved }: TeacherProfileProps) => {
   const [profile, setProfile] = useState({
     full_name: '',
     phone: '',
@@ -61,11 +66,16 @@ const TeacherProfile = ({ user }: { user: any }) => {
           .maybeSingle();
 
         if (data) {
-          setProfile({
+          const loadedProfile = {
             full_name: data.full_name || '',
             phone: data.phone || '',
             avatar_url: data.avatar_url || '',
             email: user.email
+          };
+          setProfile(loadedProfile);
+          onProfileSaved?.({
+            full_name: loadedProfile.full_name,
+            phone: loadedProfile.phone
           });
         }
       } catch (err) {
@@ -87,14 +97,7 @@ const TeacherProfile = ({ user }: { user: any }) => {
     setSaving(true);
     console.log("Starter tvungen lagring for:", user?.id);
 
-    // Vi lager en lokal "nød-klient" som garantert bruker riktig adresse
-    const { createClient } = await import('@supabase/supabase-js');
-    const tempSupabase = createClient(
-      import.meta.env.VITE_SUPABASE_URL, 
-      import.meta.env.VITE_SUPABASE_ANON_KEY
-    );
-
-    const { error } = await tempSupabase
+    const { error } = await supabase
       .from('profiles')
       .upsert({
         id: user.id,
@@ -111,6 +114,10 @@ const TeacherProfile = ({ user }: { user: any }) => {
       alert("SUKSESS! Profilen er lagret i den ekte databasen.");
       setErrorMessage(null);
       setIsEditing(false); // Lukk redigeringsmodus ved suksess
+      onProfileSaved?.({
+        full_name: profile.full_name,
+        phone: profile.phone
+      });
     }
     setSaving(false);
   };
