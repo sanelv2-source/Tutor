@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Video, CheckCircle, Clock, MessageSquare, Trash2 } from 'lucide-react';
+import { Video, CheckCircle, Clock, CreditCard, ExternalLink, MessageSquare, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import MyCalendar from './MyCalendar';
@@ -22,6 +22,18 @@ interface Assignment {
   profiles?: {
     full_name: string;
   };
+}
+
+interface PaymentRequest {
+  id: string;
+  student_name: string;
+  amount: number;
+  due_date: string | null;
+  status: string;
+  method?: string | null;
+  payment_link?: string | null;
+  description?: string | null;
+  created_at?: string | null;
 }
 
 const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: string, tutorId?: string, studentId?: string, onComplete: (url: string) => void }) => {
@@ -146,6 +158,7 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('tasks');
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [resources, setResources] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
   const [vacations, setVacations] = useState<any[]>([]);
@@ -184,6 +197,34 @@ const StudentDashboard = () => {
 
         console.log('Loaded student row:', student);
         setStudentId(student.id);
+
+        const fetchStudentInvoices = async (columns: string) => supabase
+          .from('invoices')
+          .select(columns)
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false });
+
+        try {
+          let { data: invoicesData, error: invoicesError } = await fetchStudentInvoices(
+            'id, student_name, amount, due_date, status, method, payment_link, description, created_at'
+          );
+
+          if (invoicesError && /schema cache|Could not find .* column|column .* does not exist/i.test(invoicesError.message || '')) {
+            ({ data: invoicesData, error: invoicesError } = await fetchStudentInvoices(
+              'id, student_name, amount, due_date, status, method, created_at'
+            ));
+          }
+
+          if (invoicesError) {
+            console.error('Error fetching payment requests:', invoicesError);
+            setPaymentRequests([]);
+          } else {
+            setPaymentRequests(((invoicesData || []) as unknown) as PaymentRequest[]);
+          }
+        } catch (invoiceError) {
+          console.error('Exception while fetching payment requests:', invoiceError);
+          setPaymentRequests([]);
+        }
 
         // Fetch assignments
         const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -587,6 +628,97 @@ const StudentDashboard = () => {
               </div>
             )}
           </div>
+        </div>
+      );
+    } else if (activeTab === 'payments') {
+      const pendingPayments = paymentRequests.filter(payment => {
+        const status = String(payment.status || '').toLowerCase();
+        return status !== 'betalt' && status !== 'paid';
+      });
+      const paidPayments = paymentRequests.filter(payment => {
+        const status = String(payment.status || '').toLowerCase();
+        return status === 'betalt' || status === 'paid';
+      });
+
+      const renderPaymentCard = (payment: PaymentRequest) => {
+        const isPaid = String(payment.status || '').toLowerCase() === 'betalt' || String(payment.status || '').toLowerCase() === 'paid';
+
+        return (
+          <div key={payment.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {isPaid ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                    {isPaid ? 'Betalt' : 'Venter på betaling'}
+                  </span>
+                  {payment.method && <span className="text-xs font-medium text-slate-400">{payment.method}</span>}
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">{payment.description || 'Privatundervisning'}</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Forfall: {payment.due_date ? new Date(payment.due_date).toLocaleDateString('no-NO') : 'Ikke satt'}
+                </p>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-2xl font-black text-slate-900">{Number(payment.amount || 0).toLocaleString('no-NO')} kr</p>
+              </div>
+            </div>
+
+            {!isPaid && payment.payment_link && (
+              <a
+                href={payment.payment_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff5b24] px-4 py-3 font-bold text-white hover:bg-[#e65220] transition"
+              >
+                Betal med Vipps
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+
+            {!isPaid && !payment.payment_link && (
+              <p className="mt-5 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+                Betalingslenken mangler. Be læreren sende betalingskravet på nytt.
+              </p>
+            )}
+          </div>
+        );
+      };
+
+      return (
+        <div className="p-4 sm:p-8">
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Betaling</h1>
+              <p className="mt-1 text-sm text-slate-500">Her finner du betalingskrav fra læreren din.</p>
+            </div>
+            <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+              <CreditCard className="h-6 w-6" />
+            </div>
+          </div>
+
+          {paymentRequests.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
+              <CreditCard className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+              <p className="font-medium text-slate-700">Ingen betalingskrav enda.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {pendingPayments.length > 0 && (
+                <section className="space-y-4">
+                  <h2 className="text-lg font-bold text-slate-900">Venter på betaling</h2>
+                  {pendingPayments.map(renderPaymentCard)}
+                </section>
+              )}
+
+              {paidPayments.length > 0 && (
+                <section className="space-y-4">
+                  <h2 className="text-lg font-bold text-slate-900">Historikk</h2>
+                  {paidPayments.map(renderPaymentCard)}
+                </section>
+              )}
+            </div>
+          )}
         </div>
       );
     } else if (activeTab === 'calendar') {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Logo from './Logo';
-import { BookOpen, CalendarDays, ClipboardList, LifeBuoy, LogOut, Menu, MessageCircle, Settings, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ClipboardList, CreditCard, LifeBuoy, LogOut, Menu, MessageCircle, Settings, X } from 'lucide-react';
 
 interface StudentSidebarProps {
   activeTab: string;
@@ -13,6 +13,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
 
   const menuItems = [
     { id: 'tasks', label: 'Oppgaver', Icon: ClipboardList },
+    { id: 'payments', label: 'Betaling', Icon: CreditCard },
     { id: 'calendar', label: 'Timeplan', Icon: CalendarDays },
     { id: 'messages', label: 'Meldinger', Icon: MessageCircle },
     { id: 'resources', label: 'Ressurser', Icon: BookOpen },

@@ -208,7 +208,7 @@ app.get("/api/invoices/:publicToken", async (req, res) => {
     let invoice: any = null;
     let invoiceError: any = null;
     const invoiceResult = await fetchInvoice(
-      'id, public_token, tutor_id, student_name, amount, due_date, status, method, tutor_phone, description, created_at'
+      'id, public_token, tutor_id, student_name, amount, due_date, status, method, tutor_phone, payment_link, description, created_at'
     );
     invoice = invoiceResult.data;
     invoiceError = invoiceResult.error;
@@ -1211,6 +1211,130 @@ async function startServer() {
     }
 
     res.json({ success: true });
+  });
+
+  app.post("/api/payment/send-vipps-link", async (req, res) => {
+    const authToken = getBearerToken(req.headers.authorization);
+    if (!authToken) {
+      return res.status(401).json({ error: "Du må være logget inn for å sende betalingskrav." });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase Admin not initialized" });
+    }
+
+    const invoiceId = clipText(req.body.invoiceId, 80);
+    const recipientEmail = normalizeEmail(req.body.recipientEmail);
+    const paymentLink = clipText(req.body.paymentLink, 1000);
+    const paymentPageUrl = clipText(req.body.paymentPageUrl, 1000);
+
+    if (!invoiceId || !recipientEmail || !paymentLink) {
+      return res.status(400).json({ error: "Mangler faktura, mottaker eller Vipps-lenke." });
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Ugyldig eller utløpt innlogging." });
+      }
+
+      const fetchInvoiceForEmail = (columns: string) => supabaseAdmin
+        .from("invoices")
+        .select(columns)
+        .eq("id", invoiceId)
+        .maybeSingle();
+
+      let invoice: any = null;
+      let invoiceError: any = null;
+      const invoiceResult = await fetchInvoiceForEmail("id, tutor_id, student_name, amount, due_date, description, public_token");
+      invoice = invoiceResult.data;
+      invoiceError = invoiceResult.error;
+
+      if (invoiceError && /schema cache|Could not find .* column|column .* does not exist/i.test(invoiceError.message || "")) {
+        const fallbackInvoiceResult = await fetchInvoiceForEmail("id, tutor_id, student_name, amount, due_date, public_token");
+        invoice = fallbackInvoiceResult.data;
+        invoiceError = fallbackInvoiceResult.error;
+      }
+
+      if (invoiceError) throw invoiceError;
+      if (!invoice) return res.status(404).json({ error: "Fant ikke betalingskravet." });
+      if (invoice.tutor_id !== authData.user.id) {
+        return res.status(403).json({ error: "Du kan bare sende dine egne betalingskrav." });
+      }
+
+      const { data: tutorProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      const teacherName = tutorProfile?.full_name || authData.user.user_metadata?.full_name || "Læreren din";
+      const amount = Number(invoice.amount || 0).toLocaleString("no-NO");
+      const description = invoice.description || `Undervisning - ${invoice.student_name || "elev"}`;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>";
+
+      if (resend) {
+        const data = await resend.emails.send({
+          from: fromEmail,
+          to: recipientEmail,
+          subject: `Betalingskrav fra ${teacherName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #0f172a; padding: 24px;">
+              <h1 style="font-size: 24px; margin: 0 0 12px;">Betaling for undervisning</h1>
+              <p style="font-size: 16px; line-height: 1.6; color: #475569;">${escapeHtml(teacherName)} har sendt deg et betalingskrav.</p>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 22px 0;">
+                <p style="margin: 0 0 8px;"><strong>Elev:</strong> ${escapeHtml(invoice.student_name || "Ikke oppgitt")}</p>
+                <p style="margin: 0 0 8px;"><strong>Gjelder:</strong> ${escapeHtml(description)}</p>
+                <p style="margin: 0;"><strong>Beløp:</strong> ${escapeHtml(amount)} kr</p>
+              </div>
+              <a href="${escapeHtml(paymentLink)}" style="display: block; text-align: center; background: #ff5b24; color: #ffffff; text-decoration: none; font-weight: 800; border-radius: 12px; padding: 16px 20px; margin: 22px 0;">
+                Betal med Vipps
+              </a>
+              ${paymentPageUrl ? `<p style="font-size: 14px; line-height: 1.6; color: #64748b;">Du kan også se betalingskravet i elevportalen: <a href="${escapeHtml(paymentPageUrl)}">${escapeHtml(paymentPageUrl)}</a></p>` : ""}
+              <p style="font-size: 12px; color: #94a3b8; margin-top: 28px;">Betalingen skjer direkte i Vipps. Tutorflyt lagrer status og historikk.</p>
+            </div>
+          `,
+        });
+
+        if (data.error) {
+          console.error("Resend API returned an error for Vipps link:", data.error);
+          return res.status(502).json({ error: data.error.message || "Kunne ikke sende e-post." });
+        }
+      } else {
+        console.log("=========================================");
+        console.log("RESEND_API_KEY not set. Simulating Vipps payment link email:");
+        console.log(`To: ${recipientEmail}`);
+        console.log(`Subject: Betalingskrav fra ${teacherName}`);
+        console.log(`Vipps link: ${paymentLink}`);
+        console.log("=========================================");
+      }
+
+      const updatePayload = {
+        status: "request_sent",
+        request_sent_at: new Date().toISOString(),
+        email: recipientEmail,
+        payment_link: paymentLink,
+      };
+
+      let { error: updateError } = await supabaseAdmin
+        .from("invoices")
+        .update(updatePayload)
+        .eq("id", invoiceId);
+
+      if (updateError && /schema cache|Could not find .* column|column .* does not exist/i.test(updateError.message || "")) {
+        ({ error: updateError } = await supabaseAdmin
+          .from("invoices")
+          .update({ status: "request_sent", email: recipientEmail })
+          .eq("id", invoiceId));
+      }
+
+      if (updateError) throw updateError;
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error sending Vipps payment link:", error);
+      res.status(500).json({ error: "Kunne ikke sende betalingskravet." });
+    }
   });
 
   app.post("/api/support-feedback", async (req, res) => {
