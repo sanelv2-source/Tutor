@@ -16,8 +16,7 @@ export const ChatList = () => {
 
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [linkedTutorId, setLinkedTutorId] = useState<string | null>(null);
-  const [studentRecordId, setStudentRecordId] = useState<string | null>(null);
+  const [studentLinks, setStudentLinks] = useState<any[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -39,15 +38,34 @@ export const ChatList = () => {
         setUserRole(profile?.role || null);
 
         if (profile?.role === 'student') {
-          const { data: studentRecord } = await supabase
+          const { data: studentRecords, error: studentRecordsError } = await supabase
             .from('students')
-            .select('id, tutor_id')
-            .eq('profile_id', userData.user.id)
-            .maybeSingle();
-            
-          if (studentRecord) {
-            setStudentRecordId(studentRecord.id);
-            setLinkedTutorId(studentRecord.tutor_id);
+            .select('id, tutor_id, full_name')
+            .eq('profile_id', userData.user.id);
+
+          if (studentRecordsError) {
+            console.error('Error fetching linked tutors for student:', studentRecordsError);
+          } else if (studentRecords?.length) {
+            const tutorIds = Array.from(new Set(studentRecords.map(record => record.tutor_id).filter(Boolean))) as string[];
+            let teacherNames = new Map<string, string>();
+
+            if (tutorIds.length > 0) {
+              const { data: tutorProfiles, error: tutorProfilesError } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', tutorIds);
+
+              if (tutorProfilesError) {
+                console.error('Error fetching tutor names for student chat:', tutorProfilesError);
+              } else {
+                teacherNames = new Map((tutorProfiles || []).map(profile => [profile.id, profile.full_name || 'Lærer']));
+              }
+            }
+
+            setStudentLinks(studentRecords.map(record => ({
+              ...record,
+              teacher_name: teacherNames.get(record.tutor_id) || 'Lærer',
+            })));
           }
         }
       }
@@ -145,6 +163,7 @@ export const ChatList = () => {
       .select(`
         id,
         tutor_id,
+        student_id,
         created_at,
         updated_at,
         last_message_at,
@@ -186,6 +205,7 @@ export const ChatList = () => {
       .select(`
         id,
         tutor_id,
+        student_id,
         created_at,
         updated_at,
         last_message_at,
@@ -230,27 +250,76 @@ export const ChatList = () => {
     }
   };
 
-  const handleStudentStartChat = async () => {
-    if (!currentUserId || !linkedTutorId || !studentRecordId) return;
+  const getConversationStudentId = (conv: any) => {
+    if (conv.student_id) return conv.student_id;
+    if (Array.isArray(conv.student)) return conv.student[0]?.id;
+    return conv.student?.id;
+  };
+
+  const handleStudentStartChat = async (studentLink?: any) => {
+    const selectedLink = studentLink || studentLinks[0];
+    if (!currentUserId || !selectedLink?.tutor_id || !selectedLink?.id) return;
 
     // Check if conversation already exists
-    const existingConv = conversations.find(c => c.tutor_id === linkedTutorId);
+    const existingConv = conversations.find(c =>
+      c.tutor_id === selectedLink.tutor_id && getConversationStudentId(c) === selectedLink.id
+    );
     if (existingConv) {
       handleConversationClick(existingConv);
+      setShowNewChatModal(false);
       return;
     }
 
     // Create new conversation
     try {
+      const { data: existing, error: existingError } = await supabase
+        .from('conversations')
+        .select(`
+          id,
+          tutor_id,
+          student_id,
+          created_at,
+          updated_at,
+          last_message_at,
+          tutor_unread_count,
+          student_unread_count,
+          student:students (
+            id,
+            full_name,
+            profile_id
+          ),
+          tutor:profiles!tutor_id (
+            id,
+            full_name
+          )
+        `)
+        .eq('tutor_id', selectedLink.tutor_id)
+        .eq('student_id', selectedLink.id)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      if (existing) {
+        const isExisting = conversations.some(c => c.id === existing.id);
+        if (!isExisting) {
+          setConversations(prev => [existing, ...prev]);
+        }
+        setActiveConversation(existing);
+        setShowNewChatModal(false);
+        fetchMessages(existing.id);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('conversations')
         .insert({
-          tutor_id: linkedTutorId,
-          student_id: studentRecordId,
+          tutor_id: selectedLink.tutor_id,
+          student_id: selectedLink.id,
         })
         .select(`
           id,
           tutor_id,
+          student_id,
           created_at,
           updated_at,
           last_message_at,
@@ -272,6 +341,7 @@ export const ChatList = () => {
       
       setConversations(prev => [data, ...prev]);
       setActiveConversation(data);
+      setShowNewChatModal(false);
       fetchMessages(data.id);
     } catch (error) {
       console.error('Error creating conversation:', error);
@@ -350,6 +420,7 @@ export const ChatList = () => {
         .select(`
           id,
           tutor_id,
+          student_id,
           created_at,
           updated_at,
           last_message_at,
@@ -599,12 +670,18 @@ export const ChatList = () => {
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
           <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-violet-600" />
-            {userRole === 'student' ? 'Meldinger med lærer' : 'Meldinger'}
+            {userRole === 'student' ? 'Meldinger med lærere' : 'Meldinger'}
           </h1>
           {userRole === 'student' ? (
             <button 
-              onClick={handleStudentStartChat}
-              disabled={!linkedTutorId}
+              onClick={() => {
+                if (studentLinks.length === 1) {
+                  handleStudentStartChat(studentLinks[0]);
+                } else {
+                  setShowNewChatModal(true);
+                }
+              }}
+              disabled={studentLinks.length === 0}
               title="Skriv til lærer"
               className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:hover:bg-violet-600 text-white p-2 rounded-full transition-all shadow-sm"
             >
@@ -645,7 +722,7 @@ export const ChatList = () => {
           ) : conversations.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-sm">
               {userRole === 'student' ? (
-                linkedTutorId ? 'Skriv en melding til læreren din' : 'Du er ikke koblet til en lærer ennå'
+                studentLinks.length > 0 ? 'Skriv en melding til en lærer' : 'Du er ikke koblet til en lærer ennå'
               ) : (
                 'Ingen samtaler funnet.'
               )}
@@ -806,18 +883,43 @@ export const ChatList = () => {
         )}
       </div>
 
-      {/* New Chat Modal (Only for Tutors) */}
-      {showNewChatModal && userRole !== 'student' && (
+      {/* New Chat Modal */}
+      {showNewChatModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-900">Start ny samtale</h2>
+              <h2 className="text-xl font-bold text-slate-900">
+                {userRole === 'student' ? 'Velg lærer' : 'Start ny samtale'}
+              </h2>
               <button onClick={() => setShowNewChatModal(false)} className="text-slate-400 hover:text-slate-600">
                 &times;
               </button>
             </div>
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {availableStudents.length === 0 ? (
+              {userRole === 'student' ? (
+                studentLinks.length === 0 ? (
+                  <p className="text-slate-500 text-center py-4">Du er ikke koblet til en lærer ennå.</p>
+                ) : (
+                  studentLinks.map(link => {
+                    const existingConversation = conversations.some(c =>
+                      c.tutor_id === link.tutor_id && getConversationStudentId(c) === link.id
+                    );
+
+                    return (
+                      <button
+                        key={link.id}
+                        onClick={() => handleStudentStartChat(link)}
+                        className="w-full text-left p-3 rounded-xl hover:bg-slate-50 transition-colors text-slate-800 border border-transparent hover:border-slate-200"
+                      >
+                        <span className="block font-medium">{link.teacher_name || 'Lærer'}</span>
+                        <span className="block text-xs text-slate-500 mt-1">
+                          {existingConversation ? 'Åpne samtale' : 'Start samtale'}
+                        </span>
+                      </button>
+                    );
+                  })
+                )
+              ) : availableStudents.length === 0 ? (
                 <p className="text-slate-500 text-center py-4">Ingen nye elever å starte samtale med.</p>
               ) : (
                 availableStudents.map(student => (

@@ -157,10 +157,10 @@ export default function App() {
           .from('students')
           .select('id')
           .eq('email', session.user.email)
-          .maybeSingle();
+          .limit(1);
         
         if (!error) {
-          studentData = data;
+          studentData = data?.[0] || null;
           break;
         }
         
