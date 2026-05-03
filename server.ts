@@ -1925,6 +1925,10 @@ async function startServer() {
   });
 
   app.post("/api/ai/teacher-assistant", async (req, res) => {
+    if (process.env.AI_ASSISTANT_ENABLED !== "true") {
+      return res.status(403).json({ error: "AI-assistenten er ikke tilgjengelig på dette abonnementet ennå." });
+    }
+
     const authHeader = String(req.headers.authorization || "");
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
 

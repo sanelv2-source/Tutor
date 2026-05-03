@@ -45,6 +45,8 @@ import { readApiJson } from '../utils/api';
 import { createNotification } from '../services/notificationService';
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
 
+const AI_ASSISTANT_ENABLED = import.meta.env.VITE_AI_ASSISTANT_ENABLED === 'true';
+
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('profil');
   const [reportStatus, setReportStatus] = useState<'great' | 'good' | 'needs_focus'>('great');
@@ -120,6 +122,12 @@ const saveMeetLink = async (link: string) => {
   useEffect(() => {
     fetchTutorProfile();
   }, [fetchTutorProfile]);
+
+  useEffect(() => {
+    if (!AI_ASSISTANT_ENABLED && activeTab === 'ai') {
+      setActiveTab('profil');
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'betaling') {
@@ -2034,13 +2042,15 @@ const saveMeetLink = async (link: string) => {
             <CreditCard className="h-5 w-5" />
             Betalingsstatus
           </button>
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'ai' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
-          >
-            <Bot className="h-5 w-5" />
-            AI-assistent
-          </button>
+          {AI_ASSISTANT_ENABLED && (
+            <button
+              onClick={() => setActiveTab('ai')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'ai' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            >
+              <Bot className="h-5 w-5" />
+              AI-assistent
+            </button>
+          )}
           <button 
             onClick={() => setActiveTab('meldinger')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'meldinger' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -2083,7 +2093,7 @@ const saveMeetLink = async (link: string) => {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid grid-cols-7 items-center min-h-16 px-1 z-30 pb-safe">
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid ${AI_ASSISTANT_ENABLED ? 'grid-cols-7' : 'grid-cols-6'} items-center min-h-16 px-1 z-30 pb-safe`}>
         <button 
           onClick={() => setActiveTab('oversikt')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'oversikt' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -2105,13 +2115,15 @@ const saveMeetLink = async (link: string) => {
           <CreditCard className="h-5 w-5" />
           <span className="text-[10px] font-medium">Betal</span>
         </button>
-        <button
-          onClick={() => setActiveTab('ai')}
-          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'ai' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
-        >
-          <Bot className="h-5 w-5" />
-          <span className="text-[10px] font-medium">AI</span>
-        </button>
+        {AI_ASSISTANT_ENABLED && (
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'ai' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            <Bot className="h-5 w-5" />
+            <span className="text-[10px] font-medium">AI</span>
+          </button>
+        )}
         <button 
           onClick={() => setActiveTab('meldinger')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'meldinger' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -3492,7 +3504,7 @@ Per Andersen,per@example.com,Norsk`}
           <TeacherProfile user={{ ...user, id: authUserId }} onProfileSaved={handleTeacherProfileSaved} />
         )}
 
-        {activeTab === 'ai' && (
+        {AI_ASSISTANT_ENABLED && activeTab === 'ai' && (
           <AIAssistant students={students} teacherName={profile?.name || user?.name || 'Lærer'} />
         )}
 

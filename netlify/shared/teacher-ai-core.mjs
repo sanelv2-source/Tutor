@@ -77,7 +77,7 @@ export async function generateTeacherAssistantContent(request) {
 
   const model = new ChatGoogleGenerativeAI({
     apiKey,
-    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     temperature: 0.35,
     maxOutputTokens: 1800,
   });
