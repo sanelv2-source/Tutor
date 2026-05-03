@@ -828,13 +828,13 @@ const saveMeetLink = async (link: string) => {
           }
         }
         setIsBulkImporting(false);
-        showToast('Bulk import completed!');
+        showToast('Masseimport fullført!');
         fetchStudents();
       },
       error: (error: any) => {
         console.error('CSV parse error:', error);
         setIsBulkImporting(false);
-        showToast('Error parsing CSV');
+        showToast('Kunne ikke lese CSV-filen');
       }
     });
   };
@@ -2270,19 +2270,19 @@ const saveMeetLink = async (link: string) => {
               </div>
             )}
 
-            <div className="mb-4">
+            <div className="order-1">
               <button
                 onClick={() => setShowBulkImportHelp(true)}
                 className="inline-flex items-center justify-center px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm"
                 disabled={isBulkImporting}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                {isBulkImporting ? 'Importing...' : 'Bulk Import'}
+                {isBulkImporting ? 'Importerer...' : 'Masseimport av elever'}
               </button>
               {showBulkImportHelp && (
                 <div className="mt-4 p-4 sm:p-6 bg-blue-50 border border-blue-200 rounded-2xl">
                   <div className="flex items-start justify-between gap-3 mb-4">
-                    <h3 className="text-lg font-bold text-blue-900">Bulk Import av Elever</h3>
+                    <h3 className="text-lg font-bold text-blue-900">Masseimport av elever</h3>
                     <button
                       onClick={() => setShowBulkImportHelp(false)}
                       className="text-blue-600 hover:text-blue-800"
@@ -2292,7 +2292,7 @@ const saveMeetLink = async (link: string) => {
                   </div>
                   <div className="space-y-4 text-sm text-blue-800">
                     <p>
-                      <strong>Oversikt:</strong> Bulk import lar deg legge til flere elever samtidig ved å laste opp en CSV-fil. Dette sparer tid sammenlignet med å legge til elever en etter en.
+                      <strong>Oversikt:</strong> Masseimport lar deg legge til flere elever samtidig ved å laste opp en CSV-fil. Dette sparer tid sammenlignet med å legge til elever en etter en.
                     </p>
                     <div>
                       <strong>Steg 1: Forbered CSV-filen</strong>
