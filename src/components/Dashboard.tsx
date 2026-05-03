@@ -43,9 +43,10 @@ import SupportFeedback from './SupportFeedback';
 import { supabase } from '../supabaseClient';
 import { readApiJson } from '../utils/api';
 import { createNotification } from '../services/notificationService';
-import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, GoogleCalendarEvent } from '../lib/googleCalendar';
+import type { GoogleCalendarEvent } from '../lib/googleCalendar';
 
 const AI_ASSISTANT_ENABLED = import.meta.env.VITE_AI_ASSISTANT_ENABLED === 'true';
+const GOOGLE_CALENDAR_ENABLED = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === 'true';
 
 export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: (page: string) => void, user: any, onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('profil');
@@ -402,9 +403,17 @@ const saveMeetLink = async (link: string) => {
   };
 
   const fetchCalendar = React.useCallback(async () => {
+    if (!GOOGLE_CALENDAR_ENABLED) {
+      setCalendarEvents([]);
+      setCalendarError(null);
+      setIsLoadingCalendar(false);
+      return;
+    }
+
     setIsLoadingCalendar(true);
     setCalendarError(null);
     try {
+      const { fetchGoogleCalendarEvents } = await import('../lib/googleCalendar');
       const events = await fetchGoogleCalendarEvents();
       setCalendarEvents(events);
     } catch (error: any) {
@@ -415,6 +424,11 @@ const saveMeetLink = async (link: string) => {
   }, []);
 
   const handleSyncCalendar = async () => {
+    if (!GOOGLE_CALENDAR_ENABLED) {
+      showToast('Google Kalender blir tilgjengelig senere i Pro.');
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -1233,7 +1247,7 @@ const saveMeetLink = async (link: string) => {
         };
       });
 
-    const gcItems = calendarEvents
+    const gcItems = GOOGLE_CALENDAR_ENABLED ? calendarEvents
       .filter(ce => {
         const startDate = new Date(ce.start.dateTime || ce.start.date || '');
         return startDate.toLocaleDateString('sv-SE') === todayStr;
@@ -1253,7 +1267,7 @@ const saveMeetLink = async (link: string) => {
           source: 'google',
           sortTime: startTimeStr
         };
-      });
+      }) : [];
 
     const combined = [...localItems, ...fasteItems, ...gcItems];
     
@@ -2703,6 +2717,7 @@ Per Andersen,per@example.com,Norsk`}
               </div>
               
               <div className="space-y-6">
+                {GOOGLE_CALENDAR_ENABLED && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -2766,6 +2781,7 @@ Per Andersen,per@example.com,Norsk`}
                     </ul>
                   )}
                 </div>
+                )}
 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                   <h2 className="text-lg font-bold text-slate-900 mb-4">Hurtighandlinger</h2>
@@ -4303,20 +4319,22 @@ Per Andersen,per@example.com,Norsk`}
           onSave={async (dates, time) => {
             if (calendarModal.mode === 'faste_tider') {
               try {
-                // 1. Lagre til Google Kalender
                 let googleSuccessCount = 0;
-                for (const date of dates) {
-                  try {
-                    await createGoogleCalendarEvent('Fast tid (Lærerportalen)', date, time!);
-                    googleSuccessCount++;
-                  } catch (gErr: any) {
-                    if (!gErr.message?.includes('provider_token mangler') && !gErr.message?.includes('aktiv sesjon funnet')) {
-                      console.error("Feil ved lagring til Google Kalender for dato", date, gErr);
+
+                if (GOOGLE_CALENDAR_ENABLED) {
+                  const { createGoogleCalendarEvent } = await import('../lib/googleCalendar');
+                  for (const date of dates) {
+                    try {
+                      await createGoogleCalendarEvent('Fast tid (Lærerportalen)', date, time!);
+                      googleSuccessCount++;
+                    } catch (gErr: any) {
+                      if (!gErr.message?.includes('provider_token mangler') && !gErr.message?.includes('aktiv sesjon funnet')) {
+                        console.error("Feil ved lagring til Google Kalender for dato", date, gErr);
+                      }
                     }
                   }
                 }
 
-                // 2. Lagre til Supabase (faste_tider tabell)
                 if (authUserId) {
                   const { error } = await supabase.from('faste_tider').insert(
                     dates.map(date => ({
@@ -4340,9 +4358,10 @@ Per Andersen,per@example.com,Norsk`}
                     fetchFasteTider(); // Oppdater fra Supabase
                   }
                 }
-                
-                showToast(`Faste tider lagret for ${dates.length} dager kl ${time}! (${googleSuccessCount} i Google Kalender)`);
-                fetchCalendar(); // Oppdater Google Kalender-visningen
+
+                const googleCalendarMessage = GOOGLE_CALENDAR_ENABLED ? ` (${googleSuccessCount} i Google Kalender)` : '';
+                showToast(`Faste tider lagret for ${dates.length} dager kl ${time}!${googleCalendarMessage}`);
+                if (GOOGLE_CALENDAR_ENABLED) fetchCalendar();
               } catch (error: any) {
                 showToast(`Feil ved lagring: ${error.message}`);
               }
