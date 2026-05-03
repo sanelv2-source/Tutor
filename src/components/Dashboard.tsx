@@ -1090,38 +1090,46 @@ const saveMeetLink = async (link: string) => {
   
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [calendarModal, setCalendarModal] = useState<{ isOpen: boolean, title: string, mode: 'faste_tider' | 'ferie' } | null>(null);
-  const [stats, setStats] = useState({ earned: 0, pending: 0, vippsPercent: 0 });
+  const [studentSearch, setStudentSearch] = useState('');
 
-  const fetchPaymentStats = React.useCallback(async () => {
-    if (!authUserId) return;
-    const { data: lessonsData, error } = await supabase
-      .from('lessons')
-      .select('price, payment_status, method')
-      .eq('tutor_id', authUserId);
+  const stats = React.useMemo(() => {
+    const now = new Date();
+    const monthInvoices = invoices.filter(inv => {
+      const date = new Date(inv.due_date || inv.created_at || inv.date || '');
+      return !Number.isNaN(date.getTime()) && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    });
+    const paidInvoices = monthInvoices.filter(isInvoicePaid);
+    const pendingInvoices = monthInvoices.filter(inv => !isInvoicePaid(inv));
+    const earned = paidInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+    const pending = pendingInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+    const vippsPaid = paidInvoices
+      .filter(inv => String(inv.method || '').toLowerCase().includes('vipps'))
+      .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
 
-    if (lessonsData) {
-      let earned = 0;
-      let pending = 0;
-      let vippsCount = 0;
-      let totalPaid = 0;
+    return {
+      earned,
+      pending,
+      vippsPercent: earned > 0 ? Math.round((vippsPaid / earned) * 100) : 0
+    };
+  }, [invoices]);
 
-      lessonsData.forEach(l => {
-        if (l.payment_status === 'betalt') {
-          earned += l.price;
-          totalPaid++;
-          if (l.method === 'Vipps') vippsCount++;
-        } else if (l.payment_status === 'ubetalt' || l.payment_status === 'fakturert') {
-          pending += l.price;
-        }
-      });
+  const fetchPaymentStats = React.useCallback(() => {
+    // Payment stats are derived from invoices so they update immediately with invoice state.
+  }, []);
 
-      setStats({
-        earned,
-        pending,
-        vippsPercent: totalPaid > 0 ? Math.round((vippsCount / totalPaid) * 100) : 0
-      });
-    }
-  }, [authUserId]);
+  const filteredStudents = React.useMemo(() => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return students;
+
+    return students.filter(student => [
+      student.name,
+      student.full_name,
+      student.subject,
+      student.email,
+      student.parentEmail,
+      student.phone,
+    ].some(value => String(value || '').toLowerCase().includes(query)));
+  }, [studentSearch, students]);
 
   React.useEffect(() => {
     fetchVacations();
@@ -1147,7 +1155,12 @@ const saveMeetLink = async (link: string) => {
     if (!error) {
       // Oppdater lokalt state så fargen endres med en gang
       setInvoices(prev => prev.map(inv => inv.id === id ? {...inv, status: nyStatus} : inv));
+      return true;
     }
+
+    console.error('Feil ved oppdatering av fakturastatus:', error);
+    showToast(`Kunne ikke oppdatere betaling: ${error.message}`);
+    return false;
   };
 
   const generateMonthlyReport = (valgtMåned = new Date().getMonth(), valgtÅr = new Date().getFullYear()) => {
@@ -1156,8 +1169,8 @@ const saveMeetLink = async (link: string) => {
       return date.getMonth() === valgtMåned && date.getFullYear() === valgtÅr;
     });
 
-    const total = månedsInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-    const totalPaid = månedsInvoices.filter(i => i.status === 'Betalt' || i.status === 'betalt').reduce((sum, i) => sum + i.amount, 0);
+    const total = månedsInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+    const totalPaid = månedsInvoices.filter(isInvoicePaid).reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
     return {
       totalRequested: total,
@@ -1184,8 +1197,9 @@ const saveMeetLink = async (link: string) => {
     oppdaterFakturaStatus(inv.id, 'Fakturert');
   };
 
-  const markerSomBetalt = (id: string | number) => {
-    oppdaterFakturaStatus(id, 'betalt');
+  const markerSomBetalt = async (id: string | number) => {
+    const updated = await oppdaterFakturaStatus(id, 'paid');
+    if (updated) showToast('Betaling bekreftet');
   };
 
   const slettFaktura = async (id: string | number) => {
@@ -2202,7 +2216,7 @@ const saveMeetLink = async (link: string) => {
 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
                 <Video className="w-5 h-5 text-indigo-600" />
@@ -2344,7 +2358,7 @@ Per Andersen,per@example.com,Norsk`}
               }}
             />
 
-            <div className="max-w-4xl mx-auto mt-12 mb-20">
+            <div className="order-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-900 flex flex-wrap items-center gap-2">
                   Innleveringer <span className="bg-indigo-100 text-indigo-600 text-sm py-1 px-3 rounded-full">{submissions.length}</span>
@@ -2411,13 +2425,19 @@ Per Andersen,per@example.com,Norsk`}
               </div>
             </div>
             
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+            <div className="order-5 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col gap-4 bg-white lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Elevliste</h2>
+                  <p className="text-sm text-slate-500">{students.length} elever lagt til</p>
+                </div>
                 <div className="relative w-full max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input 
                     type="text" 
                     placeholder="Søk etter elev..." 
+                    value={studentSearch}
+                    onChange={(event) => setStudentSearch(event.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -2429,8 +2449,13 @@ Per Andersen,per@example.com,Norsk`}
                     <p>Du har ingen elever enda.</p>
                     <p className="text-sm mt-1">Bruk skjemaet over for å invitere din første elev!</p>
                   </div>
+                ) : filteredStudents.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500">
+                    <Search className="h-10 w-10 mx-auto text-slate-300 mb-3" />
+                    <p>Ingen elever matcher søket.</p>
+                  </div>
                 ) : (
-                  students.map((student) => (
+                  filteredStudents.map((student) => (
                     <div key={student.id} className="p-4 sm:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex min-w-0 items-center gap-4">
                         <div className="w-12 h-12 shrink-0 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
@@ -2825,23 +2850,41 @@ Per Andersen,per@example.com,Norsk`}
           <div className="space-y-6">
             {/* Stats Row */}
             <div className="grid sm:grid-cols-3 gap-4">
-              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-sm font-medium text-slate-500 mb-1">Inntjent denne måneden</p>
-                <h3 className="text-2xl sm:text-3xl font-bold text-slate-900">kr {stats.earned.toLocaleString('no-NO')}</h3>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Innbetalt denne måneden</p>
+                  <h3 className="text-2xl sm:text-3xl font-black text-slate-900">kr {stats.earned.toLocaleString('no-NO')}</h3>
+                </div>
+                <div className="h-11 w-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
               </div>
-              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-sm font-medium text-slate-500 mb-1">Utestående</p>
-                <h3 className="text-2xl sm:text-3xl font-bold text-amber-600">kr {stats.pending.toLocaleString('no-NO')}</h3>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Venter på betaling</p>
+                  <h3 className="text-2xl sm:text-3xl font-black text-amber-600">kr {stats.pending.toLocaleString('no-NO')}</h3>
+                </div>
+                <div className="h-11 w-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
               </div>
-              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-sm font-medium text-slate-500 mb-1">Betalt via Vipps</p>
-                <h3 className="text-2xl sm:text-3xl font-bold text-emerald-600">{stats.vippsPercent}%</h3>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Andel betalt via Vipps</p>
+                  <h3 className="text-2xl sm:text-3xl font-black text-indigo-600">{stats.vippsPercent}%</h3>
+                </div>
+                <div className="h-11 w-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Smartphone className="h-5 w-5" />
+                </div>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6 items-start">
-              <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl max-w-md mx-auto w-full">
-                <h2 className="text-xl font-bold mb-6 text-gray-800">Ny betaling</h2>
+            <div className="grid gap-6 items-start lg:grid-cols-[minmax(340px,460px)_minmax(0,1fr)]">
+              <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-sm border border-slate-200 w-full">
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold text-slate-900">Nytt betalingskrav</h2>
+                  <p className="text-sm text-slate-500 mt-1">Send betalingskrav på e-post og følg statusen under.</p>
+                </div>
                 
                 <div className="space-y-4">
                   {/* Velg elev - henter info automatisk fra databasen */}
@@ -2916,42 +2959,55 @@ Per Andersen,per@example.com,Norsk`}
 
                   <button 
                     onClick={handleGoToVippsPreparation}
-                    className="w-full bg-[#ff5b24] text-white font-bold py-4 rounded-xl mt-4 shadow-lg hover:bg-[#e65220] transition flex items-center justify-center gap-2"
+                    className="w-full bg-[#ff5b24] text-white font-bold py-4 rounded-xl mt-4 shadow-sm hover:bg-[#e65220] transition flex items-center justify-center gap-2"
                   >
                     <Send className="h-4 w-4" />
-                    SEND BETALINGSKRAV PÅ E-POST
+                    Send betalingskrav
                   </button>
                 </div>
               </div>
 
-              <div className="report-box m-0 h-full">
-                <div className="report-header">
-                  <h3>Rapport for {rapport.månedNavn.charAt(0).toUpperCase() + rapport.månedNavn.slice(1)} 2026 📈</h3>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 h-full">
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Månedsrapport</h3>
+                    <p className="text-sm text-slate-500">{rapport.månedNavn.charAt(0).toUpperCase() + rapport.månedNavn.slice(1)} {new Date().getFullYear()}</p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <FileText className="h-5 w-5" />
+                  </div>
                 </div>
                 
-                <div className="report-grid">
-                  <div className="report-item">
-                    <span>Totalt fakturert:</span>
-                    <strong>{rapport.totalRequested.toLocaleString()} kr</strong>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
+                    <span className="block text-xs font-bold uppercase text-slate-400 mb-1">Fakturert</span>
+                    <strong className="text-lg text-slate-900">{rapport.totalRequested.toLocaleString()} kr</strong>
                   </div>
                   
-                  <div className="report-item">
-                    <span>Faktisk innbetalt:</span>
-                    <strong className="text-success">{rapport.totalPaid.toLocaleString()} kr</strong>
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
+                    <span className="block text-xs font-bold uppercase text-emerald-600 mb-1">Innbetalt</span>
+                    <strong className="text-lg text-emerald-700">{rapport.totalPaid.toLocaleString()} kr</strong>
                   </div>
                   
-                  <div className="report-item">
-                    <span>Antall timer holdt:</span>
-                    <strong>{rapport.count} timer</strong>
+                  <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4">
+                    <span className="block text-xs font-bold uppercase text-indigo-600 mb-1">Fakturaer</span>
+                    <strong className="text-lg text-indigo-700">{rapport.count}</strong>
                   </div>
                 </div>
 
-                {/* En liten bonus: Prosentvis betalt */}
-                <div className="progress-bar-container">
-                  <div 
-                    className="progress-bar-fill" 
-                    style={{ width: `${rapport.totalRequested > 0 ? (rapport.totalPaid / rapport.totalRequested) * 100 : 0}%` }}
-                  ></div>
+                <div className="mt-6">
+                  <div className="flex items-center justify-between text-sm text-slate-500 mb-2">
+                    <span>Betalt av fakturert</span>
+                    <span className="font-bold text-slate-700">
+                      {rapport.totalRequested > 0 ? Math.round((rapport.totalPaid / rapport.totalRequested) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-600 rounded-full transition-all"
+                      style={{ width: `${rapport.totalRequested > 0 ? (rapport.totalPaid / rapport.totalRequested) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4242,72 +4298,6 @@ Per Andersen,per@example.com,Norsk`}
           </div>
         </div>
       )}
-
-      {/* Innboks for elevsvar */}
-      <div className="max-w-4xl mx-auto mt-12 mb-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Innleveringer 📥</h2>
-            <p className="text-slate-500 text-sm">Svar fra dine elever mellom timene</p>
-          </div>
-          <button 
-            onClick={fetchSubmissions}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-indigo-600"
-            title="Oppdater liste"
-          >
-            <Clock className="h-6 w-6" />
-          </button>
-        </div>
-
-        <div className="grid gap-4">
-          {submissions.map((sub: any) => (
-            <div key={sub.id} className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group hover:border-indigo-200 transition-all">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-                    {sub.students?.full_name}
-                  </span>
-                  <span className="text-slate-400 text-[10px]">• {sub.assignments?.title || sub.reports?.topic || 'Oppgave'}</span>
-                </div>
-                {sub.answer_text && (
-                  <p className="text-slate-700 font-medium mb-2">"{sub.answer_text}"</p>
-                )}
-                <p className="text-xs text-slate-400">Sendt inn: {new Date(sub.created_at).toLocaleString('no-NB')}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                {sub.file_url && (
-                  <a 
-                    href={sub.file_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center flex-1 md:flex-none"
-                  >
-                    Se bilde
-                  </a>
-                )}
-                <button 
-                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'approved')}
-                  className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
-                >
-                  Godkjenn <CheckCircle2 className="h-4 w-4" />
-                </button>
-                <button 
-                  onClick={() => oppdaterStatus(sub.id, sub.assignment_id, 'rejected')}
-                  className="bg-rose-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
-                >
-                  Avvis <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {submissions.length === 0 && (
-            <div className="text-center py-12 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
-              <p className="text-slate-400 italic text-sm">Ingen nye svar å sjekke akkurat nå. Godt jobba!</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Calendar Modal */}
       {calendarModal && (
