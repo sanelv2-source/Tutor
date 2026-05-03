@@ -17,6 +17,10 @@ export async function handler(event) {
     return json(405, { error: 'Method not allowed' });
   }
 
+  if (process.env.AI_ASSISTANT_ENABLED !== 'true') {
+    return json(403, { error: 'AI-assistenten er ikke tilgjengelig på dette abonnementet ennå.' });
+  }
+
   const authHeader = event.headers.authorization || event.headers.Authorization || '';
   const token = String(authHeader).replace(/^Bearer\s+/i, '').trim();
 
