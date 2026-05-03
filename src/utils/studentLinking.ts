@@ -20,23 +20,39 @@ export async function linkStudentProfileByEmail() {
 
   const normalizedEmail = user.email.trim().toLowerCase();
 
-  const { data: student, error: studentError } = await supabase
+  const { data: students, error: studentError } = await supabase
     .from('students')
-    .select('id, profile_id')
+    .select('id, tutor_id, profile_id')
     .ilike('email', normalizedEmail)
-    .is('profile_id', null)
-    .maybeSingle();
+    .or(`profile_id.is.null,profile_id.eq.${user.id}`);
 
-  if (studentError || !student) return;
+  if (studentError || !students?.length) return;
 
-  const { error: updateError } = await supabase
-    .from('students')
-    .update({ profile_id: user.id })
-    .eq('id', student.id)
-    .is('profile_id', null);
+  const linkedTutorIds = new Set(
+    students
+      .filter(student => student.profile_id === user.id)
+      .map(student => student.tutor_id)
+      .filter(Boolean)
+  );
+  const queuedTutorIds = new Set<string>();
+  const rowsToLink = students.filter(student => {
+    if (student.profile_id !== null || linkedTutorIds.has(student.tutor_id) || queuedTutorIds.has(student.tutor_id)) {
+      return false;
+    }
+    queuedTutorIds.add(student.tutor_id);
+    return true;
+  });
 
-  if (updateError) {
-    console.error('Failed to link student profile:', updateError);
+  for (const student of rowsToLink) {
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ profile_id: user.id })
+      .eq('id', student.id)
+      .is('profile_id', null);
+
+    if (updateError) {
+      console.error('Failed to link student profile:', updateError);
+    }
   }
 }
 
@@ -54,21 +70,37 @@ export async function linkStudentProfileByEmailFallback() {
 
   const normalizedEmail = user.email.trim().toLowerCase();
 
-  const { data: student } = await supabase
+  const { data: students } = await supabase
     .from('students')
-    .select('id, profile_id')
+    .select('id, tutor_id, profile_id')
     .ilike('email', normalizedEmail)
-    .is('profile_id', null)
-    .maybeSingle();
+    .or(`profile_id.is.null,profile_id.eq.${user.id}`);
 
-  if (!student) return;
+  if (!students?.length) return;
 
-  await supabase
-    .from('students')
-    .update({
-      profile_id: user.id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', student.id)
-    .is('profile_id', null);
+  const linkedTutorIds = new Set(
+    students
+      .filter(student => student.profile_id === user.id)
+      .map(student => student.tutor_id)
+      .filter(Boolean)
+  );
+  const queuedTutorIds = new Set<string>();
+  const rowsToLink = students.filter(student => {
+    if (student.profile_id !== null || linkedTutorIds.has(student.tutor_id) || queuedTutorIds.has(student.tutor_id)) {
+      return false;
+    }
+    queuedTutorIds.add(student.tutor_id);
+    return true;
+  });
+
+  for (const student of rowsToLink) {
+    await supabase
+      .from('students')
+      .update({
+        profile_id: user.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', student.id)
+      .is('profile_id', null);
+  }
 }

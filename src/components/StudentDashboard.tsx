@@ -40,6 +40,19 @@ interface PaymentRequest {
   created_at?: string | null;
 }
 
+interface StudentLink {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  tutor_id: string | null;
+}
+
+interface MeetLink {
+  tutorId: string;
+  teacherName: string;
+  url: string;
+}
+
 const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: string, tutorId?: string, studentId?: string, onComplete: (url: string) => void }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -63,18 +76,23 @@ const SubmitAssignment = ({ taskId, tutorId, studentId, onComplete }: { taskId: 
       const authUserId = user?.id;
       if (!authUserId) throw new Error('Ikke logget inn');
 
-      // Load the student row to ensure we have the correct student.id
-      const { data: studentRow, error: studentError } = await supabase
-        .from('students')
-        .select('id')
-        .eq('profile_id', authUserId)
-        .single();
-        
-      if (studentError || !studentRow) {
-        throw new Error('Fant ikke elevprofilen din.');
+      let actualStudentId = studentId;
+      if (!actualStudentId) {
+        const { data: assignmentRow, error: assignmentError } = await supabase
+          .from('assignments')
+          .select('student_id')
+          .eq('id', taskId)
+          .maybeSingle();
+
+        if (assignmentError) {
+          throw assignmentError;
+        }
+        actualStudentId = assignmentRow?.student_id || undefined;
       }
-      
-      const actualStudentId = studentRow.id;
+
+      if (!actualStudentId) {
+        throw new Error('Fant ikke elevkoblingen for denne oppgaven.');
+      }
       
       const fileExt = file.name.split('.').pop();
       const fileName = `${taskId}-${Date.now()}.${fileExt}`;
@@ -169,9 +187,9 @@ const StudentDashboard = () => {
   const [resources, setResources] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
   const [vacations, setVacations] = useState<any[]>([]);
-  const [meetLink, setMeetLink] = useState<string | null>(null);
+  const [meetLinks, setMeetLinks] = useState<MeetLink[]>([]);
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
-  const [studentId, setStudentId] = useState<string | null>(null);
+  const [studentLinks, setStudentLinks] = useState<StudentLink[]>([]);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMessage, setPasswordMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
@@ -189,21 +207,49 @@ const StudentDashboard = () => {
         if (!user) throw new Error('Ikke logget inn');
         console.log('Auth user id:', user.id);
 
-        const { data: student, error: studentError } = await supabase
+        const { data: linkedStudentsData, error: studentError } = await supabase
           .from('students')
           .select('id, full_name, email, tutor_id')
-          .eq('profile_id', user.id)
-          .single();
+          .eq('profile_id', user.id);
 
-        console.log('Student row result:', student);
-        console.log('Student row error:', studentError);
+        console.log('Student rows result:', linkedStudentsData);
+        console.log('Student rows error:', studentError);
 
-        if (studentError || !student) {
+        if (studentError || !linkedStudentsData?.length) {
           throw new Error('Fant ikke elevkobling.');
         }
 
-        console.log('Loaded student row:', student);
-        setStudentId(student.id);
+        const linkedStudents = linkedStudentsData as StudentLink[];
+        const studentIds = linkedStudents.map(student => student.id).filter(Boolean);
+        const tutorIds = Array.from(new Set(linkedStudents.map(student => student.tutor_id).filter(Boolean))) as string[];
+        setStudentLinks(linkedStudents);
+
+        let tutorProfiles: Array<{ id: string; full_name: string | null; meet_link?: string | null }> = [];
+        if (tutorIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, full_name, meet_link')
+            .in('id', tutorIds);
+
+          if (profilesError) {
+            console.error('Error fetching tutor profiles:', profilesError);
+          } else {
+            tutorProfiles = profilesData || [];
+          }
+        }
+
+        const teacherNameById = new Map(
+          tutorProfiles.map(profile => [profile.id, profile.full_name || 'Lærer'])
+        );
+        setMeetLinks(
+          tutorProfiles
+            .filter(profile => profile.meet_link)
+            .map(profile => ({
+              tutorId: profile.id,
+              teacherName: profile.full_name || 'Lærer',
+              url: profile.meet_link as string,
+            }))
+        );
 
         try {
           const fetchPaymentRequestsFromApi = async () => {
@@ -247,18 +293,20 @@ const StudentDashboard = () => {
             };
 
             const invoiceGroups = [];
-            invoiceGroups.push(await runInvoiceQuery((query) => query.eq('student_id', student.id)));
+            for (const linkedStudent of linkedStudents) {
+              invoiceGroups.push(await runInvoiceQuery((query) => query.eq('student_id', linkedStudent.id)));
 
-            if (student.email && student.tutor_id) {
-              invoiceGroups.push(await runInvoiceQuery((query) =>
-                query.eq('tutor_id', student.tutor_id).eq('email', student.email)
-              ));
-            }
+              if (linkedStudent.email && linkedStudent.tutor_id) {
+                invoiceGroups.push(await runInvoiceQuery((query) =>
+                  query.eq('tutor_id', linkedStudent.tutor_id).eq('email', linkedStudent.email)
+                ));
+              }
 
-            if (student.full_name && student.tutor_id) {
-              invoiceGroups.push(await runInvoiceQuery((query) =>
-                query.eq('tutor_id', student.tutor_id).eq('student_name', student.full_name)
-              ));
+              if (linkedStudent.full_name && linkedStudent.tutor_id) {
+                invoiceGroups.push(await runInvoiceQuery((query) =>
+                  query.eq('tutor_id', linkedStudent.tutor_id).eq('student_name', linkedStudent.full_name)
+                ));
+              }
             }
 
             const byId = new Map<string, any>();
@@ -294,7 +342,7 @@ const StudentDashboard = () => {
               full_name
             )
           `)
-          .eq('student_id', student.id);
+          .in('student_id', studentIds);
 
         console.log('Assignments query result:', assignmentsData);
         console.log('Assignments query error:', assignmentsError);
@@ -324,7 +372,7 @@ const StudentDashboard = () => {
             *,
             resource_assignments!inner(student_id)
           `)
-          .eq('resource_assignments.student_id', student.id)
+          .in('resource_assignments.student_id', studentIds)
           .order('created_at', { ascending: false });
 
         if (resourcesData) {
@@ -334,41 +382,69 @@ const StudentDashboard = () => {
         }
 
         // Fetch lessons
+        const lessonSelect = `
+          id,
+          lesson_date,
+          start_time,
+          duration_minutes,
+          is_recurring,
+          student_id,
+          student_name,
+          tutor:profiles (
+            id,
+            full_name,
+            email
+          )
+        `;
+
         const { data: lessonsData, error: lessonsError } = await supabase
           .from('lessons')
-          .select(`
-            id,
-            lesson_date,
-            start_time,
-            duration_minutes,
-            is_recurring,
-            student_name,
-            tutor:profiles (
-              id,
-              full_name,
-              email
-            )
-          `)
-          .eq('student_id', student.id)
+          .select(lessonSelect)
+          .in('student_id', studentIds)
           .order('lesson_date', { ascending: true });
 
         if (lessonsError) throw lessonsError;
 
-        if (lessonsData) {
-          setLessons(lessonsData);
-        } else {
-          setLessons([]);
-        }
+        const legacyLessonGroups = await Promise.all(
+          linkedStudents
+            .filter(linkedStudent => linkedStudent.tutor_id && linkedStudent.full_name)
+            .map(async (linkedStudent) => {
+              const { data, error } = await supabase
+                .from('lessons')
+                .select(lessonSelect)
+                .eq('tutor_id', linkedStudent.tutor_id)
+                .eq('student_name', linkedStudent.full_name)
+                .is('student_id', null)
+                .order('lesson_date', { ascending: true });
 
-        // Fetch vacations only if student has a tutor_id
-        // CLEAN FETCH: Get vacations and teacher name separately to avoid joins
-        if (student.tutor_id) {
+              if (error) {
+                console.error('Error fetching legacy lessons:', error);
+                return [];
+              }
+
+              return data || [];
+            })
+        );
+
+        const lessonsById = new Map<string, any>();
+        [...(lessonsData || []), ...legacyLessonGroups.flat()].forEach(lesson => {
+          if (lesson?.id) lessonsById.set(lesson.id, lesson);
+        });
+        setLessons(
+          Array.from(lessonsById.values()).sort((a, b) => {
+            const dateCompare = String(a.lesson_date || '').localeCompare(String(b.lesson_date || ''));
+            if (dateCompare !== 0) return dateCompare;
+            return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+          })
+        );
+
+        // Fetch vacations for every connected tutor.
+        if (tutorIds.length > 0) {
           try {
-            // First get the vacation records
             const { data: vacationsData, error: vacationsError } = await supabase
               .from('tutor_vacation')
               .select('*')
-              .eq('tutor_id', student.tutor_id);
+              .in('tutor_id', tutorIds);
 
             console.log('Raw data from Supabase (vacations):', vacationsData);
 
@@ -376,23 +452,13 @@ const StudentDashboard = () => {
               console.error('Error fetching vacations:', vacationsError);
               setVacations([]);
             } else if (vacationsData && Array.isArray(vacationsData)) {
-              // Get teacher name from profiles table
-              const { data: teacherProfile, error: teacherError } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', student.tutor_id)
-                .single();
-
-              const teacherName = teacherProfile?.full_name || 'Lærer';
-
-              // Add teacher name to each vacation record
               const vacationsWithTeacher = vacationsData.map(vacation => ({
                 ...vacation,
-                teacher_name: teacherName
+                teacher_name: teacherNameById.get(vacation.tutor_id) || 'Lærer'
               }));
 
               setVacations(vacationsWithTeacher);
-              console.log(`Successfully loaded ${vacationsWithTeacher.length} vacation records for ${teacherName}`);
+              console.log(`Successfully loaded ${vacationsWithTeacher.length} vacation records`);
             } else {
               setVacations([]);
             }
@@ -402,19 +468,6 @@ const StudentDashboard = () => {
           }
         } else {
           setVacations([]);
-        }
-
-        // Fetch tutor profile for meet link
-        if (student.tutor_id) {
-          const { data: tutorProfile } = await supabase
-            .from('profiles')
-            .select('meet_link')
-            .eq('id', student.tutor_id)
-            .single();
-
-          if (tutorProfile?.meet_link) {
-            setMeetLink(tutorProfile.meet_link);
-          }
         }
 
         // Fetch notifications
@@ -515,21 +568,26 @@ const StudentDashboard = () => {
             <h1 className="text-2xl font-bold text-gray-900">Dine oppgaver</h1>
           </div>
           
-          {meetLink && (
+          {meetLinks.length > 0 && (
             <div className="bg-blue-50 border border-blue-100 p-4 sm:p-6 rounded-2xl mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-blue-900 font-bold text-lg">Videoundervisning</h3>
-                <p className="text-blue-700 text-sm">Bli med i timen din her.</p>
+                <p className="text-blue-700 text-sm">Bli med i timen hos læreren din her.</p>
               </div>
-              <a 
-                href={meetLink} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
-              >
-                <Video className="w-5 h-5" />
-                Bli med
-              </a>
+              <div className="flex w-full flex-col gap-2 sm:w-auto">
+                {meetLinks.map(link => (
+                  <a
+                    key={link.tutorId}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
+                  >
+                    <Video className="w-5 h-5" />
+                    {meetLinks.length > 1 ? `Bli med hos ${link.teacherName}` : 'Bli med'}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 
@@ -620,7 +678,7 @@ const StudentDashboard = () => {
                       <SubmitAssignment 
                         taskId={assignment.id} 
                         tutorId={assignment.tutor_id}
-                        studentId={studentId || undefined}
+                        studentId={assignment.student_id}
                         onComplete={(url) => handleAssignmentComplete(assignment.id, url)} 
                       />
                     </div>
@@ -766,7 +824,9 @@ const StudentDashboard = () => {
           <div className="flex items-center justify-between mb-6 sm:mb-8">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Betaling</h1>
-              <p className="mt-1 text-sm text-slate-500">Her finner du betalingskrav fra læreren din.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Her finner du betalingskrav fra {studentLinks.length > 1 ? 'lærerne dine' : 'læreren din'}.
+              </p>
             </div>
             <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
               <CreditCard className="h-6 w-6" />
