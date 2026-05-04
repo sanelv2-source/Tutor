@@ -10,6 +10,10 @@ import path from "path";
 import { createClient } from "@supabase/supabase-js";
 import { deleteAccountForUser } from "./netlify/shared/account-delete-core.mjs";
 import {
+  getBearerToken as getTermsBearerToken,
+  sendStudentTermsEmail,
+} from "./netlify/shared/student-terms-core.mjs";
+import {
   generateTeacherAssistantContent,
   normalizeTeacherAssistantRequest,
 } from "./netlify/shared/teacher-ai-core.mjs";
@@ -453,6 +457,23 @@ async function startServer() {
     } catch (error) {
       console.error("Password reset request error:", error);
       res.status(500).json({ error: "Kunne ikke sende tilbakestillingslenke." });
+    }
+  });
+
+  app.post("/api/student/terms/send", async (req, res) => {
+    try {
+      const result = await sendStudentTermsEmail({
+        supabaseAdmin,
+        resend,
+        authToken: getTermsBearerToken(req.headers.authorization),
+        payload: req.body || {},
+        fromEmail: process.env.RESEND_FROM_EMAIL || "TutorFlyt <onboarding@resend.dev>",
+      });
+
+      return res.status(result.statusCode).json(result.body);
+    } catch (error) {
+      console.error("Error sending student terms:", error);
+      return res.status(500).json({ error: "Kunne ikke sende vilkår." });
     }
   });
 

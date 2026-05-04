@@ -28,7 +28,9 @@ import {
   Smartphone,
   Upload,
   LifeBuoy,
-  Bot
+  Bot,
+  Bell,
+  Download
 } from 'lucide-react';
 import Logo from './Logo';
 import InviteStudent from './InviteStudent';
@@ -40,6 +42,8 @@ import TeacherProfile from './TeacherProfile';
 import AIAssistant from './AIAssistant';
 import NotificationBell from './NotificationBell';
 import SupportFeedback from './SupportFeedback';
+import TeacherOperations from './TeacherOperations';
+import StudentDetailModal from './StudentDetailModal';
 import { supabase } from '../supabaseClient';
 import { readApiJson } from '../utils/api';
 import { createNotification } from '../services/notificationService';
@@ -168,6 +172,7 @@ const saveMeetLink = async (link: string) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectedVippsInvoice, setSelectedVippsInvoice] = useState<any>(null);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [studentDetailModal, setStudentDetailModal] = useState<any>(null);
   const [vippsModalOpen, setVippsModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [vippsAmount, setVippsAmount] = useState('');
@@ -211,6 +216,11 @@ const saveMeetLink = async (link: string) => {
   const isInvoicePaid = (invoice: any) => {
     const status = String(invoice?.status || '').toLowerCase();
     return status === 'paid' || status === 'betalt';
+  };
+
+  const isInvoiceDraft = (invoice: any) => {
+    const status = String(invoice?.status || '').toLowerCase();
+    return status === 'draft' || status === 'utkast';
   };
 
   const getInvoicePaymentLink = (invoice: any) => {
@@ -845,11 +855,18 @@ const saveMeetLink = async (link: string) => {
 
   const handleCompleteLesson = async (lesson: any) => {
     try {
-      // 1. Marker timen som fullført i lessons-tabellen
-      const { error } = await supabase
+      const completedAt = new Date().toISOString();
+      let { error } = await supabase
         .from('lessons')
-        .update({ status: 'Fullført' })
+        .update({ status: 'Fullført', completed_at: completedAt })
         .eq('id', lesson.id);
+
+      if (error && isSchemaCacheColumnError(error)) {
+        ({ error } = await supabase
+          .from('lessons')
+          .update({ status: 'Fullført' })
+          .eq('id', lesson.id));
+      }
 
       if (error) {
         console.error("Kunne ikke markere time som fullført:", error.message);
@@ -857,26 +874,57 @@ const saveMeetLink = async (link: string) => {
         return;
       }
 
-      // Oppdater listen på skjermen
-      setLessons(prev => prev.map(l => l.id === lesson.id ? { ...l, status: 'Fullført' } : l));
-      showToast('Timen er markert som fullført!');
+      const student = students.find(s =>
+        s.id === lesson.student_id ||
+        s.name === lesson.student_name ||
+        s.full_name === lesson.student_name
+      );
+      const amount = Math.round((Number(lesson.hourly_rate || 500) * Number(lesson.duration_minutes || 60)) / 60);
+      const dueDate = new Date().toISOString().split('T')[0];
+      const description = `${lesson.duration_minutes || 60} min privatundervisning ${lesson.lesson_date || dueDate}`;
 
-      // Finn elevens e-post
-      const student = students.find(s => s.name === lesson.student_name);
-      const studentEmail = student?.email || student?.parentEmail || '';
+      const fullPayload = {
+        student_id: student?.id || lesson.student_id || null,
+        student_name: lesson.student_name,
+        amount,
+        due_date: dueDate,
+        status: 'draft',
+        method: 'Vipps',
+        tutor_id: authUserId,
+        email: getStudentEmail(student) || null,
+        tutor_phone: getTeacherVippsPhone() || null,
+        description,
+        lesson_id: lesson.id,
+        created_from_lesson: true
+      };
 
-      // 2. Åpne faktura-modalen med ferdig utfylte data
-      setNewItemData({
-        name: lesson.student_name,
-        detail: '500', // Standardpris
-        date: new Date().toISOString().split('T')[0], // Dagens dato som forfall
-        email: studentEmail,
-        method: 'Faktura',
-        studentId: student?.id || '',
-        duration: '60'
-      });
+      const fallbackPayload = {
+        student_name: lesson.student_name,
+        amount,
+        due_date: dueDate,
+        status: 'draft',
+        method: 'Vipps',
+        tutor_id: authUserId,
+        email: getStudentEmail(student) || null
+      };
+
+      const invoiceData = await saveInvoiceWithSchemaFallback({}, fullPayload, fallbackPayload);
+
+      if (invoiceData?.id) {
+        const { error: lessonInvoiceError } = await supabase
+          .from('lessons')
+          .update({ invoice_id: invoiceData.id })
+          .eq('id', lesson.id);
+
+        if (lessonInvoiceError && !isSchemaCacheColumnError(lessonInvoiceError)) {
+          console.warn('Kunne ikke koble fakturautkast til time:', lessonInvoiceError.message);
+        }
+      }
+
+      setLessons(prev => prev.map(l => l.id === lesson.id ? { ...l, status: 'Fullført', completed_at: completedAt, invoice_id: invoiceData?.id } : l));
+      fetchInvoices();
       setActiveTab('betaling');
-      setShowAddModal(true);
+      showToast('Timen er fullført og fakturautkast er opprettet.');
     } catch (error: any) {
       console.error("Feil ved fullføring av time:", error.message);
       showToast("En feil oppstod. Prøv igjen.");
@@ -1099,7 +1147,7 @@ const saveMeetLink = async (link: string) => {
       return !Number.isNaN(date.getTime()) && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     });
     const paidInvoices = monthInvoices.filter(isInvoicePaid);
-    const pendingInvoices = monthInvoices.filter(inv => !isInvoicePaid(inv));
+    const pendingInvoices = monthInvoices.filter(inv => !isInvoicePaid(inv) && !isInvoiceDraft(inv));
     const earned = paidInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
     const pending = pendingInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
     const vippsPaid = paidInvoices
@@ -1131,6 +1179,29 @@ const saveMeetLink = async (link: string) => {
     ].some(value => String(value || '').toLowerCase().includes(query)));
   }, [studentSearch, students]);
 
+  const paymentStatusByStudent = React.useMemo(() => {
+    return students.map(student => {
+      const studentInvoices = invoices.filter(inv =>
+        inv.student_id === student.id ||
+        String(inv.student_name || inv.student || '').trim().toLowerCase() === String(student.full_name || student.name || '').trim().toLowerCase()
+      );
+      const paid = studentInvoices.filter(isInvoicePaid).reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+      const pending = studentInvoices
+        .filter(inv => !isInvoicePaid(inv) && !isInvoiceDraft(inv))
+        .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+      const drafts = studentInvoices.filter(isInvoiceDraft).length;
+
+      return {
+        id: student.id,
+        name: student.name || student.full_name,
+        paid,
+        pending,
+        drafts,
+        count: studentInvoices.length,
+      };
+    }).filter(row => row.count > 0 || row.pending > 0 || row.drafts > 0);
+  }, [students, invoices]);
+
   React.useEffect(() => {
     fetchVacations();
   }, [fetchVacations]);
@@ -1147,14 +1218,23 @@ const saveMeetLink = async (link: string) => {
   }, [authUserId]);
 
   const oppdaterFakturaStatus = async (id: string | number, nyStatus: string) => {
-    const { error } = await supabase
+    const paidStatus = nyStatus === 'paid' || nyStatus === 'betalt';
+    const payload = paidStatus ? { status: nyStatus, paid_at: new Date().toISOString() } : { status: nyStatus };
+    let { error } = await supabase
       .from('invoices')
-      .update({ status: nyStatus })
+      .update(payload)
       .eq('id', id);
+
+    if (error && isSchemaCacheColumnError(error)) {
+      ({ error } = await supabase
+        .from('invoices')
+        .update({ status: nyStatus })
+        .eq('id', id));
+    }
       
     if (!error) {
       // Oppdater lokalt state så fargen endres med en gang
-      setInvoices(prev => prev.map(inv => inv.id === id ? {...inv, status: nyStatus} : inv));
+      setInvoices(prev => prev.map(inv => inv.id === id ? {...inv, ...payload} : inv));
       return true;
     }
 
@@ -1166,7 +1246,7 @@ const saveMeetLink = async (link: string) => {
   const generateMonthlyReport = (valgtMåned = new Date().getMonth(), valgtÅr = new Date().getFullYear()) => {
     const månedsInvoices = invoices.filter(inv => {
       const date = new Date(inv.due_date);
-      return date.getMonth() === valgtMåned && date.getFullYear() === valgtÅr;
+      return !isInvoiceDraft(inv) && date.getMonth() === valgtMåned && date.getFullYear() === valgtÅr;
     });
 
     const total = månedsInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
@@ -1178,6 +1258,69 @@ const saveMeetLink = async (link: string) => {
       count: månedsInvoices.length,
       månedNavn: new Date(valgtÅr, valgtMåned).toLocaleString('no-NO', { month: 'long' })
     };
+  };
+
+  const downloadCsv = (filename: string, rows: Array<Record<string, any>>) => {
+    const headers = Object.keys(rows[0] || {});
+    if (headers.length === 0) {
+      showToast('Ingen data å eksportere.');
+      return;
+    }
+
+    const escapeCsvValue = (value: any) => {
+      const text = String(value ?? '');
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => headers.map(header => escapeCsvValue(row[header])).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportInvoicesCsv = () => {
+    const rows = invoices.map(inv => ({
+      dato: inv.due_date || inv.created_at || '',
+      elev: inv.student_name || inv.student || '',
+      beskrivelse: getInvoiceDescription(inv),
+      belop: Number(inv.amount || 0),
+      metode: inv.method || '',
+      status: isInvoicePaid(inv) ? 'betalt' : isInvoiceDraft(inv) ? 'utkast' : 'venter',
+      epost: getInvoiceRecipientEmail(inv),
+    }));
+
+    downloadCsv(`tutorflyt-fakturaer-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  };
+
+  const exportMonthlyIncomeCsv = () => {
+    const now = new Date();
+    const rows = invoices
+      .filter(inv => {
+        const date = new Date(inv.due_date || inv.created_at || '');
+        return !isInvoiceDraft(inv) && !Number.isNaN(date.getTime()) && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      })
+      .map(inv => ({
+        dato: inv.due_date || inv.created_at || '',
+        elev: inv.student_name || inv.student || '',
+        beskrivelse: getInvoiceDescription(inv),
+        fakturert: Number(inv.amount || 0),
+        innbetalt: isInvoicePaid(inv) ? Number(inv.amount || 0) : 0,
+        utestaende: isInvoicePaid(inv) ? 0 : Number(inv.amount || 0),
+        metode: inv.method || '',
+        status: isInvoicePaid(inv) ? 'betalt' : 'venter',
+      }));
+
+    downloadCsv(`tutorflyt-manedsrapport-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}.csv`, rows);
   };
 
   const sendEpostFaktura = (inv: any) => {
@@ -2070,6 +2213,13 @@ const saveMeetLink = async (link: string) => {
             <CreditCard className="h-5 w-5" />
             Betalingsstatus
           </button>
+          <button
+            onClick={() => setActiveTab('drift')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'drift' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <Bell className="h-5 w-5" />
+            Drift
+          </button>
           {AI_ASSISTANT_ENABLED && (
             <button
               onClick={() => setActiveTab('ai')}
@@ -2121,7 +2271,7 @@ const saveMeetLink = async (link: string) => {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid ${AI_ASSISTANT_ENABLED ? 'grid-cols-7' : 'grid-cols-6'} items-center min-h-16 px-1 z-30 pb-safe`}>
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid ${AI_ASSISTANT_ENABLED ? 'grid-cols-8' : 'grid-cols-7'} items-center min-h-16 px-1 z-30 pb-safe`}>
         <button 
           onClick={() => setActiveTab('oversikt')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'oversikt' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -2142,6 +2292,13 @@ const saveMeetLink = async (link: string) => {
         >
           <CreditCard className="h-5 w-5" />
           <span className="text-[10px] font-medium">Betal</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('drift')}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'drift' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <Bell className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Drift</span>
         </button>
         {AI_ASSISTANT_ENABLED && (
           <button
@@ -2182,7 +2339,7 @@ const saveMeetLink = async (link: string) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 capitalize">
-              {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab === 'ai' ? 'AI-assistent' : activeTab}
+              {activeTab === 'oversikt' ? 'Dine elever' : activeTab === 'support' ? 'Support' : activeTab === 'ai' ? 'AI-assistent' : activeTab === 'drift' ? 'Drift' : activeTab}
             </h1>
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
@@ -2190,7 +2347,7 @@ const saveMeetLink = async (link: string) => {
             <div className="hidden md:block">
               <NotificationBell />
             </div>
-            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && activeTab !== 'ai' && (
+            {activeTab !== 'oversikt' && activeTab !== 'ressurser' && activeTab !== 'profil' && activeTab !== 'betaling' && activeTab !== 'meldinger' && activeTab !== 'support' && activeTab !== 'ai' && activeTab !== 'drift' && (
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 {activeTab === 'timeplan' && (
                   <button 
@@ -2485,6 +2642,13 @@ Per Andersen,per@example.com,Norsk`}
                           >
                             <Send className="w-4 h-4" />
                             Send oppgave
+                          </button>
+                          <button
+                            onClick={() => setStudentDetailModal(student)}
+                            className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors sm:w-auto"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Notater
                           </button>
                           <button
                             onClick={() => handleDeleteStudent(student.id, student.name)}
@@ -2879,6 +3043,71 @@ Per Andersen,per@example.com,Norsk`}
               </div>
             </div>
 
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <h2 className="text-lg font-bold text-slate-900">Betalingsstatus per elev</h2>
+                  <CreditCard className="h-5 w-5 text-slate-400" />
+                </div>
+                {paymentStatusByStudent.length === 0 ? (
+                  <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Ingen betalingshistorikk enda.</p>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {paymentStatusByStudent.slice(0, 6).map(row => (
+                      <div key={row.id} className="rounded-xl border border-slate-200 p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="font-bold text-slate-900">{row.name}</p>
+                          {row.drafts > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                              {row.drafts} utkast
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs font-bold uppercase text-emerald-600">Betalt</p>
+                            <p className="font-black text-slate-900">{row.paid.toLocaleString('no-NO')} kr</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold uppercase text-amber-600">Venter</p>
+                            <p className="font-black text-slate-900">{row.pending.toLocaleString('no-NO')} kr</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                    <Download className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Eksport</h2>
+                    <p className="text-sm text-slate-500">CSV for regnskap og skatt.</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <button
+                    onClick={exportInvoicesCsv}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800"
+                  >
+                    <Download className="h-4 w-4" />
+                    Eksporter fakturaer
+                  </button>
+                  <button
+                    onClick={exportMonthlyIncomeCsv}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Månedsrapport CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="grid gap-6 items-start lg:grid-cols-[minmax(340px,460px)_minmax(0,1fr)]">
               <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-sm border border-slate-200 w-full">
                 <div className="mb-6">
@@ -3048,6 +3277,10 @@ Per Andersen,per@example.com,Norsk`}
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
                                 <CheckCircle2 className="h-3.5 w-3.5" /> Betalt
                               </span>
+                            ) : isInvoiceDraft(inv) ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                                <FileText className="h-3.5 w-3.5" /> Utkast
+                              </span>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
                                 <AlertCircle className="h-3.5 w-3.5" /> Venter på betaling
@@ -3107,6 +3340,14 @@ Per Andersen,per@example.com,Norsk`}
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'drift' && (
+          <TeacherOperations
+            authUserId={authUserId}
+            students={students}
+            onToast={showToast}
+          />
         )}
 
         {/* Tab Content: Progresjonsrapporter */}
@@ -3589,6 +3830,16 @@ Per Andersen,per@example.com,Norsk`}
         )}
 
       </main>
+
+      {studentDetailModal && (
+        <StudentDetailModal
+          student={studentDetailModal}
+          lessons={lessons}
+          invoices={invoices}
+          onClose={() => setStudentDetailModal(null)}
+          onToast={showToast}
+        />
+      )}
 
       {/* Task Modal */}
       {taskModal && (

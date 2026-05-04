@@ -66,6 +66,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/student/terms/send"
+  to = "/.netlify/functions/student-terms-send"
+  status = 200
+
+[[redirects]]
   from = "/api/invitations/validate"
   to = "/.netlify/functions/invitations-validate"
   status = 200
