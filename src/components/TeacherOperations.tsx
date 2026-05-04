@@ -35,6 +35,11 @@ const defaultTerms: TeacherTerms = {
     'Avbestilling må skje senest 24 timer før avtalt time. Timer som avbestilles senere kan faktureres.\n\nBetaling skjer etter fullført time, med forfall etter 7 dager dersom annet ikke er avtalt.\n\nEleven møter forberedt til timen. Lærer gir beskjed så tidlig som mulig ved sykdom eller behov for å flytte time.',
 };
 
+const isSchemaMissingError = (error: any) => {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return /schema cache|Could not find .* table|relation .* does not exist|Could not find .* column|column .* does not exist/i.test(message);
+};
+
 export default function TeacherOperations({ authUserId, students, onToast }: TeacherOperationsProps) {
   const [settings, setSettings] = useState<TeacherSettings>(defaultSettings);
   const [terms, setTerms] = useState<TeacherTerms>(defaultTerms);
@@ -44,12 +49,47 @@ export default function TeacherOperations({ authUserId, students, onToast }: Tea
   const [isSavingTerms, setIsSavingTerms] = useState(false);
   const [isSendingTerms, setIsSendingTerms] = useState(false);
 
+  const getSettingsStorageKey = () => `teacher_settings_${authUserId}`;
+  const getTermsStorageKey = () => `teacher_terms_${authUserId}`;
+
+  const loadLocalSettings = () => {
+    try {
+      const saved = window.localStorage.getItem(getSettingsStorageKey());
+      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadLocalTerms = () => {
+    try {
+      const saved = window.localStorage.getItem(getTermsStorageKey());
+      return saved ? { ...defaultTerms, ...JSON.parse(saved) } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveLocalSettings = (nextSettings: TeacherSettings) => {
+    window.localStorage.setItem(getSettingsStorageKey(), JSON.stringify(nextSettings));
+  };
+
+  const saveLocalTerms = (nextTerms: TeacherTerms) => {
+    const { id, ...termsWithoutId } = nextTerms;
+    window.localStorage.setItem(getTermsStorageKey(), JSON.stringify(termsWithoutId));
+  };
+
   useEffect(() => {
     const fetchOperationsData = async () => {
       if (!authUserId) return;
       setIsLoading(true);
 
-      const [{ data: settingsData }, { data: termsData }] = await Promise.all([
+      const localSettings = loadLocalSettings();
+      const localTerms = loadLocalTerms();
+      if (localSettings) setSettings(localSettings);
+      if (localTerms) setTerms(localTerms);
+
+      const [{ data: settingsData, error: settingsError }, { data: termsData, error: termsError }] = await Promise.all([
         supabase
           .from('teacher_settings')
           .select('lesson_reminders_enabled, lesson_reminder_hours')
@@ -62,6 +102,14 @@ export default function TeacherOperations({ authUserId, students, onToast }: Tea
           .eq('is_default', true)
           .maybeSingle(),
       ]);
+
+      if (settingsError && !isSchemaMissingError(settingsError)) {
+        console.error('Could not fetch teacher settings:', settingsError);
+      }
+
+      if (termsError && !isSchemaMissingError(termsError)) {
+        console.error('Could not fetch teacher terms:', termsError);
+      }
 
       if (settingsData) {
         setSettings({
@@ -101,6 +149,12 @@ export default function TeacherOperations({ authUserId, students, onToast }: Tea
     setIsSavingSettings(false);
 
     if (error) {
+      if (isSchemaMissingError(error)) {
+        saveLocalSettings(settings);
+        onToast('Påminnelser lagret lokalt. Kjør Supabase-migrasjonen for automatisk utsending.');
+        return;
+      }
+
       onToast(`Kunne ikke lagre påminnelser: ${error.message}`);
       return;
     }
@@ -109,7 +163,7 @@ export default function TeacherOperations({ authUserId, students, onToast }: Tea
   };
 
   const saveTerms = async () => {
-    if (!authUserId) return;
+    if (!authUserId) return false;
     setIsSavingTerms(true);
 
     const payload = {
@@ -129,12 +183,19 @@ export default function TeacherOperations({ authUserId, students, onToast }: Tea
     setIsSavingTerms(false);
 
     if (error) {
+      if (isSchemaMissingError(error)) {
+        saveLocalTerms(terms);
+        onToast('Vilkår lagret lokalt. Kjør Supabase-migrasjonen for skylagring.');
+        return true;
+      }
+
       onToast(`Kunne ikke lagre vilkår: ${error.message}`);
-      return;
+      return false;
     }
 
     if (data?.id) setTerms(prev => ({ ...prev, id: data.id }));
     onToast('Vilkår lagret');
+    return true;
   };
 
   const sendTerms = async () => {
@@ -161,6 +222,12 @@ export default function TeacherOperations({ authUserId, students, onToast }: Tea
         body: JSON.stringify({
           studentId: selectedStudentId,
           termsId: terms.id,
+          terms: {
+            title: terms.title,
+            cancellation_notice_hours: Number(terms.cancellation_notice_hours) || 24,
+            payment_due_days: Number(terms.payment_due_days) || 7,
+            content: terms.content,
+          },
         }),
       });
 

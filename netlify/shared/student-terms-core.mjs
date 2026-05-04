@@ -14,10 +14,22 @@ export const escapeHtml = (value) => String(value ?? '')
 export const clipText = (value, maxLength) => String(value ?? '').trim().slice(0, maxLength);
 export const normalizeEmail = (value) => String(value ?? '').trim().toLowerCase();
 export const getBearerToken = (value) => String(value ?? '').replace(/^Bearer\s+/i, '').trim();
+export const isSchemaMissingError = (error) => {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return /schema cache|Could not find .* table|relation .* does not exist|Could not find .* column|column .* does not exist/i.test(message);
+};
 
 export async function sendStudentTermsEmail({ supabaseAdmin, resend, authToken, payload, fromEmail }) {
   const studentId = clipText(payload.studentId, 80);
   const termsId = clipText(payload.termsId, 80);
+  const payloadTerms = payload.terms && typeof payload.terms === 'object'
+    ? {
+        title: clipText(payload.terms.title || 'Vilkår for privatundervisning', 160),
+        cancellation_notice_hours: Number(payload.terms.cancellation_notice_hours || 24),
+        payment_due_days: Number(payload.terms.payment_due_days || 7),
+        content: clipText(payload.terms.content, 6000),
+      }
+    : null;
 
   if (!authToken) {
     return { statusCode: 401, body: { error: 'Du må være logget inn for å sende vilkår.' } };
@@ -60,17 +72,27 @@ export async function sendStudentTermsEmail({ supabaseAdmin, resend, authToken, 
     return { statusCode: 400, body: { error: 'Eleven mangler e-postadresse.' } };
   }
 
-  let termsQuery = supabaseAdmin
-    .from('teacher_terms')
-    .select('id, title, cancellation_notice_hours, payment_due_days, content')
-    .eq('tutor_id', authData.user.id);
+  let terms = payloadTerms;
 
-  termsQuery = termsId ? termsQuery.eq('id', termsId) : termsQuery.eq('is_default', true);
+  if (!terms?.content && !terms?.title) {
+    let termsQuery = supabaseAdmin
+      .from('teacher_terms')
+      .select('id, title, cancellation_notice_hours, payment_due_days, content')
+      .eq('tutor_id', authData.user.id);
 
-  const { data: terms, error: termsError } = await termsQuery.maybeSingle();
-  if (termsError) {
-    console.error('Terms lookup error:', termsError);
-    return { statusCode: 500, body: { error: 'Kunne ikke hente vilkår.' } };
+    termsQuery = termsId ? termsQuery.eq('id', termsId) : termsQuery.eq('is_default', true);
+
+    const { data: termsData, error: termsError } = await termsQuery.maybeSingle();
+    if (termsError) {
+      if (isSchemaMissingError(termsError)) {
+        return { statusCode: 400, body: { error: 'Vilkårsteksten mangler. Oppdater siden og prøv igjen.' } };
+      }
+
+      console.error('Terms lookup error:', termsError);
+      return { statusCode: 500, body: { error: 'Kunne ikke hente vilkår.' } };
+    }
+
+    terms = termsData;
   }
 
   if (!terms) {
