@@ -54,7 +54,7 @@ export async function sendStudentTermsEmail({ supabaseAdmin, resend, authToken, 
 
   const { data: student, error: studentError } = await supabaseAdmin
     .from('students')
-    .select('id, tutor_id, full_name, email, parent_email, profile_id')
+    .select('id, tutor_id, full_name, email, profile_id')
     .eq('id', studentId)
     .maybeSingle();
 
@@ -67,7 +67,7 @@ export async function sendStudentTermsEmail({ supabaseAdmin, resend, authToken, 
     return { statusCode: 403, body: { error: 'Du kan bare sende vilkår til egne elever.' } };
   }
 
-  const recipientEmail = normalizeEmail(student.parent_email || student.email);
+  const recipientEmail = normalizeEmail(student.email);
   if (!recipientEmail) {
     return { statusCode: 400, body: { error: 'Eleven mangler e-postadresse.' } };
   }
