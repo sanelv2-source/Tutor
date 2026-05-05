@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Logo from './Logo';
 import Footer from './Footer';
+import TeacherDashboardDemo from './TeacherDashboardDemo';
 
 // FAQ Accordion Component
 const AccordionItem = ({ question, answer }: { question: string, answer: React.ReactNode }) => {
@@ -116,6 +117,8 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             </div>
           </div>
         </section>
+
+        <TeacherDashboardDemo onNavigate={onNavigate} />
 
         {/* 2. Problem/Agitation Section */}
         <section className="py-16 sm:py-24 bg-slate-50 border-y border-slate-200">

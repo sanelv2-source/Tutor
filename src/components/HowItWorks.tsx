@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Logo from './Logo';
 import Footer from './Footer';
+import TeacherDashboardDemo from './TeacherDashboardDemo';
 
 export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) => void }) {
   return (
@@ -27,21 +28,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
           </p>
         </section>
 
-        {/* Video Demo Section */}
-        <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto mb-16 sm:mb-24">
-          <div className="relative rounded-2xl overflow-hidden shadow-xl sm:shadow-2xl border border-slate-200 bg-slate-900 aspect-video group">
-            <video 
-              className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-              autoPlay 
-              muted 
-              loop 
-              playsInline
-            >
-              <source src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/sign/Video/63328-506377472_medium.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iMDI1N2Q0Mi04YTljLTQ2OWItOGY2Yy1lZjJiMjE3ZmI0YTAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlby82MzMyOC01MDYzNzc0NzJfbWVkaXVtLm1wNCIsImlhdCI6MTc3MzQ4MjkxOCwiZXhwIjoxODA1MDE4OTE4fQ.W2KgNPPrxQB_9X2dmIsUVKcuILC8GCnOoX5WB6mbAIE`} type="video/mp4" />
-              Din nettleser støtter ikke video-taggen.
-            </video>
-          </div>
-        </section>
+        <TeacherDashboardDemo onNavigate={onNavigate} variant="how-it-works" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20 sm:space-y-32">
           
