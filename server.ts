@@ -22,6 +22,10 @@ import {
   getBearerToken as getAdminBearerToken,
   requireAdminUser,
 } from "./netlify/shared/admin-analytics-core.mjs";
+import {
+  getGeoFromHeaders,
+  recordPageViewEvent,
+} from "./netlify/shared/visitor-analytics-core.mjs";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -1953,6 +1957,22 @@ async function startServer() {
     } catch (error) {
       console.error("Error handling support feedback:", error);
       res.status(500).json({ error: "Kunne ikke sende supportmeldingen." });
+    }
+  });
+
+  app.post("/api/analytics/page-view", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    try {
+      await recordPageViewEvent(supabaseAdmin, req.body || {}, getGeoFromHeaders(req.headers));
+      res.status(202).json({ success: true });
+    } catch (error) {
+      console.error("Page view analytics error:", error);
+      res.status(500).json({ error: "Kunne ikke lagre sidevisning." });
     }
   });
 
