@@ -9,8 +9,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type Profile = {
   id: string;
   email: string;
-  role: 'tutor' | 'student';
+  role: 'tutor' | 'student' | 'admin';
   tutor_id?: string | null;
   has_paid?: boolean;
   name?: string;
+  force_password_change?: boolean;
+  password_changed_at?: string | null;
 };

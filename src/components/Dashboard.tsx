@@ -46,6 +46,7 @@ import TeacherOperations from './TeacherOperations';
 import StudentDetailModal from './StudentDetailModal';
 import { supabase } from '../supabaseClient';
 import { readApiJson } from '../utils/api';
+import { trackAnalyticsEvent } from '../utils/analytics';
 import { createNotification } from '../services/notificationService';
 import type { GoogleCalendarEvent } from '../lib/googleCalendar';
 
@@ -263,6 +264,7 @@ const saveMeetLink = async (link: string) => {
 
   const ensureVippsInvoiceSaved = async (invoice: any) => {
     if (invoice?.id && invoice?.public_token) return invoice;
+    const isNewInvoice = !invoice?.id;
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError && userError.message.includes('Refresh Token')) {
@@ -292,6 +294,10 @@ const saveMeetLink = async (link: string) => {
 
     const savedInvoice = { ...invoice, ...payload, ...data };
     setSelectedVippsInvoice(savedInvoice);
+
+    if (isNewInvoice) {
+      await trackAnalyticsEvent('invoice_created', { method: 'Vipps', source: 'vipps_payment_request' });
+    }
 
     if (invoice.id) {
       setInvoices(prev => prev.map(inv => inv.id === invoice.id ? { ...inv, ...savedInvoice } : inv));
@@ -412,6 +418,19 @@ const saveMeetLink = async (link: string) => {
     setVippsModalOpen(true);
   };
 
+  const trackCalendarConnectedOnce = React.useCallback(async () => {
+    if (!authUserId) return;
+    const storageKey = `tutorflyt_calendar_connected_${authUserId}`;
+
+    try {
+      if (localStorage.getItem(storageKey) === 'true') return;
+      await trackAnalyticsEvent('calendar_connected', { provider: 'google', source: 'calendar_read' }, { userId: authUserId });
+      localStorage.setItem(storageKey, 'true');
+    } catch (error) {
+      console.warn('Could not persist calendar analytics marker:', error);
+    }
+  }, [authUserId]);
+
   const fetchCalendar = React.useCallback(async () => {
     if (!GOOGLE_CALENDAR_ENABLED) {
       setCalendarEvents([]);
@@ -426,12 +445,13 @@ const saveMeetLink = async (link: string) => {
       const { fetchGoogleCalendarEvents } = await import('../lib/googleCalendar');
       const events = await fetchGoogleCalendarEvents();
       setCalendarEvents(events);
+      await trackCalendarConnectedOnce();
     } catch (error: any) {
       setCalendarError(error.message);
     } finally {
       setIsLoadingCalendar(false);
     }
-  }, []);
+  }, [trackCalendarConnectedOnce]);
 
   const handleSyncCalendar = async () => {
     if (!GOOGLE_CALENDAR_ENABLED) {
@@ -923,6 +943,9 @@ const saveMeetLink = async (link: string) => {
 
       setLessons(prev => prev.map(l => l.id === lesson.id ? { ...l, status: 'Fullført', completed_at: completedAt, invoice_id: invoiceData?.id } : l));
       fetchInvoices();
+      if (invoiceData?.id) {
+        await trackAnalyticsEvent('invoice_created', { method: 'Vipps', source: 'lesson_completion' });
+      }
       setActiveTab('betaling');
       showToast('Timen er fullført og fakturautkast er opprettet.');
     } catch (error: any) {
@@ -1589,6 +1612,7 @@ const saveMeetLink = async (link: string) => {
           
         if (error) throw error;
         
+        await trackAnalyticsEvent('student_created', { source: 'manual_add' });
         showToast(newItemData.email ? `Invitasjon sendt til ${newItemData.email}!` : 'Elev lagt til!');
         fetchStudents();
       } catch (err: any) {
@@ -1630,6 +1654,8 @@ const saveMeetLink = async (link: string) => {
           });
 
         if (error) throw error;
+
+        await trackAnalyticsEvent('lesson_created', { source: 'manual_add' });
 
         // Notify student of new lesson
         if (newItemData.studentId) {
@@ -1742,6 +1768,11 @@ const saveMeetLink = async (link: string) => {
           .single();
           
         if (error) throw error;
+
+        await trackAnalyticsEvent('invoice_created', {
+          method: newItemData.method || 'Faktura',
+          source: 'manual_add',
+        });
         
         // 2. Send e-post via backend
         if (newItemData.email && invoiceData) {
@@ -1853,6 +1884,8 @@ const saveMeetLink = async (link: string) => {
         setIsSendingVipps(null);
         return;
       }
+
+      await trackAnalyticsEvent('invoice_created', { method: 'Vipps', source: 'lesson_payment_request' });
 
       const response = await fetch('/api/payment/vipps-request', {
         method: 'POST',

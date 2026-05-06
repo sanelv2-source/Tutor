@@ -22,10 +22,14 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './components/Unauthorized';
 import AcceptInvite from './components/AcceptInvite';
 import { InvoicePage } from './components/InvoicePage';
+import AdminDashboard from './components/AdminDashboard';
+import AdminPasswordChange from './components/AdminPasswordChange';
+import { trackAnalyticsEvent, trackPageView } from './utils/analytics';
 
 // Inactivity timeout (45 minutes)
 const INACTIVITY_TIMEOUT = 45 * 60 * 1000;
 const PASSWORD_RECOVERY_FLAG = 'tutorflyt_password_recovery';
+const ADMIN_EMAIL = 'info@tutorflyt.no';
 
 const isPasswordResetPage = () => {
   if (typeof window === 'undefined') return false;
@@ -49,7 +53,7 @@ const hasPasswordRecoveryMarker = () => {
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string} | null>(null);
+  const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string, forcePasswordChange?: boolean} | null>(null);
   const [pendingUser, setPendingUser] = useState<{name: string, email: string, password: string} | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   
@@ -117,7 +121,7 @@ export default function App() {
       while (retries > 0) {
         const { data, error } = await supabase
           .from('profiles')
-          .select('subscription_status, last_session_id, role')
+          .select('subscription_status, last_session_id, role, force_password_change')
           .eq('id', session.user.id)
           .maybeSingle();
         
@@ -172,20 +176,28 @@ export default function App() {
         }
       }
 
-      const isStudent = !!studentData || session.user.user_metadata?.role === 'student' || profile?.role === 'student';
-      const role = isStudent ? 'student' : 'tutor';
-      const hasPaid = role === 'student' || profile?.subscription_status === 'active';
+      const email = String(session.user.email || '').trim().toLowerCase();
+      const isAdmin = profile?.role === 'admin' && email === ADMIN_EMAIL;
+      const isStudent = !isAdmin && (!!studentData || session.user.user_metadata?.role === 'student' || profile?.role === 'student');
+      const role = isAdmin ? 'admin' : isStudent ? 'student' : 'tutor';
+      const hasPaid = role === 'student' || role === 'admin' || profile?.subscription_status === 'active';
 
       setUser({
         name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
         email: session.user.email || '',
         hasPaid: hasPaid,
-        role: role
+        role: role,
+        forcePasswordChange: isAdmin ? !!profile?.force_password_change : false
       });
       setIsAuthReady(true);
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         const path = window.location.pathname;
+
+        if (role === 'admin' && profile?.force_password_change && path !== '/admin/change-password') {
+          navigate('/admin/change-password');
+          return;
+        }
         
         // Tving KUN til betaling hvis de prøver å nå lærer-området uten å ha betalt
         if (path.startsWith('/tutor') && role === 'tutor' && !hasPaid) {
@@ -195,7 +207,9 @@ export default function App() {
 
         // Standard navigering for de som er på forsiden eller innloggingssider
         if (path === '/' || path === '/login' || path === '/signup') {
-          if (role === 'student') {
+          if (role === 'admin') {
+            navigate('/admin');
+          } else if (role === 'student') {
             navigate('/student/dashboard');
           } else {
             if (hasPaid) {
@@ -235,6 +249,10 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
 
   // Inactivity auto-logout logic
   useEffect(() => {
@@ -282,6 +300,7 @@ export default function App() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: user.email }),
           });
+          await trackAnalyticsEvent('subscription_started', { plan: 'pro_beta', source: 'checkout_success' });
           setUser({ ...user, hasPaid: true });
         } catch (err) {
           console.error("Failed to update payment status:", err);
@@ -344,6 +363,30 @@ export default function App() {
         } />
         <Route path="/student/accept-invite" element={<AcceptInvite />} />
         <Route path="/invoice/:publicToken" element={<InvoicePage />} />
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRole="admin" user={user} isAuthReady={isAuthReady}>
+            <AdminDashboard onLogout={async () => {
+              await supabase.auth.signOut();
+              setUser(null);
+              navigate('/');
+            }} />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/change-password" element={
+          <ProtectedRoute allowedRole="admin" user={user} isAuthReady={isAuthReady}>
+            <AdminPasswordChange
+              onChanged={() => {
+                setUser(prev => prev ? { ...prev, forcePasswordChange: false } : prev);
+                navigate('/admin', { replace: true });
+              }}
+              onLogout={async () => {
+                await supabase.auth.signOut();
+                setUser(null);
+                navigate('/');
+              }}
+            />
+          </ProtectedRoute>
+        } />
         
         <Route path="/verify" element={<Verify onNavigate={handleNavigate} setUser={setUser} />} />
         <Route path="/how-it-works" element={<HowItWorks onNavigate={handleNavigate} />} />

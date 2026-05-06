@@ -4,6 +4,8 @@ import { Mail, Lock, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
 
+const ADMIN_EMAIL = 'info@tutorflyt.no';
+
 export default function Login({ onNavigate, setUser }: { onNavigate: (page: string) => void, setUser: (user: any) => void }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -128,6 +130,17 @@ export default function Login({ onNavigate, setUser }: { onNavigate: (page: stri
 
       if (data?.user) {
         // Vi navigerer til roten og lar App.tsx håndtere ruting basert på rolle og betalingsstatus
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (profile?.role === 'admin' && String(data.user.email || '').trim().toLowerCase() !== ADMIN_EMAIL) {
+          await supabase.auth.signOut();
+          throw new Error('Admin kan bare logge inn med info@tutorflyt.no.');
+        }
+
         navigate('/');
       }
     } catch (err: any) {
