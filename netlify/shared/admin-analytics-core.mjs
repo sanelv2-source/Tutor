@@ -103,6 +103,17 @@ const getVisitorId = (event) => {
   return typeof visitorId === 'string' && visitorId.trim() ? visitorId.trim() : null;
 };
 
+const getCountry = (event) => {
+  const code = typeof event?.metadata?.country_code === 'string' ? event.metadata.country_code.trim().toUpperCase() : '';
+  const name = typeof event?.metadata?.country_name === 'string' ? event.metadata.country_name.trim() : '';
+
+  return {
+    key: code || 'unknown',
+    countryCode: code || null,
+    countryName: name || code || 'Ukjent',
+  };
+};
+
 export async function getAdminAnalyticsSummary(supabaseAdmin) {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const todayStart = new Date();
@@ -132,6 +143,7 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
   const visitorIds = new Set();
   const visitorIds7d = new Set();
   const visitorIdsToday = new Set();
+  const countryStats = new Map();
   let pageViews7d = 0;
   let pageViewsToday = 0;
 
@@ -140,6 +152,18 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
 
     if (event.event_name === 'page_view') {
       const visitorId = getVisitorId(event);
+      const country = getCountry(event);
+      const countryEntry = countryStats.get(country.key) || {
+        countryCode: country.countryCode,
+        countryName: country.countryName,
+        pageViews: 0,
+        visitorIds: new Set(),
+      };
+
+      countryEntry.pageViews += 1;
+      if (visitorId) countryEntry.visitorIds.add(visitorId);
+      countryStats.set(country.key, countryEntry);
+
       if (visitorId) visitorIds.add(visitorId);
       if (createdAt && createdAt >= sevenDaysAgo) {
         pageViews7d += 1;
@@ -176,6 +200,15 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
   const paidFunnelCount = Math.max(eventCounts.subscription_started, paidUsers);
   const firstStudentCount = firstStudentUserIds.size || eventCounts.student_created;
   const firstLessonCount = firstLessonUserIds.size || eventCounts.lesson_created;
+  const visitorCountries = Array.from(countryStats.values())
+    .map((entry) => ({
+      countryCode: entry.countryCode,
+      countryName: entry.countryName,
+      pageViews: entry.pageViews,
+      visitors: entry.visitorIds.size,
+    }))
+    .sort((a, b) => b.pageViews - a.pageViews || b.visitors - a.visitors)
+    .slice(0, 12);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -211,6 +244,7 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
       { key: 'calendar', label: 'Kalender', value: eventCounts.calendar_connected, events: eventCounts.calendar_connected },
       { key: 'billing', label: 'Fakturering', value: invoices.length, events: eventCounts.invoice_created },
     ],
+    visitorCountries,
     events: ADMIN_ANALYTICS_EVENTS.map((eventName) => ({
       eventName,
       count: eventCounts[eventName] || 0,

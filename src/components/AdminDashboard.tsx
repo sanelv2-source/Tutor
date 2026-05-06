@@ -37,6 +37,12 @@ type AdminSummary = {
   };
   funnel: Array<{ key: string; label: string; value: number }>;
   featureUsage: Array<{ key: string; label: string; value: number; events: number }>;
+  visitorCountries: Array<{
+    countryCode: string | null;
+    countryName: string;
+    visitors: number;
+    pageViews: number;
+  }>;
 };
 
 const numberFormatter = new Intl.NumberFormat('no-NO');
@@ -313,6 +319,36 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     <p className="text-sm text-slate-500">Trackede events: {formatNumber(feature.events)}</p>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">Besøkende etter land</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Aggregert fra Netlify geodata. IP, koordinater og postnummer lagres ikke.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 divide-y divide-slate-100">
+                {summary.visitorCountries.length === 0 ? (
+                  <p className="py-4 text-sm text-slate-500">Ingen geografidata registrert ennå.</p>
+                ) : (
+                  summary.visitorCountries.map((country) => (
+                    <div key={country.countryCode || country.countryName} className="grid gap-3 py-4 sm:grid-cols-4 sm:items-center">
+                      <p className="font-bold text-slate-800">
+                        {country.countryName}
+                        {country.countryCode && <span className="ml-2 text-xs font-semibold text-slate-400">{country.countryCode}</span>}
+                      </p>
+                      <p className="text-sm text-slate-500">Besøkende: {formatNumber(country.visitors)}</p>
+                      <p className="text-sm text-slate-500">Sidevisninger: {formatNumber(country.pageViews)}</p>
+                      <p className="text-sm text-slate-500">
+                        {country.visitors > 0 ? `${formatNumber(Math.round((country.pageViews / country.visitors) * 10) / 10)} sider per besøkende` : 'Mangler visitor-id'}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </div>

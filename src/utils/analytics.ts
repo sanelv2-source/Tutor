@@ -125,13 +125,24 @@ export async function trackPageView(pathname: string) {
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return;
 
   const route = normalizeRoute(pathname);
-  await trackAnalyticsEvent(
-    'page_view',
-    {
-      route,
-      area: getRouteArea(route),
-      visitor_id: getAnonymousVisitorId(),
-    },
-    { anonymous: true }
-  );
+  const metadata = {
+    route,
+    area: getRouteArea(route),
+    visitor_id: getAnonymousVisitorId(),
+  };
+
+  try {
+    const response = await fetch('/api/analytics/page-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata),
+      keepalive: true,
+    });
+
+    if (response.ok) return;
+  } catch (error) {
+    // Fall back to direct Supabase insert below.
+  }
+
+  await trackAnalyticsEvent('page_view', metadata, { anonymous: true });
 }
