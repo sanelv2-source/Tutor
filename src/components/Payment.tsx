@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, ShieldCheck, ArrowLeft, CheckCircle2, Lock, LogOut } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '../supabaseClient';
+import { trackAnalyticsEvent } from '../utils/analytics';
 import {
   Elements,
   CardElement,
@@ -86,6 +87,7 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
       // If successful, handle registration if needed, then tell our backend to mark the user as paid
       if (setupIntent && setupIntent.status === 'succeeded') {
         let currentUser = user;
+        let currentUserId: string | null = null;
 
         // 1. If we have a pending user, register them now
         if (!currentUser && pendingUser) {
@@ -105,6 +107,7 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
           if (signUpError) throw signUpError;
           
           if (data.user) {
+            currentUserId = data.user.id;
             // Opprett profil
             await supabase.from('profiles').upsert({ 
               id: data.user.id, 
@@ -121,6 +124,8 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
               hasPaid: false,
               role: 'tutor'
             };
+
+            await trackAnalyticsEvent('signup_completed', { role: 'tutor', source: 'payment_signup' }, { userId: currentUserId });
           }
         }
 
@@ -141,6 +146,7 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
         }
 
         setPendingUser(null);
+        await trackAnalyticsEvent('subscription_started', { plan: 'pro_beta', source: 'payment_form' }, { userId: currentUserId });
         setUser({ ...currentUser, hasPaid: true });
         onNavigate('dashboard');
       }

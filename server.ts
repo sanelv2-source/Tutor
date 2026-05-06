@@ -17,6 +17,11 @@ import {
   generateTeacherAssistantContent,
   normalizeTeacherAssistantRequest,
 } from "./netlify/shared/teacher-ai-core.mjs";
+import {
+  getAdminAnalyticsSummary,
+  getBearerToken as getAdminBearerToken,
+  requireAdminUser,
+} from "./netlify/shared/admin-analytics-core.mjs";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -26,6 +31,12 @@ const PORT = 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Required for Apple OAuth POST callback
+app.use((req, res, next) => {
+  if (req.path === "/admin" || req.path.startsWith("/admin/")) {
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  }
+  next();
+});
 
 // Initialize Supabase Admin client
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
@@ -1942,6 +1953,29 @@ async function startServer() {
     } catch (error) {
       console.error("Error handling support feedback:", error);
       res.status(500).json({ error: "Kunne ikke sende supportmeldingen." });
+    }
+  });
+
+  app.get("/api/admin/analytics", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase server config mangler." });
+    }
+
+    const token = getAdminBearerToken(req.headers.authorization);
+
+    try {
+      await requireAdminUser(supabaseAdmin, token);
+      const summary = await getAdminAnalyticsSummary(supabaseAdmin);
+      res.json(summary);
+    } catch (error: any) {
+      const statusCode = Number(error?.statusCode) || 500;
+      if (statusCode >= 500) {
+        console.error("Admin analytics error:", error);
+      }
+      res.status(statusCode).json({ error: error?.message || "Kunne ikke hente admin-data." });
     }
   });
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles, ArrowRight, User, BookOpen, Mail, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import Logo from './Logo';
+import { trackAnalyticsEvent } from '../utils/analytics';
 
 interface WelcomeGuideProps {
   userId: string;
@@ -31,7 +32,7 @@ export default function WelcomeGuide({ userId, onComplete }: WelcomeGuideProps) 
           .eq('id', userId);
 
         // Forsøker å legge til elev i students-tabellen
-        await supabase
+        const { error: studentError } = await supabase
           .from('students')
           .insert([
             { 
@@ -43,9 +44,21 @@ export default function WelcomeGuide({ userId, onComplete }: WelcomeGuideProps) 
             }
           ]);
 
+        if (!studentError) {
+          await trackAnalyticsEvent('student_created', { source: 'onboarding' }, { userId });
+        }
+        await trackAnalyticsEvent('onboarding_completed', {
+          source: 'welcome_guide',
+          has_first_student: !studentError,
+        }, { userId });
+
         onComplete(tutorName);
       } catch (error) {
         console.error('Error saving onboarding data:', error);
+        await trackAnalyticsEvent('onboarding_completed', {
+          source: 'welcome_guide',
+          has_first_student: false,
+        }, { userId });
         // Vi lar dem gå videre selv om elev-lagringen feiler (f.eks. hvis tabellen ikke finnes enda)
         onComplete(tutorName);
       } finally {
