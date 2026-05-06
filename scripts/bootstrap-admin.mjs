@@ -87,6 +87,7 @@ async function main() {
       email: ADMIN_EMAIL,
       full_name: authUser.user_metadata?.full_name || 'Tutorflyt Admin',
       role: 'admin',
+      plan: 'premium',
       subscription_status: 'active',
       force_password_change: !existingProfile?.password_changed_at,
     });

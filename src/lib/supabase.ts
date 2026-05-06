@@ -10,6 +10,7 @@ export type Profile = {
   id: string;
   email: string;
   role: 'tutor' | 'student' | 'admin';
+  plan?: 'free' | 'start' | 'pro' | 'premium';
   tutor_id?: string | null;
   has_paid?: boolean;
   name?: string;

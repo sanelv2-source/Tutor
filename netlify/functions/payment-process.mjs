@@ -31,6 +31,8 @@ export async function handler(event) {
   if (!email) {
     return json(400, { error: 'E-post er pakrevd.' });
   }
+  const requestedPlan = String(payload.plan || 'pro').trim().toLowerCase();
+  const plan = ['start', 'pro', 'premium'].includes(requestedPlan) ? requestedPlan : 'pro';
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
@@ -52,7 +54,7 @@ export async function handler(event) {
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
-      .update({ subscription_status: 'active' })
+      .update({ subscription_status: 'active', plan })
       .eq('id', profile.id);
 
     if (updateError) {

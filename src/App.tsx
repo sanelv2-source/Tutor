@@ -25,6 +25,7 @@ import { InvoicePage } from './components/InvoicePage';
 import AdminDashboard from './components/AdminDashboard';
 import AdminPasswordChange from './components/AdminPasswordChange';
 import { trackAnalyticsEvent, trackPageView } from './utils/analytics';
+import { normalizePlan, type SubscriptionPlan } from './lib/plans';
 
 // Inactivity timeout (45 minutes)
 const INACTIVITY_TIMEOUT = 45 * 60 * 1000;
@@ -53,7 +54,7 @@ const hasPasswordRecoveryMarker = () => {
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string, forcePasswordChange?: boolean} | null>(null);
+  const [user, setUser] = useState<{name: string, email: string, hasPaid: boolean, role?: string, plan?: SubscriptionPlan, forcePasswordChange?: boolean} | null>(null);
   const [pendingUser, setPendingUser] = useState<{name: string, email: string, password: string} | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   
@@ -121,7 +122,7 @@ export default function App() {
       while (retries > 0) {
         const { data, error } = await supabase
           .from('profiles')
-          .select('subscription_status, last_session_id, role, force_password_change')
+          .select('subscription_status, last_session_id, role, plan, force_password_change')
           .eq('id', session.user.id)
           .maybeSingle();
         
@@ -180,13 +181,15 @@ export default function App() {
       const isAdmin = profile?.role === 'admin' && email === ADMIN_EMAIL;
       const isStudent = !isAdmin && (!!studentData || session.user.user_metadata?.role === 'student' || profile?.role === 'student');
       const role = isAdmin ? 'admin' : isStudent ? 'student' : 'tutor';
-      const hasPaid = role === 'student' || role === 'admin' || profile?.subscription_status === 'active';
+      const plan = role === 'admin' ? 'premium' : normalizePlan(profile?.plan);
+      const hasPaid = role === 'student' || role === 'admin' || plan !== 'free' || profile?.subscription_status === 'active';
 
       setUser({
         name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Bruker',
         email: session.user.email || '',
         hasPaid: hasPaid,
         role: role,
+        plan,
         forcePasswordChange: isAdmin ? !!profile?.force_password_change : false
       });
       setIsAuthReady(true);
@@ -199,12 +202,6 @@ export default function App() {
           return;
         }
         
-        // Tving KUN til betaling hvis de prøver å nå lærer-området uten å ha betalt
-        if (path.startsWith('/tutor') && role === 'tutor' && !hasPaid) {
-          navigate('/payment');
-          return;
-        }
-
         // Standard navigering for de som er på forsiden eller innloggingssider
         if (path === '/' || path === '/login' || path === '/signup') {
           if (role === 'admin') {
@@ -212,11 +209,7 @@ export default function App() {
           } else if (role === 'student') {
             navigate('/student/dashboard');
           } else {
-            if (hasPaid) {
-              navigate('/tutor/dashboard');
-            } else {
-              navigate('/payment');
-            }
+            navigate('/tutor/dashboard');
           }
         }
       }
@@ -300,8 +293,8 @@ export default function App() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: user.email }),
           });
-          await trackAnalyticsEvent('subscription_started', { plan: 'pro_beta', source: 'checkout_success' });
-          setUser({ ...user, hasPaid: true });
+          await trackAnalyticsEvent('subscription_started', { plan: 'pro', source: 'checkout_success' });
+          setUser({ ...user, hasPaid: true, plan: 'pro' });
         } catch (err) {
           console.error("Failed to update payment status:", err);
         } finally {
@@ -316,6 +309,12 @@ export default function App() {
 
   // Helper function to pass to legacy components that still use onNavigate
   const handleNavigate = (page: string) => {
+    if (page.startsWith('payment:')) {
+      const plan = page.split(':')[1] || 'pro';
+      navigate(`/payment?plan=${encodeURIComponent(plan)}`);
+      return;
+    }
+
     const routes: Record<string, string> = {
       'landing': '/',
       'login': '/login',

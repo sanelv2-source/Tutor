@@ -1556,6 +1556,8 @@ async function startServer() {
 
   app.post("/api/payment/process", async (req, res) => {
     const { email } = req.body;
+    const requestedPlan = String(req.body?.plan || 'pro').trim().toLowerCase();
+    const plan = ['start', 'pro', 'premium'].includes(requestedPlan) ? requestedPlan : 'pro';
     
     if (!supabaseAdmin) {
       return res.status(500).json({ error: "Supabase Admin not initialized" });
@@ -1574,7 +1576,7 @@ async function startServer() {
 
       const { error: updateError } = await supabaseAdmin
         .from('profiles')
-        .update({ subscription_status: 'active' })
+        .update({ subscription_status: 'active', plan })
         .eq('id', profile.id);
 
       if (updateError) throw updateError;

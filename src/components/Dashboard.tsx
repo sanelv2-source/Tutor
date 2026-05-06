@@ -44,11 +44,24 @@ import NotificationBell from './NotificationBell';
 import SupportFeedback from './SupportFeedback';
 import TeacherOperations from './TeacherOperations';
 import StudentDetailModal from './StudentDetailModal';
+import FreePlanSponsorCard from './FreePlanSponsorCard';
 import { supabase } from '../supabaseClient';
 import { readApiJson } from '../utils/api';
-import { trackAnalyticsEvent } from '../utils/analytics';
+import { trackAnalyticsEvent, trackEvent } from '../utils/analytics';
 import { createNotification } from '../services/notificationService';
 import type { GoogleCalendarEvent } from '../lib/googleCalendar';
+import {
+  PLAN_LIMITS,
+  PLAN_NAMES,
+  canCreateInvoice,
+  canCreateLesson,
+  canCreateStudent,
+  getPlanLimit,
+  getUpgradeMessage,
+  normalizePlan,
+  shouldShowAds,
+  type SubscriptionPlan,
+} from '../lib/plans';
 
 const AI_ASSISTANT_ENABLED = import.meta.env.VITE_AI_ASSISTANT_ENABLED === 'true';
 const GOOGLE_CALENDAR_ENABLED = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === 'true';
@@ -61,11 +74,14 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [reportComment, setReportComment] = useState('');
   const [homework, setHomework] = useState('');
   const [topic, setTopic] = useState('Algebra & Ligninger'); // Standard emne
-  const [profile, setProfile] = useState<{ name?: string, trial_ends_at: string, subscription_status: string, meet_link?: string, phone?: string } | null>(null);
+  const [profile, setProfile] = useState<{ name?: string, trial_ends_at: string, subscription_status: string, plan?: SubscriptionPlan, meet_link?: string, phone?: string } | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [meetLinkInput, setMeetLinkInput] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
+  const [planLimitNotice, setPlanLimitNotice] = useState<string | null>(null);
+  const userPlan = normalizePlan(profile?.plan || user?.plan);
+  const planLimits = PLAN_LIMITS[userPlan];
   
   const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
   const [fasteTider, setFasteTider] = useState<any[]>([]);
@@ -99,7 +115,7 @@ const saveMeetLink = async (link: string) => {
         setAuthUserId(authUser.id);
         const { data, error } = await supabase
           .from('profiles')
-          .select('full_name, trial_ends_at, subscription_status, meet_link, phone')
+          .select('full_name, trial_ends_at, subscription_status, plan, meet_link, phone')
           .eq('id', authUser.id)
           .maybeSingle();
 
@@ -110,6 +126,7 @@ const saveMeetLink = async (link: string) => {
             name: data.full_name,
             trial_ends_at: data.trial_ends_at,
             subscription_status: data.subscription_status,
+            plan: normalizePlan(data.plan),
             meet_link: data.meet_link,
             phone: data.phone || ''
           });
@@ -130,10 +147,10 @@ const saveMeetLink = async (link: string) => {
   }, [fetchTutorProfile]);
 
   useEffect(() => {
-    if (!AI_ASSISTANT_ENABLED && activeTab === 'ai') {
+    if ((!AI_ASSISTANT_ENABLED || !planLimits.aiAssistant) && activeTab === 'ai') {
       setActiveTab('profil');
     }
-  }, [activeTab]);
+  }, [activeTab, planLimits.aiAssistant]);
 
   useEffect(() => {
     if (activeTab === 'betaling') {
@@ -146,12 +163,13 @@ const saveMeetLink = async (link: string) => {
       name: savedProfile.full_name ?? prev?.name ?? '',
       trial_ends_at: prev?.trial_ends_at ?? '',
       subscription_status: prev?.subscription_status ?? 'trial',
+      plan: prev?.plan ?? normalizePlan(user?.plan),
       meet_link: savedProfile.meet_link ?? prev?.meet_link,
       phone: savedProfile.phone ?? prev?.phone ?? ''
     }));
   }, []);
 
-  const isTrialExpired = profile && 
+  const isTrialExpired = profile && userPlan !== 'free' &&
     profile.subscription_status !== 'active' && 
     new Date(profile.trial_ends_at) < new Date();
     
@@ -180,6 +198,22 @@ const saveMeetLink = async (link: string) => {
   const [totalAmount, setTotalAmount] = useState('');
   const [subject, setSubject] = useState('');
   const [vippsRecipientEmail, setVippsRecipientEmail] = useState('');
+
+  const isDateInCurrentMonth = (value: unknown) => {
+    const date = new Date(String(value || ''));
+    const now = new Date();
+    return !Number.isNaN(date.getTime()) && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  };
+
+  const currentMonthlyLessonCount = React.useMemo(
+    () => lessons.filter((lesson) => isDateInCurrentMonth(lesson.lesson_date || lesson.created_at)).length,
+    [lessons]
+  );
+
+  const currentMonthlyInvoiceCount = React.useMemo(
+    () => invoices.filter((invoice) => isDateInCurrentMonth(invoice.due_date || invoice.created_at)).length,
+    [invoices]
+  );
 
   const isMissingPhone = (value: unknown) => {
     const normalized = String(value ?? '').trim().toLowerCase();
@@ -265,6 +299,11 @@ const saveMeetLink = async (link: string) => {
   const ensureVippsInvoiceSaved = async (invoice: any) => {
     if (invoice?.id && invoice?.public_token) return invoice;
     const isNewInvoice = !invoice?.id;
+
+    if (isNewInvoice && !canCreateInvoice(userPlan, currentMonthlyInvoiceCount)) {
+      await handlePlanLimitReached('invoices', currentMonthlyInvoiceCount, 'vipps_payment_request');
+      throw new Error(getUpgradeMessage(userPlan, 'invoices'));
+    }
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError && userError.message.includes('Refresh Token')) {
@@ -1483,6 +1522,29 @@ const saveMeetLink = async (link: string) => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const handlePlanLimitReached = async (
+    limitName: 'students' | 'lessons' | 'invoices',
+    currentCount: number,
+    source: string
+  ) => {
+    const limitKey = limitName === 'students'
+      ? 'maxStudents'
+      : limitName === 'lessons'
+        ? 'maxLessonsPerMonth'
+        : 'maxInvoicesPerMonth';
+    const message = getUpgradeMessage(userPlan, limitName);
+
+    setPlanLimitNotice(message);
+    showToast(message);
+    await trackEvent('plan_limit_reached', {
+      plan: userPlan,
+      limit: limitName,
+      current_count: currentCount,
+      max_allowed: getPlanLimit(userPlan, limitKey),
+      source,
+    }, { userId: authUserId });
+  };
+
   const copyToClipboard = (text: string | number, label: string) => {
     navigator.clipboard.writeText(text.toString());
     showToast(`${label} kopiert!`);
@@ -1596,6 +1658,11 @@ const saveMeetLink = async (link: string) => {
     }
     
     if (activeTab === 'oversikt') {
+      if (!canCreateStudent(userPlan, students.length)) {
+        await handlePlanLimitReached('students', students.length, 'manual_add');
+        return;
+      }
+
       setIsSaving(true);
       try {
         const { error } = await supabase
@@ -1624,6 +1691,11 @@ const saveMeetLink = async (link: string) => {
         setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
       }
     } else if (activeTab === 'timeplan') {
+      if (!canCreateLesson(userPlan, currentMonthlyLessonCount)) {
+        await handlePlanLimitReached('lessons', currentMonthlyLessonCount, 'manual_add');
+        return;
+      }
+
       setIsSaving(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -1691,6 +1763,11 @@ const saveMeetLink = async (link: string) => {
         setNewItemData({ name: '', detail: '', email: '', date: '', method: 'Faktura', studentId: '', duration: '60' });
       }
     } else if (activeTab === 'betaling') {
+      if (!canCreateInvoice(userPlan, currentMonthlyInvoiceCount)) {
+        await handlePlanLimitReached('invoices', currentMonthlyInvoiceCount, 'manual_add');
+        return;
+      }
+
       setIsSaving(true);
       try {
         const amount = parseInt(newItemData.detail) || 500;
@@ -2148,11 +2225,19 @@ const saveMeetLink = async (link: string) => {
         currentDate.setDate(currentDate.getDate() + 7);
       }
 
+      const newLessonsThisMonth = newLessons.filter((lesson) => isDateInCurrentMonth(lesson.lesson_date)).length;
+      const lessonLimit = getPlanLimit(userPlan, 'maxLessonsPerMonth');
+      if (lessonLimit !== null && currentMonthlyLessonCount + newLessonsThisMonth > lessonLimit) {
+        await handlePlanLimitReached('lessons', currentMonthlyLessonCount, 'fixed_lessons');
+        return;
+      }
+
       const { error } = await supabase
         .from('lessons')
         .insert(newLessons);
 
       if (error) throw error;
+      await trackAnalyticsEvent('lesson_created', { source: 'fixed_lessons' });
 
       // Notify student of new recurring lessons
       if (fixedLessonData.studentId) {
@@ -2190,6 +2275,7 @@ const saveMeetLink = async (link: string) => {
   };
 
   const rapport = generateMonthlyReport(); // Henter tall for inneværende måned
+  const showSponsorCard = shouldShowAds(userPlan) && ['profil', 'oversikt', 'ressurser'].includes(activeTab);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans pb-16 md:pb-0 overflow-x-hidden">
@@ -2253,7 +2339,7 @@ const saveMeetLink = async (link: string) => {
             <Bell className="h-5 w-5" />
             Drift
           </button>
-          {AI_ASSISTANT_ENABLED && (
+          {AI_ASSISTANT_ENABLED && planLimits.aiAssistant && (
             <button
               onClick={() => setActiveTab('ai')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'ai' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -2304,7 +2390,7 @@ const saveMeetLink = async (link: string) => {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid ${AI_ASSISTANT_ENABLED ? 'grid-cols-8' : 'grid-cols-7'} items-center min-h-16 px-1 z-30 pb-safe`}>
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid ${AI_ASSISTANT_ENABLED && planLimits.aiAssistant ? 'grid-cols-8' : 'grid-cols-7'} items-center min-h-16 px-1 z-30 pb-safe`}>
         <button 
           onClick={() => setActiveTab('oversikt')}
           className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'oversikt' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -2333,7 +2419,7 @@ const saveMeetLink = async (link: string) => {
           <Bell className="h-5 w-5" />
           <span className="text-[10px] font-medium">Drift</span>
         </button>
-        {AI_ASSISTANT_ENABLED && (
+        {AI_ASSISTANT_ENABLED && planLimits.aiAssistant && (
           <button
             onClick={() => setActiveTab('ai')}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'ai' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -2377,6 +2463,9 @@ const saveMeetLink = async (link: string) => {
             <p className="text-slate-500 mt-1">Velkommen tilbake, {user?.name?.split(' ')[0] || 'lærer'}! Her er oversikten din for i dag.</p>
           </div>
           <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <div className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm">
+              {PLAN_NAMES[userPlan]}-plan
+            </div>
             <div className="hidden md:block">
               <NotificationBell />
             </div>
@@ -2403,6 +2492,29 @@ const saveMeetLink = async (link: string) => {
           )}
         </div>
       </div>
+
+        {planLimitNotice && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>{planLimitNotice}</span>
+              <button
+                onClick={async () => {
+                  await trackEvent('upgrade_clicked', { plan: userPlan, source: 'plan_limit_notice', target_plan: 'pro' }, { userId: authUserId });
+                  onNavigate('pricing');
+                }}
+                className="inline-flex items-center justify-center rounded-lg bg-amber-900 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-800"
+              >
+                Se pakker
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showSponsorCard && (
+          <div className="mb-6">
+            <FreePlanSponsorCard />
+          </div>
+        )}
 
         {/* Tab Content: Elevoversikt */}
         {activeTab === 'oversikt' && (
@@ -2542,8 +2654,12 @@ Per Andersen,per@example.com,Norsk`}
 
             <InviteStudent 
               tutorId={user?.id || ''} 
-              onInviteSuccess={(email) => {
+              userPlan={userPlan}
+              currentStudentCount={students.length}
+              onPlanLimitReached={() => handlePlanLimitReached('students', students.length, 'invite_student')}
+              onInviteSuccess={async (email) => {
                 fetchStudents();
+                await trackAnalyticsEvent('student_created', { source: 'invite_student' });
                 showToast(`Invitasjon sendt til ${email}!`);
               }}
             />
@@ -3850,7 +3966,7 @@ Per Andersen,per@example.com,Norsk`}
           <TeacherProfile user={{ ...user, id: authUserId }} onProfileSaved={handleTeacherProfileSaved} />
         )}
 
-        {AI_ASSISTANT_ENABLED && activeTab === 'ai' && (
+        {AI_ASSISTANT_ENABLED && planLimits.aiAssistant && activeTab === 'ai' && (
           <AIAssistant students={students} teacherName={profile?.name || user?.name || 'Lærer'} />
         )}
 

@@ -7,14 +7,29 @@ export const ADMIN_ANALYTICS_EVENTS = [
   'invoice_created',
   'calendar_connected',
   'subscription_started',
+  'subscription_changed',
+  'subscription_cancelled',
+  'plan_limit_reached',
+  'upgrade_clicked',
 ];
 
 export const ADMIN_EMAIL = 'info@tutorflyt.no';
 
-const ACTIVATION_EVENTS = new Set([
-  'onboarding_completed',
-  'student_created',
-  'lesson_created',
+const PLAN_KEYS = ['free', 'start', 'pro', 'premium'];
+const SAFE_ADMIN_METADATA_KEYS = new Set([
+  'area',
+  'current_count',
+  'feature',
+  'has_first_student',
+  'limit',
+  'max_allowed',
+  'method',
+  'plan',
+  'provider',
+  'role',
+  'route',
+  'source',
+  'target_plan',
 ]);
 
 const createHttpError = (statusCode, message) => {
@@ -98,6 +113,34 @@ const countByEventName = (events) => {
   return counts;
 };
 
+const normalizePlan = (plan, subscriptionStatus = null, role = null) => {
+  if (role === 'admin') return 'premium';
+  if (PLAN_KEYS.includes(plan)) return plan;
+  if (subscriptionStatus === 'active') return 'pro';
+  return 'free';
+};
+
+const sanitizeMetadata = (metadata = {}) => {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+
+  return Object.entries(metadata).reduce((safe, [key, value]) => {
+    if (!SAFE_ADMIN_METADATA_KEYS.has(key) || value === null || value === undefined) return safe;
+    if (typeof value === 'boolean' || typeof value === 'number') {
+      safe[key] = value;
+      return safe;
+    }
+    if (typeof value === 'string') {
+      safe[key] = value.slice(0, 120);
+    }
+    return safe;
+  }, {});
+};
+
+const incrementByKey = (map, key) => {
+  if (!key) return;
+  map.set(key, (map.get(key) || 0) + 1);
+};
+
 const getVisitorId = (event) => {
   const visitorId = event?.metadata?.visitor_id;
   return typeof visitorId === 'string' && visitorId.trim() ? visitorId.trim() : null;
@@ -120,7 +163,12 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
   todayStart.setHours(0, 0, 0, 0);
 
   const [profiles, students, lessons, invoices, events] = await Promise.all([
-    selectRows(supabaseAdmin, 'profiles', 'id, role, subscription_status, created_at', 'id, role, subscription_status'),
+    selectRows(
+      supabaseAdmin,
+      'profiles',
+      'id, email, full_name, role, plan, subscription_status, created_at',
+      'id, email, full_name, role, subscription_status, created_at'
+    ),
     selectRows(supabaseAdmin, 'students', 'id, tutor_id, created_at', 'id, tutor_id'),
     selectRows(supabaseAdmin, 'lessons', 'id, tutor_id, created_at', 'id, tutor_id'),
     selectRows(supabaseAdmin, 'invoices', 'id, tutor_id, created_at', 'id, tutor_id'),
@@ -128,8 +176,23 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
   ]);
 
   const tutorProfiles = profiles.filter((profile) => profile.role === 'tutor');
-  const paidUsers = tutorProfiles.filter((profile) => profile.subscription_status === 'active').length;
-  const freeUsers = Math.max(tutorProfiles.length - paidUsers, 0);
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const planCounts = Object.fromEntries(PLAN_KEYS.map((plan) => [plan, 0]));
+  const studentsByTutor = new Map();
+  const lessonsByTutor = new Map();
+  const invoicesByTutor = new Map();
+  const lastActivityByUser = new Map();
+
+  tutorProfiles.forEach((profile) => {
+    planCounts[normalizePlan(profile.plan, profile.subscription_status, profile.role)] += 1;
+  });
+
+  students.forEach((student) => incrementByKey(studentsByTutor, student.tutor_id));
+  lessons.forEach((lesson) => incrementByKey(lessonsByTutor, lesson.tutor_id));
+  invoices.forEach((invoice) => incrementByKey(invoicesByTutor, invoice.tutor_id));
+
+  const paidUsers = planCounts.start + planCounts.pro + planCounts.premium;
+  const freeUsers = planCounts.free;
   const newUsers7d = profiles.filter((profile) => {
     const createdAt = parseDate(profile.created_at);
     return createdAt && createdAt >= sevenDaysAgo;
@@ -137,7 +200,6 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
 
   const eventCounts = countByEventName(events);
   const activeUserIds = new Set();
-  const activatedUserIds = new Set();
   const firstStudentUserIds = new Set();
   const firstLessonUserIds = new Set();
   const visitorIds = new Set();
@@ -178,8 +240,9 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
     if (event.user_id && createdAt && createdAt >= sevenDaysAgo) {
       activeUserIds.add(event.user_id);
     }
-    if (event.user_id && ACTIVATION_EVENTS.has(event.event_name)) {
-      activatedUserIds.add(event.user_id);
+    if (event.user_id && createdAt) {
+      const previous = lastActivityByUser.get(event.user_id);
+      if (!previous || createdAt > previous) lastActivityByUser.set(event.user_id, createdAt);
     }
     if (event.user_id && event.event_name === 'student_created') {
       firstStudentUserIds.add(event.user_id);
@@ -189,17 +252,13 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
     }
   });
 
-  students.forEach((student) => {
-    if (student.tutor_id) activatedUserIds.add(student.tutor_id);
-  });
-
-  lessons.forEach((lesson) => {
-    if (lesson.tutor_id) activatedUserIds.add(lesson.tutor_id);
-  });
-
+  const activatedTutors = tutorProfiles.filter((profile) =>
+    (studentsByTutor.get(profile.id) || 0) > 0 &&
+    (lessonsByTutor.get(profile.id) || 0) > 0
+  );
   const paidFunnelCount = Math.max(eventCounts.subscription_started, paidUsers);
-  const firstStudentCount = firstStudentUserIds.size || eventCounts.student_created;
-  const firstLessonCount = firstLessonUserIds.size || eventCounts.lesson_created;
+  const firstStudentCount = new Set(students.map((student) => student.tutor_id).filter(Boolean)).size || firstStudentUserIds.size || eventCounts.student_created;
+  const firstLessonCount = new Set(lessons.map((lesson) => lesson.tutor_id).filter(Boolean)).size || firstLessonUserIds.size || eventCounts.lesson_created;
   const visitorCountries = Array.from(countryStats.values())
     .map((entry) => ({
       countryCode: entry.countryCode,
@@ -209,6 +268,31 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
     }))
     .sort((a, b) => b.pageViews - a.pageViews || b.visitors - a.visitors)
     .slice(0, 12);
+  const users = tutorProfiles
+    .map((profile) => ({
+      id: profile.id,
+      name: profile.full_name || null,
+      email: profile.email || null,
+      plan: normalizePlan(profile.plan, profile.subscription_status, profile.role),
+      createdAt: profile.created_at || null,
+      lastActivityAt: lastActivityByUser.get(profile.id)?.toISOString() || null,
+      studentCount: studentsByTutor.get(profile.id) || 0,
+      lessonCount: lessonsByTutor.get(profile.id) || 0,
+    }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, 100);
+  const recentEvents = [...events]
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, 40)
+    .map((event) => {
+      const profile = event.user_id ? profileById.get(event.user_id) : null;
+      return {
+        createdAt: event.created_at || null,
+        eventName: event.event_name,
+        plan: profile ? normalizePlan(profile.plan, profile.subscription_status, profile.role) : normalizePlan(event.metadata?.plan),
+        metadata: sanitizeMetadata(event.metadata),
+      };
+    });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -217,12 +301,15 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
       totalTutors: tutorProfiles.length,
       newUsers7d,
       activeUsers7d: activeUserIds.size,
-      activatedUsers: activatedUserIds.size,
-      activationRate: percentage(activatedUserIds.size, tutorProfiles.length),
+      activatedUsers: activatedTutors.length,
+      activationRate: percentage(activatedTutors.length, tutorProfiles.length),
       totalStudents: students.length,
       totalLessons: lessons.length,
       totalInvoices: invoices.length,
       freeUsers,
+      startUsers: planCounts.start,
+      proUsers: planCounts.pro,
+      premiumUsers: planCounts.premium,
       paidUsers,
       totalPageViews: eventCounts.page_view,
       pageViews7d,
@@ -244,6 +331,9 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
       { key: 'calendar', label: 'Kalender', value: eventCounts.calendar_connected, events: eventCounts.calendar_connected },
       { key: 'billing', label: 'Fakturering', value: invoices.length, events: eventCounts.invoice_created },
     ],
+    planDistribution: PLAN_KEYS.map((plan) => ({ plan, count: planCounts[plan] || 0 })),
+    users,
+    recentEvents,
     visitorCountries,
     events: ADMIN_ANALYTICS_EVENTS.map((eventName) => ({
       eventName,
