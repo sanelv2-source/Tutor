@@ -6,6 +6,7 @@ import {
   CreditCard,
   Lock,
   LogOut,
+  MousePointerClick,
   RefreshCw,
   TrendingUp,
   UserCheck,
@@ -27,6 +28,12 @@ type AdminSummary = {
     totalInvoices: number;
     freeUsers: number;
     paidUsers: number;
+    totalPageViews: number;
+    pageViews7d: number;
+    pageViewsToday: number;
+    uniqueVisitors: number;
+    visitors7d: number;
+    visitorsToday: number;
   };
   funnel: Array<{ key: string; label: string; value: number }>;
   featureUsage: Array<{ key: string; label: string; value: number; events: number }>;
@@ -126,6 +133,24 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const metricCards = summary
     ? [
+        {
+          label: 'Besøkende',
+          value: formatNumber(summary.metrics.uniqueVisitors),
+          detail: 'Unike anonyme nettlesere',
+          Icon: Users,
+        },
+        {
+          label: 'Besøkende siste 7 dager',
+          value: formatNumber(summary.metrics.visitors7d),
+          detail: `${formatNumber(summary.metrics.pageViews7d)} sidevisninger`,
+          Icon: TrendingUp,
+        },
+        {
+          label: 'Besøk i dag',
+          value: formatNumber(summary.metrics.pageViewsToday),
+          detail: `${formatNumber(summary.metrics.visitorsToday)} unike besøkende`,
+          Icon: MousePointerClick,
+        },
         {
           label: 'Totale brukere',
           value: formatNumber(summary.metrics.totalUsers),
