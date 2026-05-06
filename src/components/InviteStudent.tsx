@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { readApiJson } from '../utils/api';
+import { canCreateStudent, type SubscriptionPlan } from '../lib/plans';
 
 interface InviteStudentProps {
   tutorId: string;
   onInviteSuccess?: (email: string) => void;
+  userPlan?: SubscriptionPlan;
+  currentStudentCount?: number;
+  onPlanLimitReached?: () => void;
 }
 
-const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess }) => {
+const InviteStudent: React.FC<InviteStudentProps> = ({
+  tutorId,
+  onInviteSuccess,
+  userPlan = 'free',
+  currentStudentCount = 0,
+  onPlanLimitReached,
+}) => {
   const [email, setEmail] = useState('');
   const [studentName, setStudentName] = useState('');
   const [subject, setSubject] = useState('');
@@ -90,6 +100,12 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
     setStatus('Kobler eksisterende elev...');
 
     try {
+      if (!canCreateStudent(userPlan, currentStudentCount)) {
+        onPlanLimitReached?.();
+        setStatus('Du har nådd elevgrensen for planen din. Oppgrader for flere elever.');
+        return;
+      }
+
       const latestLookup = existingStudent?.exists ? existingStudent : await checkExistingStudent(normalizedEmail);
 
       if (!latestLookup?.exists) {
@@ -185,6 +201,12 @@ const InviteStudent: React.FC<InviteStudentProps> = ({ tutorId, onInviteSuccess 
         studentId = existingStudentRow.id;
         console.log("Using existing student ID:", studentId);
       } else {
+        if (!canCreateStudent(userPlan, currentStudentCount)) {
+          onPlanLimitReached?.();
+          setStatus('Du har nådd elevgrensen for planen din. Oppgrader for flere elever.');
+          return;
+        }
+
         // Opprett elev
         console.log("Creating new student with:", {
           email: normalizedEmail,

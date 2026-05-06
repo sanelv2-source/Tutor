@@ -31,10 +31,6 @@ const ProtectedRoute = ({ children, allowedRole, user, isAuthReady }: ProtectedR
     return <Navigate to="/admin" replace />;
   }
 
-  if (allowedRole === 'tutor' && !user.hasPaid) {
-    return <Navigate to="/payment" replace />;
-  }
-
   return <>{children}</>;
 };
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, ArrowLeft } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
+import { trackEvent } from '../utils/analytics';
 
 export default function Signup({ onNavigate, setPendingUser }: { onNavigate: (page: string) => void, setPendingUser: (user: any) => void }) {
   const [name, setName] = useState('');
@@ -9,11 +10,13 @@ export default function Signup({ onNavigate, setPendingUser }: { onNavigate: (pa
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccessMessage('');
 
     if (!name || !email || !password) {
       setError('Vennligst fyll ut alle feltene');
@@ -28,11 +31,46 @@ export default function Signup({ onNavigate, setPendingUser }: { onNavigate: (pa
     }
 
     try {
-      setPendingUser({ name, email, password });
-      onNavigate('payment');
+      const normalizedEmail = email.trim().toLowerCase();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            email: normalizedEmail,
+            role: 'tutor',
+            plan: 'free',
+          },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      setPendingUser(null);
+
+      if (data.user && data.session) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email: normalizedEmail,
+          full_name: name,
+          role: 'tutor',
+          plan: 'free',
+          subscription_status: 'inactive',
+        });
+      }
+
+      await trackEvent('signup_completed', { role: 'tutor', plan: 'free', source: 'free_signup' }, { userId: data.user?.id });
+
+      if (data.session) {
+        onNavigate('dashboard');
+      } else {
+        setSuccessMessage('Kontoen er opprettet. Sjekk e-posten din for å bekrefte innloggingen.');
+      }
     } catch (err: any) {
       console.error('Signup error:', err);
-      setError('En ukjent feil oppstod');
+      setError(err?.message || 'En ukjent feil oppstod');
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +100,7 @@ export default function Signup({ onNavigate, setPendingUser }: { onNavigate: (pa
           <div className="w-12 h-0.5 bg-slate-200 mx-2"></div>
           <div className="flex items-center gap-2 opacity-50">
             <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm">2</div>
-            <span className="text-sm font-medium text-slate-500">Betaling</span>
+            <span className="text-sm font-medium text-slate-500">Gratis plan</span>
           </div>
         </div>
 
@@ -70,15 +108,15 @@ export default function Signup({ onNavigate, setPendingUser }: { onNavigate: (pa
           Opprett din bruker
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Steg 1 av 2: Start din 14-dagers gratis prøveperiode
+          Kom i gang med Tutorflyt uten kostnad
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-slate-100">
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-              {error}
+          {(error || successMessage) && (
+            <div className={`mb-4 border px-4 py-3 rounded-lg text-sm ${error ? 'bg-red-50 border-red-200 text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+              {error || successMessage}
             </div>
           )}
           <form className="space-y-6" onSubmit={handleSubmit}>

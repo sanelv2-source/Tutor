@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CreditCard, ShieldCheck, ArrowLeft, CheckCircle2, Lock, LogOut } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '../supabaseClient';
 import { trackAnalyticsEvent } from '../utils/analytics';
+import { PLAN_NAMES, PLAN_PRICES, normalizePlan, type SubscriptionPlan } from '../lib/plans';
 import {
   Elements,
   CardElement,
@@ -17,7 +19,7 @@ if (!publishableKey) {
 }
 const stripePromise = publishableKey ? loadStripe(publishableKey) : Promise.resolve(null);
 
-function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void, pendingUser: any, setPendingUser: (user: any) => void }) {
+function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser, selectedPlan }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void, pendingUser: any, setPendingUser: (user: any) => void, selectedPlan: SubscriptionPlan }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -114,6 +116,7 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
               email: pendingUser.email, 
               full_name: pendingUser.name,
               role: 'tutor',
+              plan: 'free',
               trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
               subscription_status: 'inactive'
             });
@@ -122,7 +125,8 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
               name: pendingUser.name,
               email: pendingUser.email,
               hasPaid: false,
-              role: 'tutor'
+              role: 'tutor',
+              plan: 'free',
             };
 
             await trackAnalyticsEvent('signup_completed', { role: 'tutor', source: 'payment_signup' }, { userId: currentUserId });
@@ -136,7 +140,7 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email: activeEmail }),
+          body: JSON.stringify({ email: activeEmail, plan: selectedPlan }),
         });
 
         const data = await response.json();
@@ -146,8 +150,8 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
         }
 
         setPendingUser(null);
-        await trackAnalyticsEvent('subscription_started', { plan: 'pro_beta', source: 'payment_form' }, { userId: currentUserId });
-        setUser({ ...currentUser, hasPaid: true });
+        await trackAnalyticsEvent('subscription_started', { plan: selectedPlan, source: 'payment_form' }, { userId: currentUserId });
+        setUser({ ...currentUser, hasPaid: true, plan: selectedPlan });
         onNavigate('dashboard');
       }
     } catch (err) {
@@ -220,7 +224,7 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
           ) : (
             <span className="flex items-center">
               <Lock className="mr-2 h-5 w-5" />
-              Start 14-dagers gratis prøveperiode
+              Oppgrader til {PLAN_NAMES[selectedPlan]}
             </span>
           )}
         </button>
@@ -242,6 +246,12 @@ function CheckoutForm({ onNavigate, user, setUser, pendingUser, setPendingUser }
 }
 
 export default function Payment({ onNavigate, user, setUser, pendingUser, setPendingUser }: { onNavigate: (page: string) => void, user: any, setUser: (user: any) => void, pendingUser: any, setPendingUser: (user: any) => void }) {
+  const location = useLocation();
+  const requestedPlan = normalizePlan(new URLSearchParams(location.search).get('plan') || 'pro');
+  const selectedPlan = requestedPlan === 'free' ? 'pro' : requestedPlan;
+  const selectedPlanName = PLAN_NAMES[selectedPlan];
+  const selectedPlanPrice = PLAN_PRICES[selectedPlan];
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -272,7 +282,7 @@ export default function Payment({ onNavigate, user, setUser, pendingUser, setPen
             Fullfør din registrering
           </h2>
           <p className="mt-2 text-slate-600">
-            {pendingUser ? `Velkommen, ${pendingUser.name}! Start din 14-dagers gratis prøveperiode.` : 'Du betaler ingenting i dag. Start din 14-dagers gratis prøveperiode.'}
+            {pendingUser ? `Velkommen, ${pendingUser.name}! Fullfør ${selectedPlanName}-oppgraderingen.` : `Du betaler ingenting i dag. ${selectedPlanName} gir mer kapasitet og ingen annonser.`}
           </p>
         </div>
 
@@ -286,7 +296,7 @@ export default function Payment({ onNavigate, user, setUser, pendingUser, setPen
             </h3>
 
             <Elements stripe={stripePromise}>
-              <CheckoutForm onNavigate={onNavigate} user={user} setUser={setUser} pendingUser={pendingUser} setPendingUser={setPendingUser} />
+              <CheckoutForm onNavigate={onNavigate} user={user} setUser={setUser} pendingUser={pendingUser} setPendingUser={setPendingUser} selectedPlan={selectedPlan} />
             </Elements>
           </div>
 
@@ -300,10 +310,10 @@ export default function Payment({ onNavigate, user, setUser, pendingUser, setPen
               <div className="space-y-4 relative z-10">
                 <div className="flex justify-between items-start pb-4 border-b border-slate-800">
                   <div>
-                    <p className="font-bold text-lg">TutorFlyt Pro Beta</p>
-                    <p className="text-sm text-slate-400 mt-1">Full tilgang til alle funksjoner</p>
+                    <p className="font-bold text-lg">Tutorflyt {selectedPlanName}</p>
+                    <p className="text-sm text-slate-400 mt-1">{selectedPlan === 'pro' ? 'Anbefalt pakke for aktive privatlærere' : 'Valgt pakke fra pricing-siden'}</p>
                   </div>
-                  <p className="font-bold">149 kr</p>
+                  <p className="font-bold">{selectedPlanPrice} kr</p>
                 </div>
                 
                 <div className="flex justify-between items-center text-sm text-slate-300">
@@ -312,13 +322,13 @@ export default function Payment({ onNavigate, user, setUser, pendingUser, setPen
                 </div>
                 
                 <div className="flex justify-between items-center text-sm text-emerald-400 font-medium">
-                  <p>Beta-rabatt (50%)</p>
-                  <p>- 149 kr</p>
+                  <p>Gratis i dag</p>
+                  <p>- {selectedPlanPrice} kr</p>
                 </div>
 
                 <div className="flex justify-between items-center text-sm text-emerald-400 font-medium pb-4 border-b border-slate-800">
-                  <p>14 dagers gratis prøveperiode</p>
-                  <p>- 149 kr</p>
+                  <p>Ingen bindingstid</p>
+                  <p>0 kr</p>
                 </div>
                 
                 <div className="flex justify-between items-center pt-2">
@@ -344,7 +354,7 @@ export default function Payment({ onNavigate, user, setUser, pendingUser, setPen
               
               <div className="mt-8 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50 relative z-10">
                 <p className="text-xs text-slate-400 text-center leading-relaxed">
-                  Etter 14 dager fornyes abonnementet automatisk for 149 kr/mnd. Du vil få en påminnelse på e-post 3 dager før prøveperioden utløper.
+                  {selectedPlanName} koster {selectedPlanPrice} kr/mnd. Ingen bindingstid, og du kan endre plan senere.
                 </p>
               </div>
             </div>

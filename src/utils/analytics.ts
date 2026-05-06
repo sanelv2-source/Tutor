@@ -9,6 +9,10 @@ export const ANALYTICS_EVENT_NAMES = [
   'invoice_created',
   'calendar_connected',
   'subscription_started',
+  'subscription_changed',
+  'subscription_cancelled',
+  'plan_limit_reached',
+  'upgrade_clicked',
 ] as const;
 
 export type AnalyticsEventName = typeof ANALYTICS_EVENT_NAMES[number];
@@ -19,13 +23,18 @@ type AnalyticsMetadata = Record<string, MetadataValue>;
 const ANALYTICS_EVENT_SET = new Set<string>(ANALYTICS_EVENT_NAMES);
 const SAFE_METADATA_KEYS = new Set([
   'area',
+  'current_count',
+  'feature',
   'has_first_student',
+  'limit',
+  'max_allowed',
   'method',
   'plan',
   'provider',
   'role',
   'route',
   'source',
+  'target_plan',
   'visitor_id',
 ]);
 
@@ -120,6 +129,8 @@ export async function trackAnalyticsEvent(
     console.warn('Analytics event failed:', error);
   }
 }
+
+export const trackEvent = trackAnalyticsEvent;
 
 export async function trackPageView(pathname: string) {
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return;

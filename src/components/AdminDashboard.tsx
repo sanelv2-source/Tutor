@@ -7,6 +7,7 @@ import {
   Lock,
   LogOut,
   MousePointerClick,
+  PieChart,
   RefreshCw,
   TrendingUp,
   UserCheck,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../supabaseClient';
+import { PLAN_NAMES, type SubscriptionPlan } from '../lib/plans';
 
 type AdminSummary = {
   generatedAt: string;
@@ -27,6 +29,9 @@ type AdminSummary = {
     totalLessons: number;
     totalInvoices: number;
     freeUsers: number;
+    startUsers: number;
+    proUsers: number;
+    premiumUsers: number;
     paidUsers: number;
     totalPageViews: number;
     pageViews7d: number;
@@ -37,6 +42,23 @@ type AdminSummary = {
   };
   funnel: Array<{ key: string; label: string; value: number }>;
   featureUsage: Array<{ key: string; label: string; value: number; events: number }>;
+  planDistribution: Array<{ plan: SubscriptionPlan; count: number }>;
+  users: Array<{
+    id: string;
+    name: string | null;
+    email: string | null;
+    plan: SubscriptionPlan;
+    createdAt: string | null;
+    lastActivityAt: string | null;
+    studentCount: number;
+    lessonCount: number;
+  }>;
+  recentEvents: Array<{
+    createdAt: string | null;
+    eventName: string;
+    plan: SubscriptionPlan;
+    metadata: Record<string, string | number | boolean>;
+  }>;
   visitorCountries: Array<{
     countryCode: string | null;
     countryName: string;
@@ -49,6 +71,12 @@ const numberFormatter = new Intl.NumberFormat('no-NO');
 
 const formatNumber = (value: number) => numberFormatter.format(value || 0);
 const formatPercent = (value: number) => `${numberFormatter.format(value || 0)} %`;
+const formatDateTime = (value: string | null) => {
+  if (!value) return 'Ingen aktivitet';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Ukjent' : date.toLocaleString('no-NO');
+};
+const formatPlanName = (plan: SubscriptionPlan) => PLAN_NAMES[plan] || plan;
 
 function useNoIndex() {
   React.useEffect(() => {
@@ -178,7 +206,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         {
           label: 'Aktiverte brukere',
           value: formatNumber(summary.metrics.activatedUsers),
-          detail: 'Har fullført onboarding, elev eller time',
+          detail: 'Minst 1 elev og minst 1 time',
           Icon: UserCheck,
         },
         {
@@ -202,13 +230,37 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         {
           label: 'Gratisbrukere',
           value: formatNumber(summary.metrics.freeUsers),
-          detail: 'Lærere uten aktivt abonnement',
+          detail: 'Free-plan med sponsorvisning',
           Icon: Lock,
+        },
+        {
+          label: 'Startbrukere',
+          value: formatNumber(summary.metrics.startUsers),
+          detail: 'Lav terskel for betaling',
+          Icon: CreditCard,
+        },
+        {
+          label: 'Probrukere',
+          value: formatNumber(summary.metrics.proUsers),
+          detail: 'Anbefalt hovedpakke',
+          Icon: TrendingUp,
+        },
+        {
+          label: 'Premiumbrukere',
+          value: formatNumber(summary.metrics.premiumUsers),
+          detail: 'Seriøse privatlærere',
+          Icon: PieChart,
         },
         {
           label: 'Betalte brukere',
           value: formatNumber(summary.metrics.paidUsers),
           detail: 'Lærere med aktivt abonnement',
+          Icon: CreditCard,
+        },
+        {
+          label: 'Fakturaer opprettet',
+          value: formatNumber(summary.metrics.totalInvoices),
+          detail: 'Aggregert antall fakturaer',
           Icon: CreditCard,
         },
       ]
@@ -319,6 +371,85 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     <p className="text-sm text-slate-500">Trackede events: {formatNumber(feature.events)}</p>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-black text-slate-950">Planfordeling</h2>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {summary.planDistribution.map((item) => (
+                  <div key={item.plan} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-bold text-slate-500">{formatPlanName(item.plan)}</p>
+                    <p className="mt-2 text-3xl font-black text-slate-950">{formatNumber(item.count)}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Brukere</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Navn/e-post vises kun for lærerprofilene. Elevnotater og privat elevdata hentes ikke.
+                </p>
+              </div>
+              <div className="mt-5 overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
+                  <thead>
+                    <tr className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      <th className="py-3 pr-4">Bruker</th>
+                      <th className="py-3 pr-4">Plan</th>
+                      <th className="py-3 pr-4">Registrert</th>
+                      <th className="py-3 pr-4">Siste aktivitet</th>
+                      <th className="py-3 pr-4 text-right">Elever</th>
+                      <th className="py-3 text-right">Timer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {summary.users.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-5 text-slate-500">Ingen lærerbrukere funnet.</td>
+                      </tr>
+                    ) : (
+                      summary.users.map((row) => (
+                        <tr key={row.id}>
+                          <td className="py-4 pr-4">
+                            <p className="font-bold text-slate-800">{row.name || 'Uten navn'}</p>
+                            <p className="text-xs text-slate-500">{row.email || 'Mangler e-post'}</p>
+                          </td>
+                          <td className="py-4 pr-4 font-semibold text-slate-700">{formatPlanName(row.plan)}</td>
+                          <td className="py-4 pr-4 text-slate-500">{formatDateTime(row.createdAt)}</td>
+                          <td className="py-4 pr-4 text-slate-500">{formatDateTime(row.lastActivityAt)}</td>
+                          <td className="py-4 pr-4 text-right font-bold text-slate-800">{formatNumber(row.studentCount)}</td>
+                          <td className="py-4 text-right font-bold text-slate-800">{formatNumber(row.lessonCount)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Aktivitet</h2>
+                <p className="mt-1 text-sm text-slate-500">Siste interne analytics-events med renset metadata.</p>
+              </div>
+              <div className="mt-5 divide-y divide-slate-100">
+                {summary.recentEvents.length === 0 ? (
+                  <p className="py-4 text-sm text-slate-500">Ingen events registrert ennå.</p>
+                ) : (
+                  summary.recentEvents.map((event, index) => (
+                    <div key={`${event.createdAt}-${event.eventName}-${index}`} className="grid gap-3 py-4 lg:grid-cols-[180px_1fr_120px_2fr] lg:items-start">
+                      <p className="text-sm text-slate-500">{formatDateTime(event.createdAt)}</p>
+                      <p className="font-bold text-slate-800">{event.eventName}</p>
+                      <p className="text-sm font-semibold text-slate-600">{formatPlanName(event.plan)}</p>
+                      <code className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                        {JSON.stringify(event.metadata, null, 2)}
+                      </code>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
 
