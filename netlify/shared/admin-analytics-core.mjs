@@ -98,15 +98,22 @@ const countByEventName = (events) => {
   return counts;
 };
 
+const getVisitorId = (event) => {
+  const visitorId = event?.metadata?.visitor_id;
+  return typeof visitorId === 'string' && visitorId.trim() ? visitorId.trim() : null;
+};
+
 export async function getAdminAnalyticsSummary(supabaseAdmin) {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
   const [profiles, students, lessons, invoices, events] = await Promise.all([
     selectRows(supabaseAdmin, 'profiles', 'id, role, subscription_status, created_at', 'id, role, subscription_status'),
     selectRows(supabaseAdmin, 'students', 'id, tutor_id, created_at', 'id, tutor_id'),
     selectRows(supabaseAdmin, 'lessons', 'id, tutor_id, created_at', 'id, tutor_id'),
     selectRows(supabaseAdmin, 'invoices', 'id, tutor_id, created_at', 'id, tutor_id'),
-    selectRows(supabaseAdmin, 'analytics_events', 'event_name, user_id, created_at'),
+    selectRows(supabaseAdmin, 'analytics_events', 'event_name, user_id, metadata, created_at', 'event_name, user_id, created_at'),
   ]);
 
   const tutorProfiles = profiles.filter((profile) => profile.role === 'tutor');
@@ -122,9 +129,28 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
   const activatedUserIds = new Set();
   const firstStudentUserIds = new Set();
   const firstLessonUserIds = new Set();
+  const visitorIds = new Set();
+  const visitorIds7d = new Set();
+  const visitorIdsToday = new Set();
+  let pageViews7d = 0;
+  let pageViewsToday = 0;
 
   events.forEach((event) => {
     const createdAt = parseDate(event.created_at);
+
+    if (event.event_name === 'page_view') {
+      const visitorId = getVisitorId(event);
+      if (visitorId) visitorIds.add(visitorId);
+      if (createdAt && createdAt >= sevenDaysAgo) {
+        pageViews7d += 1;
+        if (visitorId) visitorIds7d.add(visitorId);
+      }
+      if (createdAt && createdAt >= todayStart) {
+        pageViewsToday += 1;
+        if (visitorId) visitorIdsToday.add(visitorId);
+      }
+    }
+
     if (event.user_id && createdAt && createdAt >= sevenDaysAgo) {
       activeUserIds.add(event.user_id);
     }
@@ -165,6 +191,12 @@ export async function getAdminAnalyticsSummary(supabaseAdmin) {
       totalInvoices: invoices.length,
       freeUsers,
       paidUsers,
+      totalPageViews: eventCounts.page_view,
+      pageViews7d,
+      pageViewsToday,
+      uniqueVisitors: visitorIds.size,
+      visitors7d: visitorIds7d.size,
+      visitorsToday: visitorIdsToday.size,
     },
     funnel: [
       { key: 'visits', label: 'Besøk', value: eventCounts.page_view },

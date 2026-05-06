@@ -26,7 +26,11 @@ const SAFE_METADATA_KEYS = new Set([
   'role',
   'route',
   'source',
+  'visitor_id',
 ]);
+
+const VISITOR_ID_KEY = 'tutorflyt_visitor_id';
+let runtimeVisitorId: string | null = null;
 
 const normalizeRoute = (pathname: string) => {
   if (/^\/invoice\/[^/]+/.test(pathname)) return '/invoice/:publicToken';
@@ -42,6 +46,34 @@ const getRouteArea = (route: string) => {
   if (route.startsWith('/student')) return 'student_app';
   if (route.startsWith('/invoice')) return 'public_invoice';
   return 'public_site';
+};
+
+const createVisitorId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `visitor_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const getAnonymousVisitorId = () => {
+  if (runtimeVisitorId) return runtimeVisitorId;
+
+  try {
+    const existing = localStorage.getItem(VISITOR_ID_KEY);
+    if (existing) {
+      runtimeVisitorId = existing;
+      return existing;
+    }
+
+    const visitorId = createVisitorId();
+    localStorage.setItem(VISITOR_ID_KEY, visitorId);
+    runtimeVisitorId = visitorId;
+    return visitorId;
+  } catch (error) {
+    runtimeVisitorId = runtimeVisitorId || createVisitorId();
+    return runtimeVisitorId;
+  }
 };
 
 const sanitizeMetadata = (metadata: AnalyticsMetadata = {}) => {
@@ -98,6 +130,7 @@ export async function trackPageView(pathname: string) {
     {
       route,
       area: getRouteArea(route),
+      visitor_id: getAnonymousVisitorId(),
     },
     { anonymous: true }
   );
