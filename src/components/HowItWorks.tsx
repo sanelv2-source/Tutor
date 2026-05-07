@@ -21,10 +21,10 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
         {/* Hero Section */}
         <section className="pt-12 sm:pt-20 pb-10 sm:pb-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 mb-5 sm:mb-6 break-words">
-            Slik fungerer TutorFlyt
+            Slik fungerer Tutorflyt
           </h1>
           <p className="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
-            Tre enkle steg for å komme i gang. Enten du er en lærer som vil ha mindre administrasjon, eller en elev som vil ha bedre oversikt.
+            En enkel arbeidsflyt for privatlærere som vil samle elever, timer, kalender, kommunikasjon og fakturering på ett sted.
           </p>
         </section>
 
@@ -144,11 +144,11 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
           {/* Divider */}
           <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
 
-          {/* Elever Section */}
+          {/* Teacher Follow-up Section */}
           <section>
             <div className="text-center mb-10 sm:mb-16">
-              <span className="text-orange-500 font-bold tracking-wider uppercase text-sm mb-2 block">For Elever</span>
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">Full oversikt over læringen</h2>
+              <span className="text-orange-500 font-bold tracking-wider uppercase text-sm mb-2 block">Oppfølging</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">Følg opp elevene fra samme sted</h2>
             </div>
             
             <div className="space-y-16 sm:space-y-24">
@@ -158,7 +158,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 aspect-[4/3]">
                     <img 
                       src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=800" 
-                      alt="Elev får tilgang til portal" 
+                      alt="Privatlærer deler elevportal"
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -167,19 +167,19 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-5 sm:mb-6">
                     <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 font-bold text-xl">1</span>
-                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Få tilgang til din portal</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Gi eleven en ryddig portal</h3>
                   </div>
                   <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
-                    Motta en sikker, magisk lenke på SMS eller e-post. Ingen passord å huske – bare klikk og du er inne i din personlige portal på mobilen eller PC-en.
+                    Del timeplan, ressurser og oppgaver med eleven uten å sende alt på SMS, e-post eller ulike apper. Du styrer hva eleven får tilgang til.
                   </p>
                   <ul className="space-y-3">
                     <li className="flex items-center gap-3 text-slate-700">
                       <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                      Sikker, passordløs innlogging
+                      Ryddig elevportal på mobil og PC
                     </li>
                     <li className="flex items-center gap-3 text-slate-700">
                       <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                      Fungerer perfekt på alle enheter
+                      Du beholder kontrollen som lærer
                     </li>
                   </ul>
                 </div>
@@ -190,10 +190,10 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                 <div className="flex-1 order-2 md:order-1">
                   <div className="flex items-center gap-4 mb-5 sm:mb-6">
                     <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-purple-100 text-purple-600 font-bold text-xl">2</span>
-                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Se fremgang & ressurser</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Følg fremgang & del ressurser</h3>
                   </div>
                   <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
-                    Følg med på mestringsnivået fra uke til uke. Finn lekser, tilbakemeldinger og delte dokumenter samlet på ett sted, slik at du alltid er forberedt.
+                    Som lærer kan du samle lekser, tilbakemeldinger og delte dokumenter på ett sted, slik at både du og eleven vet hva som skal følges opp.
                   </p>
                   <ul className="space-y-3">
                     <li className="flex items-center gap-3 text-slate-700">
@@ -202,7 +202,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                     </li>
                     <li className="flex items-center gap-3 text-slate-700">
                       <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                      Tydelig oversikt over hva som må øves på
+                      Tydelig oversikt over hva eleven må øve på
                     </li>
                   </ul>
                 </div>
@@ -210,7 +210,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 aspect-[4/3]">
                     <img 
                       src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=800" 
-                      alt="Elev ser fremgang" 
+                      alt="Privatlærer følger elevens fremgang"
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -224,7 +224,7 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 aspect-[4/3]">
                     <img 
                       src="https://images.unsplash.com/photo-1577563908411-5077b6dc7624?auto=format&fit=crop&q=80&w=800" 
-                      alt="Elev kommuniserer med lærer" 
+                      alt="Privatlærer kommuniserer med elev"
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -233,19 +233,19 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-5 sm:mb-6">
                     <span className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-rose-100 text-rose-600 font-bold text-xl">3</span>
-                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Kommuniser med din lærer</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900">Kommuniser med din elev</h3>
                   </div>
                   <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-6">
-                    Be om å flytte timer, still spørsmål om leksene eller gi beskjed om fravær – alt direkte gjennom portalen. Slutt på spredte SMS-er og e-poster.
+                    Send beskjeder, avklar timer og følg opp spørsmål direkte gjennom portalen. Mindre spredte SMS-er og e-poster gir mer profesjonell oppfølging.
                   </p>
                   <ul className="space-y-3">
                     <li className="flex items-center gap-3 text-slate-700">
                       <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                      Innebygd chat med læreren
+                      Innebygd chat med eleven
                     </li>
                     <li className="flex items-center gap-3 text-slate-700">
                       <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                      Enkel ombooking av timer
+                      Enklere avklaring av timer og fravær
                     </li>
                   </ul>
                 </div>
@@ -265,13 +265,13 @@ export default function HowItWorks({ onNavigate }: { onNavigate: (page: string) 
                   Klar til å forenkle undervisningen?
                 </h2>
                 <p className="text-lg sm:text-xl text-indigo-100 mb-8 sm:mb-10 max-w-2xl mx-auto">
-                  Start med TutorFlyt i dag og få en ryddigere hverdag for deg og dine elever. Prøv gratis i 14 dager.
+                  Start med Tutorflyt i dag og få en ryddigere hverdag for deg og dine elever. Gratis for nye privatlærere.
                 </p>
                 <button 
                   onClick={() => onNavigate('signup')}
                   className="inline-flex w-full sm:w-auto items-center justify-center px-6 sm:px-8 py-4 text-base sm:text-lg font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                 >
-                  Kom i gang nå
+                  Start gratis
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </button>
               </div>
