@@ -80,7 +80,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [meetLinkInput, setMeetLinkInput] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
   const [planLimitNotice, setPlanLimitNotice] = useState<string | null>(null);
-  const userPlan = normalizePlan(profile?.plan || user?.plan);
+  const userPlan = normalizePlan(profile?.plan || user?.plan || (profile?.subscription_status === 'active' ? 'pro' : 'free'));
   const planLimits = PLAN_LIMITS[userPlan];
   
   const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
@@ -113,11 +113,19 @@ const saveMeetLink = async (link: string) => {
       }
       if (authUser) {
         setAuthUserId(authUser.id);
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('profiles')
           .select('full_name, trial_ends_at, subscription_status, plan, meet_link, phone')
           .eq('id', authUser.id)
           .maybeSingle();
+
+        if (error && isSchemaCacheColumnError(error)) {
+          ({ data, error } = await supabase
+            .from('profiles')
+            .select('full_name, trial_ends_at, subscription_status, meet_link, phone')
+            .eq('id', authUser.id)
+            .maybeSingle());
+        }
 
         if (error) throw error;
 
@@ -126,7 +134,7 @@ const saveMeetLink = async (link: string) => {
             name: data.full_name,
             trial_ends_at: data.trial_ends_at,
             subscription_status: data.subscription_status,
-            plan: normalizePlan(data.plan),
+            plan: normalizePlan(data.plan || (data.subscription_status === 'active' ? 'pro' : 'free')),
             meet_link: data.meet_link,
             phone: data.phone || ''
           });
