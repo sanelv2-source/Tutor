@@ -55,12 +55,17 @@ export const PLAN_NAMES: Record<SubscriptionPlan, string> = {
 
 export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
   free: 0,
-  start: 59,
-  pro: 129,
-  premium: 249,
+  start: 79,
+  pro: 149,
+  premium: 0,
 };
 
 export const PLAN_ORDER: SubscriptionPlan[] = ['free', 'start', 'pro', 'premium'];
+export const PURCHASABLE_PLANS: SubscriptionPlan[] = ['start', 'pro'];
+
+export const isPurchasablePlan = (plan?: string | null): plan is 'start' | 'pro' => {
+  return plan === 'start' || plan === 'pro';
+};
 
 export const normalizePlan = (plan?: string | null): SubscriptionPlan => {
   if (plan === 'start' || plan === 'pro' || plan === 'premium') return plan;
