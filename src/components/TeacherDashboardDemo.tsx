@@ -16,18 +16,18 @@ type TeacherDashboardDemoProps = {
 const highlights = [
   {
     icon: Clock,
-    title: 'Dagens timer',
-    text: 'Se neste økt, elever og avtaler uten å lete i meldinger.'
+    title: 'Timeplan og kalender',
+    text: 'Se neste økt, faste avtaler og kalender uten å lete i meldinger.'
   },
   {
     icon: TrendingUp,
-    title: 'Elevprogresjon',
-    text: 'Logg fremgang og send korte rapporter etter timen.'
+    title: 'Elevoversikt',
+    text: 'Hold oversikt over elever, fag og oppfølging på ett sted.'
   },
   {
     icon: Wallet,
-    title: 'Betaling',
-    text: 'Følg Vipps-krav, inntekt og utestående på samme sted.'
+    title: 'Fakturering og betalingsoversikt',
+    text: 'Send krav, følg inntekt og se hva som fortsatt venter.'
   }
 ];
 
@@ -50,10 +50,10 @@ export default function TeacherDashboardDemo({ onNavigate, variant = 'landing' }
               Demo av lærer-dashboardet
             </div>
             <h2 className="mt-5 text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
-              Se hva du får når du åpner TutorFlyt.
+              Fra elevoversikt til betaling.
             </h2>
             <p className="mt-4 text-sm sm:text-lg text-slate-600 leading-relaxed">
-              En kort gjennomgang av lærerens arbeidsflate: timer, elevprogresjon, rapporter og betaling samlet på ett sted.
+              En kort gjennomgang av lærerens arbeidsflate: elever, timeplan, kalender, fakturering og betalingsoversikt samlet på ett sted.
             </p>
 
             <div className="mt-6 sm:mt-7 space-y-4">
@@ -74,7 +74,7 @@ export default function TeacherDashboardDemo({ onNavigate, variant = 'landing' }
               onClick={() => onNavigate('signup')}
               className="mt-7 sm:mt-8 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm sm:text-base font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-xl"
             >
-              Prøv gratis i 14 dager
+              Start gratis
               <ArrowRight className="h-5 w-5" />
             </button>
           </div>
@@ -91,7 +91,7 @@ export default function TeacherDashboardDemo({ onNavigate, variant = 'landing' }
                 <source srcSet="/teacher-dashboard-demo.webp" type="image/webp" />
                 <img
                   src="/teacher-dashboard-demo-poster.png"
-                  alt="Kort animert demo av lærer-dashboardet i TutorFlyt"
+                  alt="Kort animert demo av lærer-dashboardet i Tutorflyt"
                   className="block aspect-video w-full bg-slate-100 object-cover"
                   loading={isLanding ? 'eager' : 'lazy'}
                   decoding="async"
