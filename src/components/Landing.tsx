@@ -100,31 +100,70 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
               <div className="relative w-full max-w-[260px] sm:max-w-[300px] aspect-[1/2] bg-slate-900 rounded-[2rem] sm:rounded-[3rem] border-[7px] sm:border-[8px] border-slate-900 shadow-2xl overflow-hidden">
                 <div className="absolute top-0 inset-x-0 h-6 bg-slate-900 rounded-b-3xl w-40 mx-auto z-20"></div>
                 <div className="bg-slate-50 w-full h-full flex flex-col relative z-10">
-                  <div className="bg-indigo-600 text-white pt-11 sm:pt-12 pb-5 sm:pb-6 px-5 sm:px-6 rounded-b-3xl shadow-sm">
-                    <p className="text-indigo-100 text-xs sm:text-sm font-medium mb-1">Dagens kontroll</p>
-                    <h3 className="text-2xl sm:text-3xl font-bold">3 timer</h3>
+                  <div className="bg-gradient-to-br from-indigo-600 to-teal-500 text-white pt-11 sm:pt-12 pb-5 px-5 sm:px-6 rounded-b-[2rem] shadow-sm">
+                    <p className="text-indigo-100 text-xs sm:text-sm font-semibold mb-1">Tutorflyt i dag</p>
+                    <div className="flex items-end justify-between gap-3">
+                      <h3 className="text-2xl sm:text-3xl font-black">3 timer</h3>
+                      <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-bold text-white ring-1 ring-white/20">5 elever</span>
+                    </div>
                   </div>
-                  <div className="p-3 sm:p-4 flex-1 flex flex-col gap-3 sm:gap-4 mt-3 sm:mt-4">
-                    <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 animate-fade-in-up">
-                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                        <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
+
+                  <div className="px-3 sm:px-4 pt-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        ['Elever', '5'],
+                        ['Faktura', '2'],
+                        ['Ubetalt', '1'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-xl bg-white p-2 text-center shadow-sm ring-1 ring-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400">{label}</p>
+                          <p className="text-sm font-black text-slate-900">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-3 sm:p-4 flex-1 flex flex-col gap-3">
+                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 animate-fade-in-up">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                        <CalendarIcon className="h-5 w-5 text-indigo-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Neste time</p>
-                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Matte R1 - Jonas kl. 14:00</p>
+                        <p className="font-black text-xs sm:text-sm leading-tight text-slate-900">Neste time</p>
+                        <p className="text-[11px] sm:text-xs text-slate-500 truncate">Matte R1 - Jonas</p>
                       </div>
-                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-indigo-600">I dag</div>
+                      <div className="ml-auto shrink-0 text-xs font-black text-indigo-600">14:00</div>
                     </div>
-                    <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 opacity-70">
-                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+
+                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                        <CreditCard className="h-5 w-5 text-emerald-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Faktura sendt</p>
-                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Pianotime - Sofie (Vipps)</p>
+                        <p className="font-black text-xs sm:text-sm leading-tight text-slate-900">Faktura sendt</p>
+                        <p className="text-[11px] sm:text-xs text-slate-500 truncate">Pianotime - Sofie</p>
                       </div>
-                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">500 kr</div>
+                      <div className="ml-auto shrink-0 text-xs font-black text-emerald-600">500 kr</div>
                     </div>
+
+                    <div className="rounded-2xl bg-slate-900 p-3 text-white shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold text-slate-300">Elevoppfølging</p>
+                          <p className="truncate text-sm font-black">Sara har ny melding</p>
+                        </div>
+                        <MessageCircle className="h-5 w-5 shrink-0 text-teal-300" />
+                      </div>
+                      <div className="mt-3 h-1.5 rounded-full bg-white/10">
+                        <div className="h-full w-2/3 rounded-full bg-teal-300"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mx-8 mb-4 grid grid-cols-3 rounded-2xl bg-white p-2 text-center text-[10px] font-bold text-slate-400 shadow-sm ring-1 ring-slate-100">
+                    <span className="text-indigo-600">Oversikt</span>
+                    <span>Timer</span>
+                    <span>Betaling</span>
                   </div>
                 </div>
               </div>
