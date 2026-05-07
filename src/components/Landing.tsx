@@ -40,27 +40,27 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
       <main>
         {/* 1. Hero Section */}
-        <section className="pt-10 sm:pt-16 pb-16 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-8 items-center">
-            <div className="max-w-2xl min-w-0">
-              <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 mb-5 sm:mb-6 leading-[1.08] break-words">
+        <section className="pt-7 sm:pt-16 pb-12 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-8 items-center">
+            <div className="max-w-2xl min-w-0 mx-auto text-center lg:mx-0 lg:text-left">
+              <h1 className="text-3xl sm:text-6xl font-extrabold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight sm:leading-[1.08] break-words">
                 Slutt å mase om betaling. <span className="text-indigo-600">Begynn å undervise.</span>
               </h1>
-              <p className="text-lg sm:text-xl text-slate-600 mb-7 sm:mb-8 leading-relaxed">
+              <p className="text-base sm:text-xl text-slate-600 mb-6 sm:mb-8 leading-relaxed">
                 Det enkle kontrollpanelet bygget for norske privatlærere. Automatiser fakturering, styr timeplanen og imponerer elevene – alt fra mobilen.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center lg:items-start">
                 <button 
                   onClick={() => onNavigate('signup')}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-5 sm:px-6 py-3 text-base font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-center"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-5 sm:px-6 py-3 text-sm sm:text-base font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-center"
                 >
-                  Prøv ut nå – 14 dager gratis prøveperiode
+                  Prøv gratis i 14 dager
                 </button>
               </div>
               <p className="mt-3 text-sm text-slate-500 font-medium">
                 Ingen binding. Ingen kredittkort kreves.
               </p>
-              <div className="mt-8 flex items-start sm:items-center gap-3">
+              <div className="mt-6 sm:mt-8 flex items-start sm:items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left ring-1 ring-slate-100 lg:bg-transparent lg:p-0 lg:ring-0">
                 <div className="flex -space-x-2 shrink-0">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden">
@@ -80,40 +80,38 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             </div>
             
             {/* Hero Illustration / Mockup */}
-            <div className="relative mx-auto w-full max-w-[300px] sm:max-w-[320px] lg:max-w-none lg:ml-auto flex justify-center">
-              <div className="relative w-full max-w-[300px] aspect-[1/2] bg-slate-900 rounded-[2.5rem] sm:rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden">
+            <div className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] lg:max-w-none lg:ml-auto flex justify-center">
+              <div className="relative w-full max-w-[260px] sm:max-w-[300px] aspect-[1/2] bg-slate-900 rounded-[2rem] sm:rounded-[3rem] border-[7px] sm:border-[8px] border-slate-900 shadow-2xl overflow-hidden">
                 <div className="absolute top-0 inset-x-0 h-6 bg-slate-900 rounded-b-3xl w-40 mx-auto z-20"></div>
                 <div className="bg-slate-50 w-full h-full flex flex-col relative z-10">
-                  <div className="bg-indigo-600 text-white pt-12 pb-6 px-6 rounded-b-3xl shadow-sm">
-                    <p className="text-indigo-100 text-sm font-medium mb-1">Total inntjening</p>
-                    <h3 className="text-3xl font-bold">kr 12 450</h3>
+                  <div className="bg-indigo-600 text-white pt-11 sm:pt-12 pb-5 sm:pb-6 px-5 sm:px-6 rounded-b-3xl shadow-sm">
+                    <p className="text-indigo-100 text-xs sm:text-sm font-medium mb-1">Total inntjening</p>
+                    <h3 className="text-2xl sm:text-3xl font-bold">kr 12 450</h3>
                   </div>
-                  <div className="p-4 flex-1 flex flex-col gap-4 mt-4">
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 animate-fade-in-up">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                  <div className="p-3 sm:p-4 flex-1 flex flex-col gap-3 sm:gap-4 mt-3 sm:mt-4">
+                    <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 animate-fade-in-up">
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-sm sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
-                        <p className="text-xs sm:text-sm text-slate-500">Mattehjelp - Jonas (Vipps)</p>
+                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
+                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Mattehjelp - Jonas (Vipps)</p>
                       </div>
                       <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">+450 kr</div>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 opacity-70">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 opacity-70">
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-sm sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
-                        <p className="text-xs sm:text-sm text-slate-500">Pianotime - Sofie (Kort)</p>
+                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
+                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Pianotime - Sofie (Kort)</p>
                       </div>
                       <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">+500 kr</div>
                     </div>
                   </div>
                 </div>
               </div>
-              {/* Decorative blobs */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-tr from-indigo-200 to-orange-100 rounded-full blur-3xl -z-10 opacity-60"></div>
             </div>
           </div>
         </section>
@@ -121,17 +119,17 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         <TeacherDashboardDemo onNavigate={onNavigate} />
 
         {/* 2. Problem/Agitation Section */}
-        <section className="py-16 sm:py-24 bg-slate-50 border-y border-slate-200">
+        <section className="py-12 sm:py-24 bg-slate-50 border-y border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
+            <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-16">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-4">
                 Administrasjon skal ikke ta mer tid enn selve undervisningen.
               </h2>
             </div>
             
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                <div className="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center mb-6">
+            <div className="grid md:grid-cols-3 gap-4 sm:gap-8">
+              <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-red-50 rounded-xl flex items-center justify-center mb-5 sm:mb-6">
                   <FileWarning className="h-7 w-7 text-red-500" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">Fakturerings-marerittet</h3>
@@ -140,8 +138,8 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 </p>
               </div>
               
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                <div className="w-14 h-14 bg-orange-50 rounded-xl flex items-center justify-center mb-6">
+              <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-orange-50 rounded-xl flex items-center justify-center mb-5 sm:mb-6">
                   <MessageSquareWarning className="h-7 w-7 text-orange-500" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">WhatsApp-kaoset</h3>
@@ -150,8 +148,8 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 </p>
               </div>
               
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                <div className="w-14 h-14 bg-amber-50 rounded-xl flex items-center justify-center mb-6">
+              <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-50 rounded-xl flex items-center justify-center mb-5 sm:mb-6">
                   <FileQuestion className="h-7 w-7 text-amber-500" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">«Hva gjorde vi sist?»</h3>
@@ -164,17 +162,17 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 3. Solution/Benefits Section (Z-pattern) */}
-        <section className="py-16 sm:py-24 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 sm:space-y-24">
+        <section className="py-12 sm:py-24 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-24">
             
             {/* Benefit 1: Image Right */}
-            <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+            <div className="flex flex-col md:flex-row items-center gap-8 lg:gap-20">
               <div className="flex-1">
                 <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
                   <CreditCard className="h-6 w-6 text-indigo-600" />
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6">Få betalt med ett klikk.</h2>
-                <p className="text-lg text-slate-600 leading-relaxed">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-4 sm:mb-6">Få betalt med ett klikk.</h2>
+                <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
                   Integrert med Vipps og Stripe. Send faktura automatisk etter hver time. Du ser med en gang hvem som har betalt.
                 </p>
               </div>
@@ -211,13 +209,13 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             </div>
 
             {/* Benefit 2: Image Left */}
-            <div className="flex flex-col md:flex-row-reverse items-center gap-12 lg:gap-20">
+            <div className="flex flex-col md:flex-row-reverse items-center gap-8 lg:gap-20">
               <div className="flex-1">
                 <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
                   <CalendarIcon className="h-6 w-6 text-indigo-600" />
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6">En smart kalender som forstår Norge.</h2>
-                <p className="text-lg text-slate-600 leading-relaxed">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-4 sm:mb-6">En smart kalender som forstår Norge.</h2>
+                <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
                   Synkronisert med norske skoleferier. Trenger du å flytte en time? Kunden får beskjed med en gang, og du slipper back-and-forth meldinger.
                 </p>
               </div>
@@ -249,13 +247,13 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
             </div>
 
             {/* Benefit 3: Image Right */}
-            <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+            <div className="flex flex-col md:flex-row items-center gap-8 lg:gap-20">
               <div className="flex-1">
                 <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
                   <MessageCircle className="h-6 w-6 text-indigo-600" />
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6">Proffere kommunikasjon med elevene.</h2>
-                <p className="text-lg text-slate-600 leading-relaxed">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-4 sm:mb-6">Proffere kommunikasjon med elevene.</h2>
+                <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
                   Send en 30-sekunders oppdatering etter hver time. Elever elsker å se fremgang, og fornøyde elever betyr lengre kundeforhold.
                 </p>
               </div>
@@ -286,9 +284,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 4. Differentiation Section */}
-        <section className="py-16 sm:py-24 bg-slate-900 text-white">
+        <section className="py-12 sm:py-24 bg-slate-900 text-white">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">Endelig et verktøy som snakker ditt språk.</h2>
+            <h2 className="text-2xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">Endelig et verktøy som snakker ditt språk.</h2>
             
             <div className="space-y-6">
               {[
@@ -320,7 +318,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
         </section>
 
         {/* 5. FAQ Section */}
-        <section className="py-16 sm:py-24 bg-white">
+        <section className="py-12 sm:py-24 bg-white">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-slate-900 mb-10 text-center">Ofte stilte spørsmål</h2>
             <div className="border-t border-slate-200">
@@ -328,11 +326,11 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 question="Hva koster det?" 
                 answer={
                   <div className="space-y-3">
-                    <p>TutorFlyt koster <span className="text-indigo-600 font-bold">149 kr per måned</span> etter gratis prøveperiode.</p>
+                    <p>TutorFlyt har gratisplan, Start til <span className="text-indigo-600 font-bold">79 kr/mnd</span> og Pro til <span className="text-indigo-600 font-bold">149 kr/mnd</span>.</p>
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>14 dager gratis prøveperiode.</li>
+                      <li>Kom i gang gratis uten kredittkort.</li>
                       <li>Ingen bindingstid eller skjulte gebyrer.</li>
-                      <li>Én pris for elever, timeplan, rapporter, meldinger og betalingsoversikt.</li>
+                      <li>Oppgrader når du trenger flere elever, timer og bedre oversikt.</li>
                     </ul>
                     <p className="pt-2 border-t border-slate-100 text-sm text-slate-500 italic">
                       Abonnementet kan avsluttes når som helst.

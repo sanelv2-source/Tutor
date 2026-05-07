@@ -139,7 +139,7 @@ const NotificationBell: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 left-auto z-50 mt-3 w-[320px] max-w-[calc(100vw-1rem)] origin-top-right rounded-3xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-200">
+        <div className="fixed left-3 right-3 top-16 z-50 origin-top-right rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-200 md:absolute md:left-auto md:right-0 md:top-auto md:mt-3 md:w-[360px] md:max-w-[calc(100vw-2rem)] md:rounded-3xl">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">Varsler</p>
@@ -154,7 +154,7 @@ const NotificationBell: React.FC = () => {
             </button>
           </div>
 
-          <div className="max-h-80 overflow-y-auto p-2">
+          <div className="max-h-[70vh] overflow-y-auto p-2 md:max-h-80">
             {loading ? (
               <div className="flex items-center justify-center p-6">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
@@ -165,17 +165,17 @@ const NotificationBell: React.FC = () => {
               </div>
             ) : (
               notifications.map((notification) => (
-                <div key={notification.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4 mb-2 last:mb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
-                      <p className="mt-1 text-sm text-slate-600 leading-6 truncate">{notification.body}</p>
+                <div key={notification.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 mb-2 last:mb-0 md:rounded-3xl">
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-900 break-words">{notification.title}</p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{notification.body}</p>
                     </div>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500">
+                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 ring-1 ring-slate-200">
                       {notification.type}
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+                  <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <span>{notification.created_at ? new Date(notification.created_at).toLocaleString('no-NO') : ''}</span>
                     {notification.link && (
                       <a
