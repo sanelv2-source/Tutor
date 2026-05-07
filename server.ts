@@ -1474,19 +1474,36 @@ async function startServer() {
   app.post("/api/payment/create-intent", async (req, res) => {
     try {
       const stripe = getStripe();
-      
-      // Create a PaymentIntent with the order amount and currency
-      // For a 14-day trial, we might set up a SetupIntent or a Subscription instead,
-      // but for this prototype, we'll authorize a small amount or just create a standard intent.
-      // Here we create an intent for 0 NOK (or a minimum amount if required by Stripe)
-      // to verify the card, but since Stripe requires >0 for PaymentIntents, 
-      // we'll simulate the "0 kr today, 149 kr later" by creating a SetupIntent.
-      
-      const setupIntent = await stripe.setupIntents.create({
+
+      const planPricesNok: Record<string, number> = {
+        start: 79,
+        pro: 149,
+      };
+      const requestedPlan = String(req.body?.plan || 'pro').trim().toLowerCase();
+      const plan = Object.prototype.hasOwnProperty.call(planPricesNok, requestedPlan) ? requestedPlan : '';
+      const email = String(req.body?.email || '').trim().toLowerCase();
+
+      if (!plan) {
+        return res.status(400).json({ error: "Denne pakken kan ikke kjøpes ennå." });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: planPricesNok[plan] * 100,
+        currency: 'nok',
         payment_method_types: ['card'],
+        receipt_email: email || undefined,
+        metadata: {
+          plan,
+          email,
+        },
       });
 
-      res.json({ clientSecret: setupIntent.client_secret });
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        plan,
+      });
     } catch (error) {
       console.error("Stripe error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Kunne ikke starte betaling" });
@@ -1556,18 +1573,46 @@ async function startServer() {
 
   app.post("/api/payment/process", async (req, res) => {
     const { email } = req.body;
+    const planPricesNok: Record<string, number> = {
+      start: 79,
+      pro: 149,
+    };
     const requestedPlan = String(req.body?.plan || 'pro').trim().toLowerCase();
-    const plan = ['start', 'pro', 'premium'].includes(requestedPlan) ? requestedPlan : 'pro';
+    const plan = Object.prototype.hasOwnProperty.call(planPricesNok, requestedPlan) ? requestedPlan : '';
+    const paymentIntentId = String(req.body?.paymentIntentId || '').trim();
+
+    if (!plan) {
+      return res.status(400).json({ error: "Denne pakken kan ikke kjøpes ennå." });
+    }
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: "Betalingen mangler bekreftelse." });
+    }
     
     if (!supabaseAdmin) {
       return res.status(500).json({ error: "Supabase Admin not initialized" });
     }
 
     try {
+      const stripe = getStripe();
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      const expectedAmount = planPricesNok[plan] * 100;
+
+      if (
+        paymentIntent.status !== 'succeeded' ||
+        paymentIntent.amount !== expectedAmount ||
+        paymentIntent.currency !== 'nok' ||
+        paymentIntent.metadata?.plan !== plan ||
+        paymentIntent.metadata?.email !== normalizedEmail
+      ) {
+        return res.status(400).json({ error: "Betalingen matcher ikke valgt pakke." });
+      }
+
       const { data: profile, error: fetchError } = await supabaseAdmin
         .from('profiles')
         .select('id')
-        .eq('email', email)
+        .eq('email', normalizedEmail)
         .maybeSingle();
 
       if (fetchError || !profile) {

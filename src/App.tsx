@@ -324,7 +324,8 @@ export default function App() {
   const handleNavigate = (page: string) => {
     if (page.startsWith('payment:')) {
       const plan = page.split(':')[1] || 'pro';
-      navigate(`/payment?plan=${encodeURIComponent(plan)}`);
+      const from = location.pathname === '/tutor/dashboard' ? '&from=dashboard' : '';
+      navigate(`/payment?plan=${encodeURIComponent(plan)}${from}`);
       return;
     }
 

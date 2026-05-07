@@ -45,6 +45,7 @@ import SupportFeedback from './SupportFeedback';
 import TeacherOperations from './TeacherOperations';
 import StudentDetailModal from './StudentDetailModal';
 import FreePlanSponsorCard from './FreePlanSponsorCard';
+import PlanPicker from './PlanPicker';
 import { supabase } from '../supabaseClient';
 import { readApiJson } from '../utils/api';
 import { trackAnalyticsEvent, trackEvent } from '../utils/analytics';
@@ -58,6 +59,7 @@ import {
   canCreateStudent,
   getPlanLimit,
   getUpgradeMessage,
+  isPurchasablePlan,
   normalizePlan,
   shouldShowAds,
   type SubscriptionPlan,
@@ -80,6 +82,7 @@ export default function Dashboard({ onNavigate, user, onLogout }: { onNavigate: 
   const [meetLinkInput, setMeetLinkInput] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
   const [planLimitNotice, setPlanLimitNotice] = useState<string | null>(null);
+  const [showUpgradePlans, setShowUpgradePlans] = useState(false);
   const userPlan = normalizePlan(profile?.plan || user?.plan || (profile?.subscription_status === 'active' ? 'pro' : 'free'));
   const planLimits = PLAN_LIMITS[userPlan];
   
@@ -1509,6 +1512,21 @@ const saveMeetLink = async (link: string) => {
     return filteredCombined.sort((a, b) => a.sortTime.localeCompare(b.sortTime));
   }, [schedule, fasteTider, calendarEvents]);
 
+  const openUpgradePlans = async (source: string) => {
+    await trackEvent('upgrade_clicked', { plan: userPlan, source, target_plan: 'pro' }, { userId: authUserId });
+    setShowUpgradePlans(true);
+  };
+
+  const handleChooseUpgradePlan = async (plan: SubscriptionPlan) => {
+    if (!isPurchasablePlan(plan)) {
+      return;
+    }
+
+    await trackEvent('upgrade_clicked', { plan: userPlan, source: 'dashboard_plan_picker', target_plan: plan }, { userId: authUserId });
+    setShowUpgradePlans(false);
+    onNavigate(`payment:${plan}`);
+  };
+
   if (isLoadingProfile) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -1522,7 +1540,14 @@ const saveMeetLink = async (link: string) => {
   }
 
   if (isTrialExpired) {
-    return <PaymentWall onUpgrade={() => onNavigate('payment')} />;
+    return (
+      <PaymentWall
+        currentPlan={userPlan}
+        showPlans={showUpgradePlans}
+        onUpgrade={() => openUpgradePlans('payment_wall')}
+        onChoosePlan={handleChooseUpgradePlan}
+      />
+    );
   }
 
   const showToast = (msg: string) => {
@@ -2474,6 +2499,15 @@ const saveMeetLink = async (link: string) => {
             <div className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm">
               {PLAN_NAMES[userPlan]}-plan
             </div>
+            {userPlan !== 'pro' && userPlan !== 'premium' && (
+              <button
+                type="button"
+                onClick={() => openUpgradePlans('dashboard_header')}
+                className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-3 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-700"
+              >
+                Oppgrader
+              </button>
+            )}
             <div className="hidden md:block">
               <NotificationBell />
             </div>
@@ -2506,10 +2540,7 @@ const saveMeetLink = async (link: string) => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span>{planLimitNotice}</span>
               <button
-                onClick={async () => {
-                  await trackEvent('upgrade_clicked', { plan: userPlan, source: 'plan_limit_notice', target_plan: 'pro' }, { userId: authUserId });
-                  onNavigate('pricing');
-                }}
+                onClick={() => openUpgradePlans('plan_limit_notice')}
                 className="inline-flex items-center justify-center rounded-lg bg-amber-900 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-800"
               >
                 Se pakker
@@ -2520,7 +2551,7 @@ const saveMeetLink = async (link: string) => {
 
         {showSponsorCard && (
           <div className="mb-6">
-            <FreePlanSponsorCard />
+            <FreePlanSponsorCard onUpgrade={() => openUpgradePlans('free_plan_sponsor_card')} />
           </div>
         )}
 
@@ -4185,6 +4216,34 @@ Per Andersen,per@example.com,Norsk`}
                   Ja, slett time
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Plans Modal */}
+      {showUpgradePlans && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="mx-auto flex min-h-full w-full max-w-7xl items-center py-8">
+            <div className="w-full rounded-2xl bg-slate-50 p-4 shadow-2xl sm:p-6">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wider text-teal-700">Oppgrader Tutorflyt</p>
+                  <h2 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">Velg pakken som passer nå</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                    Sammenlign Start og Pro. Premium vises som forhåndsvisning til AI og avansert automatisering er klart.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowUpgradePlans(false)}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Lukk pakkevalg"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <PlanPicker currentPlan={userPlan} context="dashboard" onChoosePlan={handleChooseUpgradePlan} />
             </div>
           </div>
         </div>
