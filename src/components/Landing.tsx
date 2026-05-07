@@ -44,21 +44,30 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-8 items-center">
             <div className="max-w-2xl min-w-0 mx-auto text-center lg:mx-0 lg:text-left">
               <h1 className="text-3xl sm:text-6xl font-extrabold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight sm:leading-[1.08] break-words">
-                Slutt å mase om betaling. <span className="text-indigo-600">Begynn å undervise.</span>
+                Få betalt uten mas. <span className="text-indigo-600">Bruk tiden på undervisning.</span>
               </h1>
               <p className="text-base sm:text-xl text-slate-600 mb-6 sm:mb-8 leading-relaxed">
-                Det enkle kontrollpanelet bygget for norske privatlærere. Automatiser fakturering, styr timeplanen og imponerer elevene – alt fra mobilen.
+                Det enkle kontrollpanelet for norske privatlærere. Samle elever, timer, kalender og fakturering på ett sted – rett fra mobilen.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center lg:items-start">
                 <button 
                   onClick={() => onNavigate('signup')}
                   className="w-full sm:w-auto inline-flex justify-center items-center px-5 sm:px-6 py-3 text-sm sm:text-base font-bold rounded-xl text-white bg-orange-500 hover:bg-orange-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-center"
                 >
-                  Prøv gratis i 14 dager
+                  Start gratis
+                </button>
+                <button
+                  onClick={() => onNavigate('pricing')}
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-5 sm:px-6 py-3 text-sm sm:text-base font-bold rounded-xl text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all text-center"
+                >
+                  Se priser
                 </button>
               </div>
               <p className="mt-3 text-sm text-slate-500 font-medium">
                 Ingen binding. Ingen kredittkort kreves.
+              </p>
+              <p className="mt-2 text-xs sm:text-sm text-slate-500">
+                Gratis for nye privatlærere. Oppgrader når du trenger flere elever, flere timer og mer kontroll.
               </p>
               <div className="mt-6 sm:mt-8 flex items-start sm:items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left ring-1 ring-slate-100 lg:bg-transparent lg:p-0 lg:ring-0">
                 <div className="flex -space-x-2 shrink-0">
@@ -70,12 +79,19 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 </div>
                 <div className="flex min-w-0 flex-col">
                   <p className="text-sm text-slate-600 font-medium">
-                    Allerede <span className="text-indigo-600 font-bold">4 lærere i Agder</span> venter på tilgang
+                    <span className="text-indigo-600 font-bold">Bygget sammen med norske privatlærere</span>
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Brukt av lærere som ønsker stålkontroll på sin egen undervisning business
+                    Laget for hverdagen til privatlærere som vil ha bedre kontroll fra mobilen.
                   </p>
                 </div>
+              </div>
+              <div className="mt-5 flex flex-wrap justify-center gap-2 text-xs font-bold text-slate-600 lg:justify-start">
+                {['Elevoversikt', 'Timeplan', 'Kalender', 'Fakturering', 'Betalingsoversikt'].map((item) => (
+                  <span key={item} className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">
+                    {item}
+                  </span>
+                ))}
               </div>
             </div>
             
@@ -85,29 +101,29 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 <div className="absolute top-0 inset-x-0 h-6 bg-slate-900 rounded-b-3xl w-40 mx-auto z-20"></div>
                 <div className="bg-slate-50 w-full h-full flex flex-col relative z-10">
                   <div className="bg-indigo-600 text-white pt-11 sm:pt-12 pb-5 sm:pb-6 px-5 sm:px-6 rounded-b-3xl shadow-sm">
-                    <p className="text-indigo-100 text-xs sm:text-sm font-medium mb-1">Total inntjening</p>
-                    <h3 className="text-2xl sm:text-3xl font-bold">kr 12 450</h3>
+                    <p className="text-indigo-100 text-xs sm:text-sm font-medium mb-1">Dagens kontroll</p>
+                    <h3 className="text-2xl sm:text-3xl font-bold">3 timer</h3>
                   </div>
                   <div className="p-3 sm:p-4 flex-1 flex flex-col gap-3 sm:gap-4 mt-3 sm:mt-4">
                     <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 animate-fade-in-up">
-                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                        <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
-                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Mattehjelp - Jonas (Vipps)</p>
+                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Neste time</p>
+                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Matte R1 - Jonas kl. 14:00</p>
                       </div>
-                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">+450 kr</div>
+                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-indigo-600">I dag</div>
                     </div>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-2 sm:gap-3 opacity-70">
                       <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Vellykket betaling</p>
-                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Pianotime - Sofie (Kort)</p>
+                        <p className="font-bold text-xs sm:text-base leading-tight text-slate-900">Faktura sendt</p>
+                        <p className="text-[11px] sm:text-sm text-slate-500 truncate">Pianotime - Sofie (Vipps)</p>
                       </div>
-                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">+500 kr</div>
+                      <div className="ml-auto shrink-0 text-xs sm:text-base font-bold text-emerald-600">500 kr</div>
                     </div>
                   </div>
                 </div>
@@ -123,7 +139,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-16">
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-4">
-                Administrasjon skal ikke ta mer tid enn selve undervisningen.
+                Alt privatlæreren trenger på ett sted.
               </h2>
             </div>
             
@@ -132,9 +148,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-red-50 rounded-xl flex items-center justify-center mb-5 sm:mb-6">
                   <FileWarning className="h-7 w-7 text-red-500" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">Fakturerings-marerittet</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Elevoversikt</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  Bruker du søndagskvelden på å sjekke bankutskrifter og sende purringer på Vipps?
+                  Ha elever, kontaktinfo, fag og oppfølging samlet i et mobilvennlig kontrollpanel.
                 </p>
               </div>
               
@@ -142,9 +158,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-orange-50 rounded-xl flex items-center justify-center mb-5 sm:mb-6">
                   <MessageSquareWarning className="h-7 w-7 text-orange-500" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">WhatsApp-kaoset</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Timeplan og kalender</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  Er avtaler og beskjeder spredt over Messenger, SMS og Instagram?
+                  Få bedre oversikt over timer, faste avtaler og kalenderen din uten meldingskaos.
                 </p>
               </div>
               
@@ -152,9 +168,9 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-50 rounded-xl flex items-center justify-center mb-5 sm:mb-6">
                   <FileQuestion className="h-7 w-7 text-amber-500" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">«Hva gjorde vi sist?»</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Fakturering og betalingsoversikt</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  Sliter du med å holde oversikt over progresjonen til hver enkelt elev i et regneark som aldri fungerer på mobilen?
+                  Send betalingskrav, se hva som venter og hold kontroll på inntektene dine.
                 </p>
               </div>
             </div>
@@ -296,7 +312,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 },
                 {
                   title: "Enkelhet foran alt.",
-                  desc: "Du trenger ikke være IT-ekspert. Hvis du kan bruke Facebook, kan du bruke TutorFlyt."
+                  desc: "Du trenger ikke være IT-ekspert. Hvis du kan bruke Facebook, kan du bruke Tutorflyt."
                 },
                 {
                   title: "Laget for solo-lærere.",
@@ -326,7 +342,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
                 question="Hva koster det?" 
                 answer={
                   <div className="space-y-3">
-                    <p>TutorFlyt har gratisplan, Start til <span className="text-indigo-600 font-bold">79 kr/mnd</span> og Pro til <span className="text-indigo-600 font-bold">149 kr/mnd</span>.</p>
+                    <p>Tutorflyt har gratisplan, Start til <span className="text-indigo-600 font-bold">79 kr/mnd</span> og Pro til <span className="text-indigo-600 font-bold">149 kr/mnd</span>.</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>Kom i gang gratis uten kredittkort.</li>
                       <li>Ingen bindingstid eller skjulte gebyrer.</li>
@@ -340,7 +356,7 @@ export default function Landing({ onNavigate, setUser }: { onNavigate: (page: st
               />
               <AccordionItem 
                 question="Fungerer det på iPhone og Android?" 
-                answer="Ja, TutorFlyt er bygget for å fungere perfekt i nettleseren på alle mobiler. En egen app er også under utvikling og vil bli presentert på et senere tidspunkt." 
+                answer="Ja, Tutorflyt er bygget for å fungere perfekt i nettleseren på alle mobiler. En egen app er også under utvikling og vil bli presentert på et senere tidspunkt."
               />
             </div>
           </div>
