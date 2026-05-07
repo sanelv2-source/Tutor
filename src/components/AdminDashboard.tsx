@@ -67,6 +67,8 @@ type AdminSummary = {
   }>;
 };
 
+type AdminSection = 'dashboard' | 'funnel' | 'users' | 'activity' | 'plans';
+
 const numberFormatter = new Intl.NumberFormat('no-NO');
 
 const formatNumber = (value: number) => numberFormatter.format(value || 0);
@@ -131,6 +133,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [summary, setSummary] = React.useState<AdminSummary | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState('');
+  const [activeSection, setActiveSection] = React.useState<AdminSection>('dashboard');
 
   const loadSummary = React.useCallback(async () => {
     setIsLoading(true);
@@ -267,6 +270,20 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     : [];
 
   const maxFunnelValue = Math.max(...(summary?.funnel.map((step) => step.value) || [0]), 1);
+  const sectionTabs: Array<{
+    key: AdminSection;
+    label: string;
+    detail: string;
+    Icon: React.ComponentType<{ className?: string }>;
+  }> = summary
+    ? [
+        { key: 'dashboard', label: 'Dashboard', detail: 'Nøkkeltall og bruk', Icon: BarChart3 },
+        { key: 'funnel', label: 'Funnel', detail: 'Fra besøk til betalt', Icon: MousePointerClick },
+        { key: 'users', label: 'Brukere', detail: `${formatNumber(summary.users.length)} lærere`, Icon: Users },
+        { key: 'activity', label: 'Aktivitet', detail: `${formatNumber(summary.recentEvents.length)} siste events`, Icon: Activity },
+        { key: 'plans', label: 'Planer', detail: 'Gratis til Premium', Icon: PieChart },
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -323,13 +340,42 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </p>
             </div>
 
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {metricCards.map((card) => (
-                <MetricCard key={card.label} {...card} />
-              ))}
-            </section>
+            <nav aria-label="Adminseksjoner" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {sectionTabs.map(({ key, label, detail, Icon }) => {
+                const isActive = activeSection === key;
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveSection(key)}
+                    className={`flex min-h-20 items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                      isActive
+                        ? 'border-teal-500 bg-teal-50 text-teal-950 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black">{label}</span>
+                      <span className="mt-0.5 block text-xs font-medium text-slate-500">{detail}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {activeSection === 'dashboard' && (
+              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {metricCards.map((card) => (
+                  <MetricCard key={card.label} {...card} />
+                ))}
+              </section>
+            )}
+
+            {activeSection === 'funnel' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-lg font-black text-slate-950">Funnel</h2>
@@ -359,9 +405,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   );
                 })}
               </div>
-            </section>
+              </section>
+            )}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            {activeSection === 'dashboard' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-black text-slate-950">Kjernefunksjoner</h2>
               <div className="mt-5 divide-y divide-slate-100">
                 {summary.featureUsage.map((feature) => (
@@ -372,9 +420,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 ))}
               </div>
-            </section>
+              </section>
+            )}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            {activeSection === 'plans' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-black text-slate-950">Planfordeling</h2>
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {summary.planDistribution.map((item) => (
@@ -384,9 +434,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 ))}
               </div>
-            </section>
+              </section>
+            )}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            {activeSection === 'users' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <div>
                 <h2 className="text-lg font-black text-slate-950">Brukere</h2>
                 <p className="mt-1 text-sm text-slate-500">
@@ -428,9 +480,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </tbody>
                 </table>
               </div>
-            </section>
+              </section>
+            )}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            {activeSection === 'activity' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <div>
                 <h2 className="text-lg font-black text-slate-950">Aktivitet</h2>
                 <p className="mt-1 text-sm text-slate-500">Siste interne analytics-events med renset metadata.</p>
@@ -451,9 +505,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   ))
                 )}
               </div>
-            </section>
+              </section>
+            )}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            {activeSection === 'dashboard' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-lg font-black text-slate-950">Besøkende etter land</h2>
@@ -481,7 +537,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   ))
                 )}
               </div>
-            </section>
+              </section>
+            )}
           </div>
         )}
       </main>
