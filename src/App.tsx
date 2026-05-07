@@ -32,6 +32,11 @@ const INACTIVITY_TIMEOUT = 45 * 60 * 1000;
 const PASSWORD_RECOVERY_FLAG = 'tutorflyt_password_recovery';
 const ADMIN_EMAIL = 'info@tutorflyt.no';
 
+const isSchemaCacheColumnError = (error: any) => {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return /schema cache|Could not find .* column|column .* does not exist/i.test(message);
+};
+
 const isPasswordResetPage = () => {
   if (typeof window === 'undefined') return false;
   return window.location.pathname === '/reset-password';
@@ -120,11 +125,19 @@ export default function App() {
       let retries = 3;
 
       while (retries > 0) {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('profiles')
           .select('subscription_status, last_session_id, role, plan, force_password_change')
           .eq('id', session.user.id)
           .maybeSingle();
+
+        if (error && isSchemaCacheColumnError(error)) {
+          ({ data, error } = await supabase
+            .from('profiles')
+            .select('subscription_status, last_session_id, role, force_password_change')
+            .eq('id', session.user.id)
+            .maybeSingle());
+        }
         
         if (!error) {
           profile = data;
@@ -181,7 +194,7 @@ export default function App() {
       const isAdmin = profile?.role === 'admin' && email === ADMIN_EMAIL;
       const isStudent = !isAdmin && (!!studentData || session.user.user_metadata?.role === 'student' || profile?.role === 'student');
       const role = isAdmin ? 'admin' : isStudent ? 'student' : 'tutor';
-      const plan = role === 'admin' ? 'premium' : normalizePlan(profile?.plan);
+      const plan = role === 'admin' ? 'premium' : normalizePlan(profile?.plan || (profile?.subscription_status === 'active' ? 'pro' : 'free'));
       const hasPaid = role === 'student' || role === 'admin' || plan !== 'free' || profile?.subscription_status === 'active';
 
       setUser({
